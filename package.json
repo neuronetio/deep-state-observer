@@ -1,0 +1,59 @@
+{
+  "name": "deep-state-observer",
+  "version": "1.1.5",
+  "description": "Deep state observer is an state management library that will fire listeners only when specified object node (which also can be a wildcard) was changed.",
+  "main": "index.cjs.js",
+  "module": "index.js",
+  "browser": "index.js",
+  "scripts": {
+    "build": "rollup -c",
+    "test": "jasmine --config=./jasmine.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neuronetio/deep-state-observer.git"
+  },
+  "keywords": [
+    "deep state observer",
+    "deep state",
+    "deep store",
+    "svelte",
+    "react",
+    "vue",
+    "angular",
+    "deep",
+    "store",
+    "observer",
+    "subscribe",
+    "svelte",
+    "deep",
+    "store",
+    "svelte",
+    "deep",
+    "observer",
+    "svelte",
+    "deep",
+    "subscribe"
+  ],
+  "author": "neuronet.io@gmail.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/neuronetio/deep-state-observer/issues"
+  },
+  "homepage": "https://github.com/neuronetio/deep-state-observer#readme",
+  "dependencies": {
+    "fast-copy": "^2.0.3",
+    "ramda": "^0.26.1",
+    "wildstring": "^1.0.9"
+  },
+  "devDependencies": {
+    "jasmine": "^3.4.0",
+    "rollup": "^1.19.4",
+    "rollup-plugin-commonjs": "^10.0.2",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-typescript": "^1.0.1",
+    "svelte": "^3.8.0",
+    "tslib": "^1.10.0",
+    "typescript": "^3.5.3"
+  }
+}
