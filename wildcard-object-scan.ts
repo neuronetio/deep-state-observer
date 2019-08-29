@@ -1,3 +1,5 @@
+import { getWildcardStringMatcher } from 'superwild';
+
 export interface wildcardApi {
   get: (wildcardSplit: string | string[]) => {};
 }
@@ -6,6 +8,11 @@ export interface wildcardResult {
   [key: string]: any;
 }
 
+export const match = (first, second) => {
+  return getWildcardStringMatcher(first)(second);
+};
+
+/*
 export function wildcardToRegex(wildcard: string, delimeter: string = '.') {
   return new RegExp(
     '^' +
@@ -23,8 +30,34 @@ export function wildcardToRegex(wildcard: string, delimeter: string = '.') {
 }
 
 export function match(first: string, second: string, delimeter: string = '.'): boolean {
-  return wildcardToRegex(first, delimeter).test(second);
+  let created = '';
+  const longParts = first.split('**');
+  let longIndex = 0;
+  let secondIndex = 0;
+  for (const longPart of longParts) {
+    const nextLongChar = typeof longParts[longIndex + 1] !== 'undefined' ? longParts[longIndex + 1].charAt(0) : '';
+    const shortParts = longPart.split('*');
+    let shortIndex = 0;
+    for (const shortPart of shortParts) {
+      const nextShortChar =
+        typeof shortParts[shortIndex + 1] !== 'undefined' ? shortParts[shortIndex + 1].charAt(0) : '';
+      created += shortPart;
+      secondIndex += shortPart.length;
+      // iterate through second and stop on nextShortChar or ''
+      while (second.charAt(secondIndex) !== nextShortChar && second.charAt(secondIndex) !== delimeter) {
+        created += second.charAt(secondIndex);
+        secondIndex++;
+      }
+      shortIndex++;
+    }
+    // shortparts are done
+
+    longIndex++;
+  }
+  return created === second;
+  //return wildcardToRegex(first, delimeter).test(second);
 }
+*/
 
 export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
   const api = {
@@ -107,4 +140,4 @@ export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
   return api;
 }
 
-export default { scanObject, match, wildcardToRegex };
+export default { scanObject, match };

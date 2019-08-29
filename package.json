@@ -43,7 +43,8 @@
   "homepage": "https://github.com/neuronetio/deep-state-observer#readme",
   "dependencies": {
     "fast-copy": "^2.0.3",
-    "ramda": "^0.26.1"
+    "ramda": "^0.26.1",
+    "superwild": "0.0.7"
   },
   "devDependencies": {
     "jasmine": "^3.4.0",

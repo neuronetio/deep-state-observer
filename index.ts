@@ -11,7 +11,6 @@ export interface ListenerOptions {
 export interface Listener {
   fn: ListenerFunction;
   options: ListenerOptions;
-  regex: RegExp | undefined;
   match: Match | undefined;
 }
 
@@ -23,7 +22,6 @@ export interface ListenersCollection {
   isRecursive: boolean;
   hasParams: boolean;
   paramsInfo: ParamsInfo | undefined;
-  regex: RegExp | undefined;
   match: Match;
 }
 
@@ -49,7 +47,6 @@ export interface ParamsInfo {
 
 export const scanObject = wildcard.scanObject;
 export const match = wildcard.match;
-export const wildcardToRegex = wildcard.wildcardToRegex;
 
 const defaultOptions = { delimeter: '.', recursive: '...', param: ':' };
 const defaultListenerOptions = { bulk: false };
@@ -79,7 +76,7 @@ export default class DeepState {
       return true;
     }
     if (this.isWildcard(first)) {
-      return match(first, second, this.options.delimeter);
+      return match(first, second);
     }
     return false;
   }
@@ -176,7 +173,6 @@ export default class DeepState {
       isRecursive: false,
       isWildcard: false,
       hasParams: false,
-      regex: undefined,
       match: undefined,
       paramsInfo: undefined
     };
@@ -186,7 +182,6 @@ export default class DeepState {
     return {
       fn,
       options: { ...defaultListenerOptions, ...options },
-      regex: undefined,
       match: undefined
     };
   }
@@ -218,14 +213,11 @@ export default class DeepState {
       listenersCollection.hasParams = hasParams;
       listenersCollection.isRecursive = isRecursive;
       listenersCollection.paramsInfo = paramsInfo;
-      if (isWildcard) {
-        listenersCollection.regex = wildcard.wildcardToRegex(listenerPath, this.options.delimeter);
-      }
       listenersCollection.match = (path) => {
         if (isRecursive && this.recursiveMatch(listenerPath, path, false)) {
           return true;
         }
-        if (isWildcard && listenersCollection.regex.test(path)) {
+        if (isWildcard && wildcard.match(listenerPath, path)) {
           return true;
         }
         return listenerPath === path;
