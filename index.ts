@@ -81,17 +81,24 @@ export default class DeepState {
     if (first === second) {
       return true;
     }
-    if (this.isWildcard(first)) {
-      return match(first, second);
-    }
-    return false;
+    return this.isWildcard(first) ? match(first, second) : false;
+  }
+
+  cutPath(longer: string, shorter: string): string {
+    return this.split(this.cleanRecursivePath(longer))
+      .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
+      .join(this.options.delimeter);
+  }
+
+  trimPath(path: string): string {
+    return this.cleanRecursivePath(path).replace(
+      new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`),
+      ''
+    );
   }
 
   split(path: string) {
-    if (path === '') {
-      return [];
-    }
-    return path.split(this.options.delimeter);
+    return path === '' ? [] : path.split(this.options.delimeter);
   }
 
   isWildcard(path: string): boolean {
@@ -102,16 +109,12 @@ export default class DeepState {
     return path.endsWith(this.options.recursive);
   }
 
-  getRecursive(path: string): string {
-    return path.slice(0, -this.options.recursive.length);
+  cleanRecursivePath(path: string): string {
+    return this.isRecursive(path) ? path.slice(0, -this.options.recursive.length) : path;
   }
 
-  recursiveMatch(listenerPath: string, userPath: string, convert = true): boolean {
-    let normalized = listenerPath;
-    if (convert) {
-      normalized = this.getRecursive(listenerPath);
-    }
-    return userPath.slice(0, normalized.length) === normalized || normalized.slice(0, userPath.length) === userPath;
+  recursiveMatch(listenerPath: string, userPath: string): boolean {
+    return this.cutPath(this.cleanRecursivePath(listenerPath), userPath) === listenerPath;
   }
 
   hasParams(path: string) {
@@ -160,10 +163,10 @@ export default class DeepState {
     return result;
   }
 
-  subscribeAll(userPaths: string[], fn: ListenerFunction) {
+  subscribeAll(userPaths: string[], fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions) {
     let unsubscribers = [];
     for (const userPath of userPaths) {
-      unsubscribers.push(this.subscribe(userPath, fn));
+      unsubscribers.push(this.subscribe(userPath, fn, options));
     }
     return () => {
       for (const unsubscribe of unsubscribers) {
@@ -208,7 +211,7 @@ export default class DeepState {
     }
     const isWildcard = this.isWildcard(listenerPath);
     if (this.isRecursive(listenerPath)) {
-      listenerPath = this.getRecursive(listenerPath);
+      listenerPath = this.cleanRecursivePath(listenerPath);
       isRecursive = true;
     }
     let listenersCollection;
@@ -219,7 +222,7 @@ export default class DeepState {
       listenersCollection.isRecursive = isRecursive;
       listenersCollection.paramsInfo = paramsInfo;
       listenersCollection.match = (path) => {
-        if (isRecursive && this.recursiveMatch(listenerPath, path, false)) {
+        if (isRecursive && this.recursiveMatch(listenerPath, path)) {
           return true;
         }
         if (isWildcard && wildcard.match(listenerPath, path)) {
@@ -271,8 +274,81 @@ export default class DeepState {
     };
   }
 
-  update(userPath: string, fn: Updater) {
-    const lens = lensPath(this.split(userPath));
+  same(newValue, oldValue): boolean {
+    return (
+      (['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) || newValue === null) &&
+      oldValue === newValue
+    );
+  }
+
+  debugListener(listener: Listener, time: number, value, params, path, listenerPath) {
+    if (listener.options.debug) {
+      console.debug('listener updated', {
+        time: Date.now() - time,
+        value,
+        params,
+        path,
+        listenerPath
+      });
+    }
+  }
+
+  debugTime(listener: Listener): number {
+    return listener.options.debug ? Date.now() : 0;
+  }
+
+  notifySubscribedListeners(modifiedPath: string, newValue): string[] {
+    const alreadyNotified = [];
+    for (let listenerPath in this.listeners) {
+      const listenersCollection = this.listeners[listenerPath];
+      if (listenersCollection.match(modifiedPath)) {
+        alreadyNotified.push(listenerPath);
+        const value = listenersCollection.isRecursive ? this.get(this.cleanRecursivePath(listenerPath)) : newValue;
+        const params = listenersCollection.paramsInfo
+          ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
+          : undefined;
+        for (const listener of listenersCollection.listeners) {
+          const time = this.debugTime(listener);
+          listener.options.bulk
+            ? listener.fn([{ value, path: modifiedPath, params }], undefined, undefined)
+            : listener.fn(value, modifiedPath, params);
+          this.debugListener(listener, time, value, params, modifiedPath, listenerPath);
+        }
+      }
+    }
+    return alreadyNotified;
+  }
+
+  notifyNestedListeners(modifiedPath: string, newValue, alreadyNotified: string[]) {
+    for (let listenerPath in this.listeners) {
+      if (alreadyNotified.includes(listenerPath)) {
+        continue;
+      }
+      const listenersCollection = this.listeners[listenerPath];
+      const nestedPath = this.cutPath(modifiedPath, listenerPath);
+      if (this.match(nestedPath, modifiedPath)) {
+        const restPath = this.trimPath(listenerPath.substr(nestedPath.length));
+        const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
+        for (const currentRestPath in values) {
+          const value = values[currentRestPath];
+          const fullPath = [modifiedPath, currentRestPath].join(this.options.delimeter);
+          const params = listenersCollection.paramsInfo
+            ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
+            : undefined;
+          for (const listener of listenersCollection.listeners) {
+            const time = this.debugTime(listener);
+            listener.options.bulk
+              ? listener.fn([{ value, path: fullPath, params }], undefined, undefined)
+              : listener.fn(value, fullPath, params);
+            this.debugListener(listener, time, value, params, modifiedPath, listenerPath);
+          }
+        }
+      }
+    }
+  }
+
+  update(modifiedPath: string, fn: Updater) {
+    const lens = lensPath(this.split(modifiedPath));
     let oldValue = clone(view(lens, this.data));
     let newValue;
     if (typeof fn === 'function') {
@@ -280,71 +356,13 @@ export default class DeepState {
     } else {
       newValue = fn;
     }
-    if (
-      (['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) || newValue === null) &&
-      oldValue === newValue
-    ) {
+    if (this.same(newValue, oldValue)) {
       return newValue;
     }
     this.data = set(lens, newValue, this.data);
-    for (let listenerPath in this.listeners) {
-      const listenersCollection = this.listeners[listenerPath];
-      if (listenersCollection.match(userPath)) {
-        const bulkListeners = [];
-        const standardListeners = [];
-        for (const listener of listenersCollection.listeners) {
-          if (listener.options.bulk) {
-            bulkListeners.push(listener);
-          } else {
-            standardListeners.push(listener);
-          }
-        }
-        const value = listenersCollection.isRecursive ? this.get(this.getRecursive(listenerPath)) : newValue;
-        for (const listener of standardListeners) {
-          let time;
-          if (listener.options.debug) {
-            time = Date.now();
-          }
-          const params = listenersCollection.paramsInfo
-            ? this.getParams(listenersCollection.paramsInfo, userPath)
-            : undefined;
-          listener.fn(value, userPath, params);
-          if (listener.options.debug) {
-            console.debug('listener updated', {
-              time: Date.now() - time,
-              value,
-              params,
-              path: userPath,
-              listenerPath
-            });
-          }
-        }
-        for (const listener of bulkListeners) {
-          let time;
-          if (listener.options.debug) {
-            time = Date.now();
-          }
-          const params = listenersCollection.paramsInfo
-            ? this.getParams(listenersCollection.paramsInfo, userPath)
-            : undefined;
-          listener.fn([
-            {
-              value,
-              path: userPath,
-              params
-            }
-          ]);
-          if (listener.options.debug) {
-            console.debug('listener updated', {
-              time: Date.now() - time,
-              value,
-              params,
-              path: userPath,
-              listenerPath
-            });
-          }
-        }
-      }
+    const alreadyNotified = this.notifySubscribedListeners(modifiedPath, newValue);
+    if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {
+      this.notifyNestedListeners(modifiedPath, newValue, alreadyNotified);
     }
     return newValue;
   }

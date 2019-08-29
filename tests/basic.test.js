@@ -49,6 +49,24 @@ describe('State', () => {
     state.destroy();
   });
 
+  it('should notify nested subscribers about change', () => {
+    const state = new State({
+      one: { two: { three: { four: 'go!' } } }
+    });
+    const paths = [];
+    const values = [];
+    state.subscribe('one.two.three.four', (value, path) => {
+      values.push(value);
+      paths.push(path);
+    });
+    expect(paths[0]).toEqual('one.two.three.four');
+    expect(values[0]).toEqual('go!');
+
+    state.update('one', { two: { three: { four: 'modified' } } });
+    expect(paths[1]).toEqual('one.two.three.four');
+    expect(values[1]).toEqual('modified');
+  });
+
   it('should watch all paths', () => {
     const state = new State({ x: 10, y: 20, z: { xyz: 50 } });
     let result = {};
@@ -292,7 +310,7 @@ describe('State', () => {
     state.update('one.two.three.four', [{ x: 2 }, { y: 2 }, { z: 3 }]);
     expect(paths.length).toEqual(2);
     expect(values.length).toEqual(2);
-    expect(paths[1]).toEqual('one.two.three.four');
+    expect(paths[1]).toEqual('one.two.three.four.0');
     expect(values[1]).toEqual({ x: 2 });
   });
 
@@ -312,7 +330,7 @@ describe('State', () => {
     state.update('one.two.three.four', [{ x: 2 }, { y: 2 }, { z: 3 }]);
     expect(paths.length).toEqual(2);
     expect(values.length).toEqual(2);
-    expect(paths[1]).toEqual('one.two.three.four');
+    expect(paths[1]).toEqual('one.two.three.four.0.x');
     expect(values[1]).toEqual(2);
   });
 

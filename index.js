@@ -2604,52 +2604,6 @@ var browser_39 = browser.subsetKeySet;
 const match = (first, second) => {
     return browser_8(first)(second);
 };
-/*
-export function wildcardToRegex(wildcard: string, delimeter: string = '.') {
-  return new RegExp(
-    '^' +
-      wildcard
-        .split('**')
-        .map((part) => {
-          return part
-            .split('*')
-            .map((smallPart) => smallPart.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-            .join(`[^\\${delimeter}]*`);
-        })
-        .join(`.*`) +
-      '$'
-  );
-}
-
-export function match(first: string, second: string, delimeter: string = '.'): boolean {
-  let created = '';
-  const longParts = first.split('**');
-  let longIndex = 0;
-  let secondIndex = 0;
-  for (const longPart of longParts) {
-    const nextLongChar = typeof longParts[longIndex + 1] !== 'undefined' ? longParts[longIndex + 1].charAt(0) : '';
-    const shortParts = longPart.split('*');
-    let shortIndex = 0;
-    for (const shortPart of shortParts) {
-      const nextShortChar =
-        typeof shortParts[shortIndex + 1] !== 'undefined' ? shortParts[shortIndex + 1].charAt(0) : '';
-      created += shortPart;
-      secondIndex += shortPart.length;
-      // iterate through second and stop on nextShortChar or ''
-      while (second.charAt(secondIndex) !== nextShortChar && second.charAt(secondIndex) !== delimeter) {
-        created += second.charAt(secondIndex);
-        secondIndex++;
-      }
-      shortIndex++;
-    }
-    // shortparts are done
-
-    longIndex++;
-  }
-  return created === second;
-  //return wildcardToRegex(first, delimeter).test(second);
-}
-*/
 function scanObject(obj, delimeter = '.') {
     const api = {
         get(wildcard) {
@@ -2751,16 +2705,18 @@ class DeepState {
         if (first === second) {
             return true;
         }
-        if (this.isWildcard(first)) {
-            return match$1(first, second);
-        }
-        return false;
+        return this.isWildcard(first) ? match$1(first, second) : false;
+    }
+    cutPath(longer, shorter) {
+        return this.split(this.cleanRecursivePath(longer))
+            .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
+            .join(this.options.delimeter);
+    }
+    trimPath(path) {
+        return this.cleanRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`), '');
     }
     split(path) {
-        if (path === '') {
-            return [];
-        }
-        return path.split(this.options.delimeter);
+        return path === '' ? [] : path.split(this.options.delimeter);
     }
     isWildcard(path) {
         return path.indexOf('*') > -1;
@@ -2768,15 +2724,11 @@ class DeepState {
     isRecursive(path) {
         return path.endsWith(this.options.recursive);
     }
-    getRecursive(path) {
-        return path.slice(0, -this.options.recursive.length);
+    cleanRecursivePath(path) {
+        return this.isRecursive(path) ? path.slice(0, -this.options.recursive.length) : path;
     }
-    recursiveMatch(listenerPath, userPath, convert = true) {
-        let normalized = listenerPath;
-        if (convert) {
-            normalized = this.getRecursive(listenerPath);
-        }
-        return userPath.slice(0, normalized.length) === normalized || normalized.slice(0, userPath.length) === userPath;
+    recursiveMatch(listenerPath, userPath) {
+        return this.cutPath(this.cleanRecursivePath(listenerPath), userPath) === listenerPath;
     }
     hasParams(path) {
         return path.indexOf(this.options.param) > -1;
@@ -2822,10 +2774,10 @@ class DeepState {
         }
         return result;
     }
-    subscribeAll(userPaths, fn) {
+    subscribeAll(userPaths, fn, options = defaultListenerOptions) {
         let unsubscribers = [];
         for (const userPath of userPaths) {
-            unsubscribers.push(this.subscribe(userPath, fn));
+            unsubscribers.push(this.subscribe(userPath, fn, options));
         }
         return () => {
             for (const unsubscribe of unsubscribers) {
@@ -2867,7 +2819,7 @@ class DeepState {
         }
         const isWildcard = this.isWildcard(listenerPath);
         if (this.isRecursive(listenerPath)) {
-            listenerPath = this.getRecursive(listenerPath);
+            listenerPath = this.cleanRecursivePath(listenerPath);
             isRecursive = true;
         }
         let listenersCollection;
@@ -2878,7 +2830,7 @@ class DeepState {
             listenersCollection.isRecursive = isRecursive;
             listenersCollection.paramsInfo = paramsInfo;
             listenersCollection.match = (path) => {
-                if (isRecursive && this.recursiveMatch(listenerPath, path, false)) {
+                if (isRecursive && this.recursiveMatch(listenerPath, path)) {
                     return true;
                 }
                 if (isWildcard && wildcard.match(listenerPath, path)) {
@@ -2928,8 +2880,74 @@ class DeepState {
             }
         };
     }
-    update(userPath, fn) {
-        const lens = lensPath(this.split(userPath));
+    same(newValue, oldValue) {
+        return ((['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) || newValue === null) &&
+            oldValue === newValue);
+    }
+    debugListener(listener, time, value, params, path, listenerPath) {
+        if (listener.options.debug) {
+            console.debug('listener updated', {
+                time: Date.now() - time,
+                value,
+                params,
+                path,
+                listenerPath
+            });
+        }
+    }
+    debugTime(listener) {
+        return listener.options.debug ? Date.now() : 0;
+    }
+    notifySubscribedListeners(modifiedPath, newValue) {
+        const alreadyNotified = [];
+        for (let listenerPath in this.listeners) {
+            const listenersCollection = this.listeners[listenerPath];
+            if (listenersCollection.match(modifiedPath)) {
+                alreadyNotified.push(listenerPath);
+                const value = listenersCollection.isRecursive ? this.get(this.cleanRecursivePath(listenerPath)) : newValue;
+                const params = listenersCollection.paramsInfo
+                    ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
+                    : undefined;
+                for (const listener of listenersCollection.listeners) {
+                    const time = this.debugTime(listener);
+                    listener.options.bulk
+                        ? listener.fn([{ value, path: modifiedPath, params }], undefined, undefined)
+                        : listener.fn(value, modifiedPath, params);
+                    this.debugListener(listener, time, value, params, modifiedPath, listenerPath);
+                }
+            }
+        }
+        return alreadyNotified;
+    }
+    notifyNestedListeners(modifiedPath, newValue, alreadyNotified) {
+        for (let listenerPath in this.listeners) {
+            if (alreadyNotified.includes(listenerPath)) {
+                continue;
+            }
+            const listenersCollection = this.listeners[listenerPath];
+            const nestedPath = this.cutPath(modifiedPath, listenerPath);
+            if (this.match(nestedPath, modifiedPath)) {
+                const restPath = this.trimPath(listenerPath.substr(nestedPath.length));
+                const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
+                for (const currentRestPath in values) {
+                    const value = values[currentRestPath];
+                    const fullPath = [modifiedPath, currentRestPath].join(this.options.delimeter);
+                    const params = listenersCollection.paramsInfo
+                        ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
+                        : undefined;
+                    for (const listener of listenersCollection.listeners) {
+                        const time = this.debugTime(listener);
+                        listener.options.bulk
+                            ? listener.fn([{ value, path: fullPath, params }], undefined, undefined)
+                            : listener.fn(value, fullPath, params);
+                        this.debugListener(listener, time, value, params, modifiedPath, listenerPath);
+                    }
+                }
+            }
+        }
+    }
+    update(modifiedPath, fn) {
+        const lens = lensPath(this.split(modifiedPath));
         let oldValue = fastCopy(view(lens, this.data));
         let newValue;
         if (typeof fn === 'function') {
@@ -2938,70 +2956,13 @@ class DeepState {
         else {
             newValue = fn;
         }
-        if ((['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) || newValue === null) &&
-            oldValue === newValue) {
+        if (this.same(newValue, oldValue)) {
             return newValue;
         }
         this.data = set(lens, newValue, this.data);
-        for (let listenerPath in this.listeners) {
-            const listenersCollection = this.listeners[listenerPath];
-            if (listenersCollection.match(userPath)) {
-                const bulkListeners = [];
-                const standardListeners = [];
-                for (const listener of listenersCollection.listeners) {
-                    if (listener.options.bulk) {
-                        bulkListeners.push(listener);
-                    }
-                    else {
-                        standardListeners.push(listener);
-                    }
-                }
-                const value = listenersCollection.isRecursive ? this.get(this.getRecursive(listenerPath)) : newValue;
-                for (const listener of standardListeners) {
-                    let time;
-                    if (listener.options.debug) {
-                        time = Date.now();
-                    }
-                    const params = listenersCollection.paramsInfo
-                        ? this.getParams(listenersCollection.paramsInfo, userPath)
-                        : undefined;
-                    listener.fn(value, userPath, params);
-                    if (listener.options.debug) {
-                        console.debug('listener updated', {
-                            time: Date.now() - time,
-                            value,
-                            params,
-                            path: userPath,
-                            listenerPath
-                        });
-                    }
-                }
-                for (const listener of bulkListeners) {
-                    let time;
-                    if (listener.options.debug) {
-                        time = Date.now();
-                    }
-                    const params = listenersCollection.paramsInfo
-                        ? this.getParams(listenersCollection.paramsInfo, userPath)
-                        : undefined;
-                    listener.fn([
-                        {
-                            value,
-                            path: userPath,
-                            params
-                        }
-                    ]);
-                    if (listener.options.debug) {
-                        console.debug('listener updated', {
-                            time: Date.now() - time,
-                            value,
-                            params,
-                            path: userPath,
-                            listenerPath
-                        });
-                    }
-                }
-            }
+        const alreadyNotified = this.notifySubscribedListeners(modifiedPath, newValue);
+        if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {
+            this.notifyNestedListeners(modifiedPath, newValue, alreadyNotified);
         }
         return newValue;
     }
