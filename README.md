@@ -60,34 +60,231 @@ subscribers.push(
     state.update('someOther.nested', 'nested changed after some changed');
 );
 
-// you can also use wildcards!! :O
+onDestroy(() => {
+  subscribers.forEach((unsubscribe) => unsubscribe());
+});
+```
+
+## Wildcards
+
+```javascript
+import { onDestroy } from 'svelte';
+import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+
+// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
+const state = new State({ some: 'value', someOther: { nested: { node: 'ok' } } }, { delimeter: '.' });
+
+// store some unsubscribe methods
+let subscribers = [];
+
 subscribers.push(
-  state.subscribe('someOther.**', (value, path)=>{
-    console.log(value);
+  state.subscribe('someOther.*.n*e', (value, path) => {
+    // fired only once with
+    // value = 'ok'
+    // path = 'someOther.nested.node'
   })
 );
 
 subscribers.push(
-  state.subscribe('some*.*.bla*.*bla*.bla', (value, path)=>{
-    console.log(value);
+  state.subscribe('someOther.**', (value, path) => {
+    // this function will be fired two times with those parameters:
+    //
+    // value={node:'ok'}
+    // path = 'someOther.nested'
+    //
+    // OR
+    //
+    // value='ok'
+    // path='someOther.nested.node'
   })
 );
 
-// by default three dots at the end of path will result in recursive listening
-subscribers.push(
-  state.subscribe('someOther...', (value, path)=>{
-    console.log(value);
-  })
-)
+onDestroy(() => {
+  subscribers.forEach((unsubscribe) => unsubscribe());
+});
+```
+
+## Named wildcards (parameters)
+
+```javascript
+import { onDestroy } from 'svelte';
+import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+
+// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
+const state = new State({
+  items: [{ val: 1 }, { val: 2 }, { val: 3 }],
+  byId: {
+    1: { val: 1 },
+    2: { val: 2 },
+    3: { val: 3 }
+  }
+});
+
+// store some unsubscribe methods
+let subscribers = [];
 
 subscribers.push(
-  state.subscribe('someOther.nested...', (value, path)=>{
-    console.log(value);
+  state.subscribe('items.:index.val', (value, path, params) => {
+    // fired three times
+    //
+    // #1
+    // value = 1
+    // path = 'items.0.val'
+    // params = { index: 0 }
+    //
+    // #2
+    // value = 2
+    // path = 'items.1.val'
+    // params = { index: 1 }
+    //
+    // #3
+    // value = 3
+    // path = 'items.2.val'
+    // params = { index: 2 }
   })
-)
+);
 
-let currentState = state.get();
-console.log(currentState.some); //-> { some: 'value', someOther: { nested: 'new value' } }
+subscribers.push(
+  state.subscribe('byId.:id.val', (value, path, params) => {
+    // fired three times
+    //
+    // #1
+    // value = 1
+    // path = 'byId.1.val'
+    // params = { id: 1 }
+    //
+    // #2
+    // value = 2
+    // path = 'byId.2.val'
+    // params = { id: 2 }
+    //
+    // #3
+    // value = 3
+    // path = 'byId.3.val'
+    // params = { id: 3 }
+  })
+);
+onDestroy(() => {
+  subscribers.forEach((unsubscribe) => unsubscribe());
+});
+```
+
+## Wildcard bulk operations (better performance)
+
+```javascript
+import { onDestroy } from 'svelte';
+import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+
+// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
+const state = new State({
+  byId: {
+    1: { val: 1 },
+    2: { val: 2 },
+    3: { val: 3 }
+  }
+});
+
+// store some unsubscribe methods
+let subscribers = [];
+
+subscribers.push(
+  state.subscribe(
+    'byId.:id.val',
+    (bulk) => {
+      // fired only once where bulk = [
+      //  {
+      //    value: 1,
+      //    path: 'byId.1.val',
+      //    params: { id: 1 }
+      //  },
+      //  {
+      //    value: 2,
+      //    path: 'byId.2.val',
+      //    params: { id: 2 }
+      //  },
+      //  {
+      //    value: 3,
+      //    path: 'byId.3.val',
+      //    params: { id: 3 }
+      //  },
+      // ]
+    },
+    { bulk: true }
+  )
+);
+
+subscribers.push(
+  state.subscribe(
+    'byId.*.val',
+    (bulk) => {
+      // fired only once where bulk = [
+      //  {
+      //    value: 1,
+      //    path: 'byId.1.val',
+      //    params: undefined
+      //  },
+      //  {
+      //    value: 2,
+      //    path: 'byId.2.val',
+      //    params: undefined
+      //  },
+      //  {
+      //    value: 3,
+      //    path: 'byId.3.val',
+      //    params: undefined
+      //  },
+      // ]
+    },
+    { bulk: true }
+  )
+);
+
+onDestroy(() => {
+  subscribers.forEach((unsubscribe) => unsubscribe());
+});
+```
+
+## Observe all node changes (recursive, nested)
+
+```javascript
+import { onDestroy } from 'svelte';
+import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+
+// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
+const state = new State({ some: 'value', someOther: { nested: { node: 'ok' } } }, { delimeter: '.' });
+
+// store some unsubscribe methods
+let subscribers = [];
+
+subscribers.push(
+  state.subscribe('someOther...', (value, path) => {
+    // fired two times
+    //
+    // #1 - immediately with
+    // value = { nested: { node: 'ok' } }
+    // path = 'someOther'
+    //
+    // #2 - after update
+    // value = { nested: { node: 'modified' } }
+    // path = 'someOther.nested.node'
+  })
+);
+
+subscribers.push(
+  state.subscribe('someOther.nested...', (value, path) => {
+    // fired two times
+    //
+    // #1 - immediately with
+    // value =  { node: 'ok' }
+    // path = 'someOther'
+    //
+    // #2 - after update
+    // value = { node: 'modified' }
+    // path = 'someOther.nested.node'
+  })
+);
+
+state.update('someOther.nested.node', 'modified');
 
 onDestroy(() => {
   subscribers.forEach((unsubscribe) => unsubscribe());
