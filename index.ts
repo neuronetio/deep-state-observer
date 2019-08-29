@@ -1,6 +1,6 @@
-import { path, set, view, lensPath, equals } from 'ramda';
+import { path, set, view, lensPath } from 'ramda';
 import clone from 'fast-copy';
-import wildstring from 'wildstring';
+import { scanObject, match, wildcardToRegex } from './wildcard-object-scan';
 
 export type Listener = (value: any, path: string) => {};
 export type ListenerAll = (valueOrPath: any, value: any | undefined) => {};
@@ -10,7 +10,7 @@ export interface IListeners {
   [key: string]: Listener[];
 }
 
-export default class Store {
+class Store {
   listeners: IListeners;
   data: any;
   options: any;
@@ -35,7 +35,7 @@ export default class Store {
       return true;
     }
     if (this.isWildcard(first)) {
-      return wildstring.match(first, second);
+      return match(first, second, this.options.delimeter);
     }
     return false;
   }
@@ -67,11 +67,7 @@ export default class Store {
     };
   }
 
-  watchAll(userPaths, fn) {
-    return this.subscribeAll(userPaths, fn);
-  }
-
-  subscribe(userPath: string | Listener, fn: Listener | undefined, execute = true) {
+  subscribe(userPath: string, fn: Listener, execute = true) {
     if (typeof userPath === 'function') {
       fn = userPath;
       userPath = '';
@@ -80,14 +76,17 @@ export default class Store {
       this.listeners[userPath] = [];
     }
     this.listeners[userPath].push(fn);
-    if (execute && !this.isWildcard(userPath)) {
+    const isWildcard = this.isWildcard(userPath);
+    if (execute && !isWildcard) {
       fn(path(this.split(userPath), this.data), userPath);
     }
+    if (isWildcard) {
+      const paths = scanObject(this.data, this.options.delimeter).get(userPath);
+      for (const path in paths) {
+        fn(paths[path], path);
+      }
+    }
     return this.unsubscribe(fn);
-  }
-
-  watch(userPath: string | Listener, fn: Listener | undefined) {
-    return this.subscribe(userPath, fn);
   }
 
   unsubscribe(fn: Listener) {
@@ -101,15 +100,7 @@ export default class Store {
     };
   }
 
-  unwatch(fn: Listener) {
-    return this.unsubscribe(fn);
-  }
-
-  update(userPath: string | Updater, fn: Updater | undefined, filter = (path, key) => true) {
-    if (typeof userPath === 'function') {
-      fn = userPath;
-      userPath = '';
-    }
+  update(userPath: string, fn: Updater) {
     const lens = lensPath(this.split(userPath));
     let oldValue = clone(view(lens, this.data));
     let newValue;
@@ -127,17 +118,12 @@ export default class Store {
     this.data = set(lens, newValue, this.data);
     for (const currentPath in this.listeners) {
       if (this.match(currentPath, userPath)) {
-        let currentPathSplit = this.split(currentPath);
         for (const listener of this.listeners[currentPath]) {
-          listener(path(currentPathSplit, this.data), userPath);
+          listener(newValue, userPath);
         }
       }
     }
     return newValue;
-  }
-
-  set(userPath: string | Updater, fn: Updater | undefined) {
-    return this.update(userPath, fn);
   }
 
   get(userPath: string | undefined = undefined) {
@@ -151,3 +137,5 @@ export default class Store {
     return clone(obj);
   }
 }
+
+export default { scanObject, match, wildcardToRegex, Store };

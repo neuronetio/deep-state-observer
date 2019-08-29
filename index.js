@@ -1245,182 +1245,100 @@ var fastCopy = createCommonjsModule(function (module, exports) {
 
 });
 
-var wildstring_1 = createCommonjsModule(function (module) {
-
-/**
-* @namespace wildstring
-* @property {string} wildcard the wildcard to use in your strings, defaults to '*'
-* @property {boolean} caseSensitive whether matches should care about case, defaults to true
-*/
-var wildstring = {
-	wildcard: '*',
-	caseSensitive: true,
-
-	/**
-	* When a match doesn't continue to the end of the string, this function rolls back to try again with the rest of the string
-	* @memberof wildstring
-	* @access private
-	* @param {string[]} rollbackStrings The list of substrings that appeared prior to the current match
-	* @param {string[]} patternSubstrings The matching list of pattens that need to be matched before the current pattern
-	*/
-	checkRollbackStrings: function (rollbackStrings, patternSubstrings) {
-		for (var s = 0; s < rollbackStrings.length; ++s) {
-			var currentString = rollbackStrings[s].string;	// starting with the rolled back string
-			var patternIndex = rollbackStrings[s].index;
-
-			while (patternIndex < patternSubstrings.length) {
-				if (currentString.indexOf(patternSubstrings[patternIndex]) === -1) {
-					break;
-				}
-
-				var testString = currentString.substr(1);	//remove just one char to retest
-				rollbackStrings.push({ string: testString, index: patternIndex });
-				if (testString.indexOf(patternSubstrings[patternIndex]) === -1) {
-					rollbackStrings.pop();
-				}
-
-				currentString = currentString.substr(
-					currentString.indexOf(patternSubstrings[patternIndex]) + patternSubstrings[patternIndex].length
-				);
-
-				patternIndex++;
-				while (patternSubstrings[patternIndex] === '') {
-					patternIndex++;
-				}
-
-				if (patternIndex >= patternSubstrings.length) {
-					if (patternSubstrings[patternSubstrings.length - 1] !== '' &&
-						currentString.length > 0) {
-						// not ending with a wildcard, we need to backtrack
-						break;
-					}
-					else {
-						return true;
-					}
-				}
-			}
-		}
-
-		return false;
-	},
-
-	/**
-	* Check if a string matches a pattern
-	* @memberof wildstring
-	* @param {string} pattern The pattern to match using the configured wildcard
-	* @param {string} string The string to test for a match
-	*/
-	match: function (pattern, string) {
-		// if there are no wildcards, must be exact
-		if (pattern.indexOf(wildstring.wildcard) === -1) {
-			return pattern === string;
-		}
-		if (!wildstring.caseSensitive) {
-			pattern = pattern.toLowerCase();
-			string = string.toLowerCase();
-		}
-		var patternSubstrings = pattern.split(wildstring.wildcard);
-		
-		var patternIndex = 0;
-		var currentString = string;
-
-		// find pattern beginning
-		while (patternSubstrings[patternIndex] === '') {
-			patternIndex++;
-			// if the pattern is just wildcards, it matches
-			if (patternIndex === pattern.length) {
-				return true;
-			}
-		}
-
-		if (patternIndex === 0 && string.indexOf(patternSubstrings[0]) !== 0) {
-			// not starting with a wildcard
-			return false;
-		}
-
-		var rollbackStrings = [];
-
-		while (patternIndex < patternSubstrings.length) {
-			if (currentString.indexOf(patternSubstrings[patternIndex]) === -1) {
-				return wildstring.checkRollbackStrings(rollbackStrings, patternSubstrings);
-			}
-			
-			// create a queue of strings to roll back and try again if we fail later
-			var testString = currentString.substr(1);	//remove just one char to retest
-			rollbackStrings.push({ string: testString, index: patternIndex });
-			if (testString.indexOf(patternSubstrings[patternIndex]) === -1) {
-				rollbackStrings.pop();
-			}
-
-			currentString = currentString.substr(
-				currentString.indexOf(patternSubstrings[patternIndex]) + patternSubstrings[patternIndex].length
-			);
-
-			patternIndex++;
-			while (patternSubstrings[patternIndex] === '') {
-				patternIndex++;
-			}
-		}
-
-		if (patternIndex >= patternSubstrings.length &&
-				patternSubstrings[patternSubstrings.length - 1] !== '' &&
-				currentString.length > 0) {
-			// not ending with a wildcard, we need to backtrack
-			if (currentString === string) { // this string doesn't even match a little
-				return false;
-			}
-
-			return wildstring.checkRollbackStrings(rollbackStrings, patternSubstrings);
-		}
-
-		return true;
-	},
-
-	/**
-	* Replace wildcards in a pattern with strings (string interpolation)
-	* @memberof wildstring
-	* @param {string} pattern The start string, using wildcards as placeholders
-	* @param {string|string[]} strings The string or strings to replace the wildcards in the pattern.
-	* 	If you pass a single string, it will replace all the wildcards with the string.
-	* 	If you pass an array of strings, they will replace the wildcards in order from left to right.
-	* @throws The number of items in the strings array (if you pass an array) must match the number of wildcards in the pattern string.
-	* @throws You need to pass both parameters
-	* @throws You need to pass the right types
-	*/
-	replace: function (pattern, strings) {
-		if (pattern === undefined || strings === undefined) {
-			throw new Error('wildstring.replace takes the pattern as one parameter and either a string or an array of strings as the second.  You didn\'t pass enough parameters.');
-		}
-		if (typeof(strings) === typeof('')) {
-			return pattern.replace(wildstring.wildcard, strings);
-		}
-		if (!Array.isArray(strings) || typeof(pattern) !== typeof('')) {
-			throw new Error('wildstring.replace takes the pattern as one parameter and either a string or an array of strings as the second.  Your parameter types are incorrect.');
-		}
-		if (pattern.indexOf(wildstring.wildcard) === -1) {
-			return pattern; // if there are no wildcards, just return the pattern
-		}
-		var patternSubstrings = pattern.split(wildstring.wildcard);
-		if (patternSubstrings.length - 1 !== strings.length) {
-			var message = 'There are a different number of wildcards than strings to replace them. You have ' +
-				wildstring.wildcard +' wildcards in "' + wildstring.wildcard + '" and ' + wildstring.wildcard +
-				' replacement strings.';
-			throw new Error(wildstring.replace(message, [ patternSubstrings.length - 1, pattern, strings.length ]));
-		}
-
-		var result = '';
-
-		for (var s = 0; s < strings.length; ++s) {
-			result += patternSubstrings[s] + strings[s];
-		}
-
-		return result;
-	}
-};
-
-{ module.exports = wildstring; }
-if (typeof(angular) !== 'undefined') { angular.module('wildstring', []).factory('wildstring', function() { return wildstring; }); }
-});
+function wildcardToRegex(wildcard, delimeter = '.') {
+    return new RegExp('^' +
+        wildcard
+            .split('**')
+            .map((part) => {
+            return part
+                .split('*')
+                .map((smallPart) => smallPart.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+                .join(`[^\\${delimeter}]*`);
+        })
+            .join(`.*`) +
+        '$');
+}
+function match(first, second, delimeter = '.') {
+    return wildcardToRegex(first, delimeter).test(second);
+}
+function scanObject(obj, delimeter = '.') {
+    const api = {
+        get(wildcard) {
+            const wildcardSplit = prepareWildcardSplit(wildcard);
+            if (wildcardSplit.length === 0) {
+                return obj;
+            }
+            return handleObject(wildcardSplit, obj, 0, '');
+        }
+    };
+    function prepareWildcardSplit(wildcardSplit) {
+        if (typeof wildcardSplit === 'string') {
+            if (wildcardSplit === '') {
+                wildcardSplit = [];
+            }
+            else {
+                wildcardSplit = wildcardSplit.split(delimeter);
+            }
+        }
+        return wildcardSplit;
+    }
+    function isEnd(wildcardSplit, partIndex) {
+        return wildcardSplit.length - 1 <= partIndex;
+    }
+    function goFurther(wildcardSplit, currentObj, partIndex, currentPath, result) {
+        if (Array.isArray(currentObj)) {
+            handleArray(wildcardSplit, currentObj, partIndex, currentPath, result);
+        }
+        else if (currentObj.constructor.name === 'Object') {
+            handleObject(wildcardSplit, currentObj, partIndex, currentPath, result);
+        }
+    }
+    function handleArray(wildcardSplit, currentArr, partIndex, path, result = {}) {
+        const currentWildcardPath = wildcardSplit.slice(0, partIndex + 1).join(delimeter);
+        const end = isEnd(wildcardSplit, partIndex);
+        const fullWildcard = currentWildcardPath.indexOf('**') > -1;
+        const traverse = !end || fullWildcard;
+        let index = 0;
+        for (const item of currentArr) {
+            const currentPath = path === '' ? path + index : path + delimeter + index;
+            if (match(currentWildcardPath, currentPath)) {
+                if (end) {
+                    result[currentPath] = item;
+                }
+                if (traverse) {
+                    goFurther(wildcardSplit, item, partIndex + 1, currentPath, result);
+                }
+            }
+            else if (fullWildcard) {
+                goFurther(wildcardSplit, item, partIndex + 1, currentPath, result);
+            }
+            index++;
+        }
+        return result;
+    }
+    function handleObject(wildcardSplit, currentObj, partIndex, path, result = {}) {
+        const currentWildcardPath = wildcardSplit.slice(0, partIndex + 1).join(delimeter);
+        const end = isEnd(wildcardSplit, partIndex);
+        const fullWildcard = currentWildcardPath.indexOf('**') > -1;
+        const traverse = !end || fullWildcard;
+        for (const key in currentObj) {
+            const currentPath = path === '' ? path + key : path + delimeter + key;
+            if (match(currentWildcardPath, currentPath)) {
+                if (end) {
+                    result[currentPath] = currentObj[key];
+                }
+                if (traverse) {
+                    goFurther(wildcardSplit, currentObj[key], partIndex + 1, currentPath, result);
+                }
+            }
+            else if (fullWildcard) {
+                goFurther(wildcardSplit, currentObj[key], partIndex + 1, currentPath, result);
+            }
+        }
+        return result;
+    }
+    return api;
+}
 
 class Store {
     constructor(data = {}, options = { delimeter: '.' }) {
@@ -1440,7 +1358,7 @@ class Store {
             return true;
         }
         if (this.isWildcard(first)) {
-            return wildstring_1.match(first, second);
+            return match(first, second, this.options.delimeter);
         }
         return false;
     }
@@ -1468,9 +1386,6 @@ class Store {
             unsubscribers = [];
         };
     }
-    watchAll(userPaths, fn) {
-        return this.subscribeAll(userPaths, fn);
-    }
     subscribe(userPath, fn, execute = true) {
         if (typeof userPath === 'function') {
             fn = userPath;
@@ -1480,13 +1395,17 @@ class Store {
             this.listeners[userPath] = [];
         }
         this.listeners[userPath].push(fn);
-        if (execute && !this.isWildcard(userPath)) {
+        const isWildcard = this.isWildcard(userPath);
+        if (execute && !isWildcard) {
             fn(path(this.split(userPath), this.data), userPath);
         }
+        if (isWildcard) {
+            const paths = scanObject(this.data, this.options.delimeter).get(userPath);
+            for (const path in paths) {
+                fn(paths[path], path);
+            }
+        }
         return this.unsubscribe(fn);
-    }
-    watch(userPath, fn) {
-        return this.subscribe(userPath, fn);
     }
     unsubscribe(fn) {
         return () => {
@@ -1498,14 +1417,7 @@ class Store {
             }
         };
     }
-    unwatch(fn) {
-        return this.unsubscribe(fn);
-    }
-    update(userPath, fn, filter = (path, key) => true) {
-        if (typeof userPath === 'function') {
-            fn = userPath;
-            userPath = '';
-        }
+    update(userPath, fn) {
         const lens = lensPath(this.split(userPath));
         let oldValue = fastCopy(view(lens, this.data));
         let newValue;
@@ -1522,16 +1434,12 @@ class Store {
         this.data = set(lens, newValue, this.data);
         for (const currentPath in this.listeners) {
             if (this.match(currentPath, userPath)) {
-                let currentPathSplit = this.split(currentPath);
                 for (const listener of this.listeners[currentPath]) {
-                    listener(path(currentPathSplit, this.data), userPath);
+                    listener(newValue, userPath);
                 }
             }
         }
         return newValue;
-    }
-    set(userPath, fn) {
-        return this.update(userPath, fn);
     }
     get(userPath = undefined) {
         if (typeof userPath === 'undefined' || userPath === '') {
@@ -1543,5 +1451,6 @@ class Store {
         return fastCopy(obj);
     }
 }
+var index = { scanObject, match, wildcardToRegex, Store };
 
-export default Store;
+export default index;
