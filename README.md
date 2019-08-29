@@ -32,10 +32,10 @@ subscribers.push(
 
 let some;
 subscribers.push(
-  state.subscribeAll(['some', 'someOther'], (which, value) => {
-    if (which === 'some') {
+  state.subscribeAll(['some', 'someOther'], (value, path) => {
+    if (path === 'some') {
       some = value;
-    } else if (which === 'someOther') {
+    } else if (path === 'someOther') {
       nestedValue = value.nested;
     }
   })
