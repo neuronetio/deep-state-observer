@@ -1387,15 +1387,8 @@ class DeepStore {
     }
     subscribeAll(userPaths, fn) {
         let unsubscribers = [];
-        for (let userPath of userPaths) {
-            let original = userPath;
-            if (this.isRecursive(userPath)) {
-                userPath = this.getRecursive(userPath);
-            }
-            const wrappedSubscriber = ((newValue, path) => {
-                fn(newValue, userPath);
-            });
-            unsubscribers.push(this.subscribe(original, wrappedSubscriber));
+        for (const userPath of userPaths) {
+            unsubscribers.push(this.subscribe(userPath, fn));
         }
         return () => {
             for (const unsubscribe of unsubscribers) {
