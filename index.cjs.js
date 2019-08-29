@@ -1,5 +1,7 @@
 'use strict';
 
+Object.defineProperty(exports, '__esModule', { value: true });
+
 function _isPlaceholder(a) {
        return a != null && typeof a === 'object' && a['@@functional/placeholder'] === true;
 }
@@ -1341,8 +1343,12 @@ function scanObject(obj, delimeter = '.') {
     }
     return api;
 }
+var wildcard = { scanObject, match, wildcardToRegex };
 
-class Store {
+const scanObject$1 = wildcard.scanObject;
+const match$1 = wildcard.match;
+const wildcardToRegex$1 = wildcard.wildcardToRegex;
+class DeepStore {
     constructor(data = {}, options = { delimeter: '.' }) {
         this.listeners = {};
         this.data = data;
@@ -1360,7 +1366,7 @@ class Store {
             return true;
         }
         if (this.isWildcard(first)) {
-            return match(first, second, this.options.delimeter);
+            return match$1(first, second, this.options.delimeter);
         }
         return false;
     }
@@ -1402,7 +1408,7 @@ class Store {
             fn(path(this.split(userPath), this.data), userPath);
         }
         if (isWildcard) {
-            const paths = scanObject(this.data, this.options.delimeter).get(userPath);
+            const paths = scanObject$1(this.data, this.options.delimeter).get(userPath);
             for (const path in paths) {
                 fn(paths[path], path);
             }
@@ -1453,6 +1459,10 @@ class Store {
         return fastCopy(obj);
     }
 }
-var index = { scanObject, match, wildcardToRegex, Store };
+const Store = DeepStore;
 
-module.exports = index;
+exports.Store = Store;
+exports.default = DeepStore;
+exports.match = match$1;
+exports.scanObject = scanObject$1;
+exports.wildcardToRegex = wildcardToRegex$1;

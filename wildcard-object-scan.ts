@@ -106,3 +106,5 @@ export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
 
   return api;
 }
+
+export default { scanObject, match, wildcardToRegex };

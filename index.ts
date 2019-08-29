@@ -1,6 +1,6 @@
 import { path, set, view, lensPath } from 'ramda';
 import clone from 'fast-copy';
-import { scanObject, match, wildcardToRegex } from './wildcard-object-scan';
+import wildcard from './wildcard-object-scan';
 
 export type Listener = (value: any, path: string) => {};
 export type ListenerAll = (valueOrPath: any, value: any | undefined) => {};
@@ -10,7 +10,11 @@ export interface IListeners {
   [key: string]: Listener[];
 }
 
-class Store {
+export const scanObject = wildcard.scanObject;
+export const match = wildcard.match;
+export const wildcardToRegex = wildcard.wildcardToRegex;
+
+export default class DeepStore {
   listeners: IListeners;
   data: any;
   options: any;
@@ -138,4 +142,4 @@ class Store {
   }
 }
 
-export default { scanObject, match, wildcardToRegex, Store };
+export const Store = DeepStore;

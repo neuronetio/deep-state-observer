@@ -1,8 +1,8 @@
 (function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
-  typeof define === 'function' && define.amd ? define(factory) :
-  (global = global || self, global['svelte-deep-store'] = factory());
-}(this, function () { 'use strict';
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+  typeof define === 'function' && define.amd ? define(['exports'], factory) :
+  (global = global || self, factory(global['svelte-deep-store'] = {}));
+}(this, function (exports) { 'use strict';
 
   function _isPlaceholder(a) {
          return a != null && typeof a === 'object' && a['@@functional/placeholder'] === true;
@@ -1345,8 +1345,12 @@
       }
       return api;
   }
+  var wildcard = { scanObject, match, wildcardToRegex };
 
-  class Store {
+  const scanObject$1 = wildcard.scanObject;
+  const match$1 = wildcard.match;
+  const wildcardToRegex$1 = wildcard.wildcardToRegex;
+  class DeepStore {
       constructor(data = {}, options = { delimeter: '.' }) {
           this.listeners = {};
           this.data = data;
@@ -1364,7 +1368,7 @@
               return true;
           }
           if (this.isWildcard(first)) {
-              return match(first, second, this.options.delimeter);
+              return match$1(first, second, this.options.delimeter);
           }
           return false;
       }
@@ -1406,7 +1410,7 @@
               fn(path(this.split(userPath), this.data), userPath);
           }
           if (isWildcard) {
-              const paths = scanObject(this.data, this.options.delimeter).get(userPath);
+              const paths = scanObject$1(this.data, this.options.delimeter).get(userPath);
               for (const path in paths) {
                   fn(paths[path], path);
               }
@@ -1457,8 +1461,14 @@
           return fastCopy(obj);
       }
   }
-  var index = { scanObject, match, wildcardToRegex, Store };
+  const Store = DeepStore;
 
-  return index;
+  exports.Store = Store;
+  exports.default = DeepStore;
+  exports.match = match$1;
+  exports.scanObject = scanObject$1;
+  exports.wildcardToRegex = wildcardToRegex$1;
+
+  Object.defineProperty(exports, '__esModule', { value: true });
 
 }));
