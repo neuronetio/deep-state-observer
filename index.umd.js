@@ -2635,11 +2635,13 @@
       update(modifiedPath, fn) {
           const lens = lensPath(this.split(modifiedPath));
           let oldValue = view(lens, this.data);
-          if (oldValue.constructor.name === 'Object') {
-              oldValue = Object.assign({}, oldValue);
-          }
-          else if (Array.isArray(oldValue)) {
-              oldValue = oldValue.slice();
+          if (typeof oldValue !== 'undefined' && oldValue !== null) {
+              if (typeof oldValue === 'object' && oldValue.constructor.name === 'Object') {
+                  oldValue = Object.assign({}, oldValue);
+              }
+              else if (Array.isArray(oldValue)) {
+                  oldValue = oldValue.slice();
+              }
           }
           let newValue;
           if (typeof fn === 'function') {
@@ -2663,9 +2665,6 @@
               return this.data;
           }
           return path(this.split(userPath), this.data);
-      }
-      static clone(obj) {
-          return clone(obj);
       }
   }
   const State = DeepState;
