@@ -295,4 +295,24 @@ describe('Store', () => {
     expect(paths[1]).toEqual('one.two.three.four');
     expect(values[1]).toEqual({ x: 2 });
   });
+
+  it('should watch recursively within path and return final value if it is not an object/array', () => {
+    const state = new Store({ one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 } });
+    const paths = [];
+    const values = [];
+    state.subscribeAll(['one.two.three.four.0.x...'], (value, path) => {
+      paths.push(path);
+      values.push(value);
+    });
+    expect(paths.length).toEqual(1);
+    expect(values.length).toEqual(1);
+    expect(paths[0]).toEqual('one.two.three.four.0.x');
+    expect(values[0]).toEqual(1);
+
+    state.update('one.two.three.four', [{ x: 2 }, { y: 2 }, { z: 3 }]);
+    expect(paths.length).toEqual(2);
+    expect(values.length).toEqual(2);
+    expect(paths[1]).toEqual('one.two.three.four');
+    expect(values[1]).toEqual(2);
+  });
 });

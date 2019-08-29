@@ -75,7 +75,13 @@ subscribers.push(
 
 // by default three dots at the end of path will result in recursive listening
 subscribers.push(
-  state.subscribe('some...', (value, path)=>{
+  state.subscribe('someOther...', (value, path)=>{
+    console.log(value);
+  })
+)
+
+subscribers.push(
+  state.subscribe('someOther.nested...', (value, path)=>{
     console.log(value);
   })
 )
