@@ -1389,8 +1389,11 @@
       getRecursive(path) {
           return path.slice(0, -this.options.recursive.length);
       }
-      recursiveMatch(listenerPath, userPath) {
-          const normalized = this.getRecursive(listenerPath);
+      recursiveMatch(listenerPath, userPath, convert = true) {
+          let normalized = listenerPath;
+          if (convert) {
+              normalized = this.getRecursive(listenerPath);
+          }
           return userPath.slice(0, normalized.length) === normalized || normalized.slice(0, userPath.length) === userPath;
       }
       hasParams(path) {
@@ -1449,31 +1452,74 @@
               unsubscribers = [];
           };
       }
-      subscribe(userPath, fn, options = defaultListenerOptions) {
-          if (typeof userPath === 'function') {
-              fn = userPath;
-              userPath = '';
+      getCleanListenersCollection() {
+          return {
+              listeners: [],
+              isRecursive: false,
+              isWildcard: false,
+              hasParams: false,
+              regex: undefined,
+              match: undefined,
+              paramsInfo: undefined
+          };
+      }
+      getCleanListener(fn, options = defaultListenerOptions) {
+          return {
+              fn,
+              options: Object.assign({}, defaultListenerOptions, options),
+              regex: undefined,
+              match: undefined
+          };
+      }
+      subscribe(listenerPath, fn, options = defaultListenerOptions) {
+          if (typeof listenerPath === 'function') {
+              fn = listenerPath;
+              listenerPath = '';
           }
-          let listener = { fn, options: Object.assign({}, defaultListenerOptions, options) };
-          let originalPath = userPath;
+          let listener = this.getCleanListener(fn, options);
+          let originalPath = listenerPath;
           let paramsInfo;
-          if (this.hasParams(userPath)) {
-              paramsInfo = this.getParamsInfo(userPath);
-              userPath = paramsInfo.replaced;
+          let hasParams = false;
+          let isRecursive = false;
+          if (this.hasParams(listenerPath)) {
+              paramsInfo = this.getParamsInfo(listenerPath);
+              listenerPath = paramsInfo.replaced;
+              hasParams = true;
           }
-          if (this.isRecursive(userPath)) {
-              userPath = this.getRecursive(userPath);
+          const isWildcard = this.isWildcard(listenerPath);
+          if (this.isRecursive(listenerPath)) {
+              listenerPath = this.getRecursive(listenerPath);
+              isRecursive = true;
           }
-          if (!Array.isArray(this.listeners[originalPath])) {
-              this.listeners[originalPath] = [];
+          let listenersCollection;
+          if (typeof this.listeners[originalPath] === 'undefined') {
+              listenersCollection = this.listeners[originalPath] = this.getCleanListenersCollection();
+              listenersCollection.isWildcard = isWildcard;
+              listenersCollection.hasParams = hasParams;
+              listenersCollection.isRecursive = isRecursive;
+              listenersCollection.paramsInfo = paramsInfo;
+              if (isWildcard) {
+                  listenersCollection.regex = wildcard.wildcardToRegex(listenerPath, this.options.delimeter);
+              }
+              listenersCollection.match = (path) => {
+                  if (isRecursive && this.recursiveMatch(listenerPath, path, false)) {
+                      return true;
+                  }
+                  if (isWildcard && listenersCollection.regex.test(path)) {
+                      return true;
+                  }
+                  return listenerPath === path;
+              };
           }
-          this.listeners[originalPath].push({ fn, options });
-          const isWildcard = this.isWildcard(userPath);
+          else {
+              listenersCollection = this.listeners[originalPath];
+          }
+          listenersCollection.listeners.push(listener);
           if (!isWildcard) {
-              fn(path(this.split(userPath), this.data), userPath, this.getParams(paramsInfo, userPath));
+              fn(path(this.split(listenerPath), this.data), listenerPath, this.getParams(paramsInfo, listenerPath));
           }
           if (isWildcard) {
-              const paths = scanObject$1(this.data, this.options.delimeter).get(userPath);
+              const paths = scanObject$1(this.data, this.options.delimeter).get(listenerPath);
               if (options.bulk) {
                   const bulkValue = [];
                   for (const path in paths) {
@@ -1496,8 +1542,8 @@
       unsubscribe(listener) {
           return () => {
               for (const listenerPath in this.listeners) {
-                  this.listeners[listenerPath] = this.listeners[listenerPath].filter((current) => current !== listener);
-                  if (this.listeners[listenerPath].length === 0) {
+                  this.listeners[listenerPath].listeners = this.listeners[listenerPath].listeners.filter((current) => current !== listener);
+                  if (this.listeners[listenerPath].listeners.length === 0) {
                       delete this.listeners[listenerPath];
                   }
               }
@@ -1519,26 +1565,11 @@
           }
           this.data = set(lens, newValue, this.data);
           for (let listenerPath in this.listeners) {
-              let originalListenerPath = listenerPath;
-              let match = false;
-              let recursive = false;
-              let paramsInfo;
-              if (this.hasParams(listenerPath)) {
-                  paramsInfo = this.getParamsInfo(listenerPath);
-                  listenerPath = paramsInfo.replaced;
-              }
-              if (this.isRecursive(listenerPath) && this.recursiveMatch(listenerPath, userPath)) {
-                  match = true;
-                  listenerPath = this.getRecursive(listenerPath);
-                  recursive = true;
-              }
-              if (this.match(listenerPath, userPath)) {
-                  match = true;
-              }
-              if (match) {
+              const listenersCollection = this.listeners[listenerPath];
+              if (listenersCollection.match(userPath)) {
                   const bulkListeners = [];
                   const standardListeners = [];
-                  for (const listener of this.listeners[originalListenerPath]) {
+                  for (const listener of listenersCollection.listeners) {
                       if (listener.options.bulk) {
                           bulkListeners.push(listener);
                       }
@@ -1546,16 +1577,18 @@
                           standardListeners.push(listener);
                       }
                   }
-                  const value = recursive ? this.get(listenerPath) : newValue;
+                  const value = listenersCollection.isRecursive ? this.get(this.getRecursive(listenerPath)) : newValue;
                   for (const listener of standardListeners) {
-                      listener.fn(value, userPath, paramsInfo ? paramsInfo.params : undefined);
+                      listener.fn(value, userPath, listenersCollection.paramsInfo ? this.getParams(listenersCollection.paramsInfo, userPath) : undefined);
                   }
                   for (const listener of bulkListeners) {
                       listener.fn([
                           {
                               value,
                               path: userPath,
-                              params: paramsInfo ? paramsInfo.params : undefined
+                              params: listenersCollection.paramsInfo
+                                  ? this.getParams(listenersCollection.paramsInfo, userPath)
+                                  : undefined
                           }
                       ]);
                   }
