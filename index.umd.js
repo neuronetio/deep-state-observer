@@ -2920,6 +2920,9 @@
                   }
               }
           }
+          if (listener.options.debug) {
+              console.debug('listener subsrcibed', listenerPath, listener);
+          }
           return this.unsubscribe(listener);
       }
       unsubscribe(listener) {
