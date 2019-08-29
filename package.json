@@ -1,6 +1,6 @@
 {
   "name": "deep-state-observer",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Deep state observer is an state management library that will fire listeners only when specified object node (which also can be a wildcard) was changed.",
   "main": "index.cjs.js",
   "module": "index.js",
@@ -43,9 +43,7 @@
   "homepage": "https://github.com/neuronetio/deep-state-observer#readme",
   "dependencies": {
     "fast-copy": "^2.0.3",
-    "picomatch": "^2.0.7",
-    "ramda": "^0.26.1",
-    "wildstring": "^1.0.9"
+    "ramda": "^0.26.1"
   },
   "devDependencies": {
     "jasmine": "^3.4.0",
