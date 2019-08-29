@@ -1348,11 +1348,12 @@ var wildcard = { scanObject, match, wildcardToRegex };
 const scanObject$1 = wildcard.scanObject;
 const match$1 = wildcard.match;
 const wildcardToRegex$1 = wildcard.wildcardToRegex;
+const defaultOptions = { delimeter: '.', recursiveString: '...' };
 class DeepStore {
-    constructor(data = {}, options = { delimeter: '.', recursiveWatchString: '...' }) {
+    constructor(data = {}, options = defaultOptions) {
         this.listeners = {};
         this.data = data;
-        this.options = options;
+        this.options = Object.assign({}, defaultOptions, options);
     }
     getListeners() {
         return this.listeners;
@@ -1380,10 +1381,10 @@ class DeepStore {
         return path.indexOf('*') > -1;
     }
     isRecursive(path) {
-        return path.endsWith(this.options.recursiveWatchString);
+        return path.endsWith(this.options.recursiveString);
     }
     getRecursive(path) {
-        return path.slice(0, -this.options.recursiveWatchString.length);
+        return path.slice(0, -this.options.recursiveString.length);
     }
     recursiveMatch(currentPath, userPath) {
         const normalized = this.getRecursive(currentPath);

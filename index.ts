@@ -15,15 +15,17 @@ export const scanObject = wildcard.scanObject;
 export const match = wildcard.match;
 export const wildcardToRegex = wildcard.wildcardToRegex;
 
+const defaultOptions = { delimeter: '.', recursiveString: '...' };
+
 export default class DeepStore {
   listeners: IListeners;
   data: any;
   options: any;
 
-  constructor(data = {}, options = { delimeter: '.', recursiveWatchString: '...' }) {
+  constructor(data = {}, options = defaultOptions) {
     this.listeners = {};
     this.data = data;
-    this.options = options;
+    this.options = { ...defaultOptions, ...options };
   }
 
   getListeners(): IListeners {
@@ -57,11 +59,11 @@ export default class DeepStore {
   }
 
   isRecursive(path: string): boolean {
-    return path.endsWith(this.options.recursiveWatchString);
+    return path.endsWith(this.options.recursiveString);
   }
 
   getRecursive(path: string): string {
-    return path.slice(0, -this.options.recursiveWatchString.length);
+    return path.slice(0, -this.options.recursiveString.length);
   }
 
   recursiveMatch(currentPath: string, userPath: string): boolean {
