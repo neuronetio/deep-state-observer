@@ -315,4 +315,40 @@ describe('Store', () => {
     expect(paths[1]).toEqual('one.two.three.four');
     expect(values[1]).toEqual(2);
   });
+
+  it('should watch recursively within object with numeric values', () => {
+    const state = new Store({
+      one: {
+        two: {
+          1: { x: 1 },
+          2: { x: 2 },
+          3: { x: 3 }
+        }
+      }
+    });
+    const paths = [];
+    const values = [];
+    state.subscribeAll(['one.two...'], (value, path) => {
+      paths.push(path);
+      values.push(value);
+    });
+    expect(paths.length).toEqual(1);
+    expect(values.length).toEqual(1);
+    expect(paths[0]).toEqual('one.two');
+    expect(values[0]).toEqual({
+      1: { x: 1 },
+      '2': { x: 2 },
+      3: { x: 3 }
+    });
+
+    state.update('one.two.2.x', 22);
+    expect(paths.length).toEqual(2);
+    expect(values.length).toEqual(2);
+    expect(paths[1]).toEqual('one.two.2.x');
+    expect(values[1]).toEqual({
+      1: { x: 1 },
+      '2': { x: 22 },
+      3: { x: 3 }
+    });
+  });
 });
