@@ -25,7 +25,7 @@ let subscribers = [];
 // change local variable - it can be vueComponent.data property or react function with setState in react
 let nestedValue;
 subscribers.push(
-  state.subscribe('someOther.nested', (value) => {
+  state.subscribe('someOther.nested', (value, path) => {
     nestedValue = value;
   })
 );
@@ -47,7 +47,7 @@ state.update('someOther.nested', (currentValue) => {
 
 // you can use function to modify data
 subscribers.push(
-  state.subscribe('some', (value) => {
+  state.subscribe('some', (value, path) => {
     state.update('someOther.nested', (oldValue) => {
       return 'nested changed after some changed';
     });
@@ -56,22 +56,29 @@ subscribers.push(
 
 // or you can just set the value (it cannot be function :) )
 subscribers.push(
-  state.subscribe('some', (value) => {
+  state.subscribe('some', (value, path) => {
     state.update('someOther.nested', 'nested changed after some changed');
 );
 
 // you can also use wildcards!! :O
 subscribers.push(
-  state.subscribe('someOther.**', value=>{
+  state.subscribe('someOther.**', (value, path)=>{
     console.log(value);
   })
 );
 
 subscribers.push(
-  state.subscribe('some*.*.bla*.*bla*.bla', value=>{
+  state.subscribe('some*.*.bla*.*bla*.bla', (value, path)=>{
     console.log(value);
   })
 );
+
+// by default three dots at the end of path will result in recursive listening
+subscribers.push(
+  state.subscribe('some...', (value, path)=>{
+    console.log(value);
+  })
+)
 
 let currentState = state.get();
 console.log(currentState.some); //-> { some: 'value', someOther: { nested: 'new value' } }

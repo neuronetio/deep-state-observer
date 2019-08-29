@@ -235,4 +235,22 @@ describe('Store', () => {
     expect(values.length).toEqual(6);
     expect(values[5]).toEqual('mod');
   });
+
+  it('should watch recursively', () => {
+    const state = new Store({ one: { two: { three: 3 }, 2: 2 } });
+    const paths = [];
+    const values = [];
+    state.subscribe('one...', (value, path) => {
+      paths.push(path);
+      values.push(value);
+    });
+    expect(paths.length).toEqual(1);
+    expect(values.length).toEqual(1);
+    expect(paths[0]).toEqual('one');
+    expect(values[0]).toEqual({ two: { three: 3 }, 2: 2 });
+
+    state.update('one.two.three', 33);
+    expect(paths.length).toEqual(2);
+    expect(values.length).toEqual(2);
+  });
 });

@@ -19,7 +19,7 @@ export default class DeepStore {
   data: any;
   options: any;
 
-  constructor(data = {}, options = { delimeter: '.' }) {
+  constructor(data = {}, options = { delimeter: '.', recursiveWatchString: '...' }) {
     this.listeners = {};
     this.data = data;
     this.options = options;
@@ -55,6 +55,19 @@ export default class DeepStore {
     return path.indexOf('*') > -1;
   }
 
+  isRecursive(path: string): boolean {
+    return path.endsWith(this.options.recursiveWatchString);
+  }
+
+  getRecursive(path: string): string {
+    return path.slice(0, -this.options.recursiveWatchString.length);
+  }
+
+  recursiveMatch(currentPath: string, userPath: string): boolean {
+    const normalized = this.getRecursive(currentPath);
+    return userPath.slice(0, normalized.length) === normalized;
+  }
+
   subscribeAll(userPaths: string[], fn: ListenerAll) {
     let unsubscribers = [];
     for (const userPath of userPaths) {
@@ -76,10 +89,14 @@ export default class DeepStore {
       fn = userPath;
       userPath = '';
     }
-    if (!Array.isArray(this.listeners[userPath])) {
-      this.listeners[userPath] = [];
+    let recursivePath = userPath;
+    if (this.isRecursive(userPath)) {
+      userPath = this.getRecursive(userPath);
     }
-    this.listeners[userPath].push(fn);
+    if (!Array.isArray(this.listeners[recursivePath])) {
+      this.listeners[recursivePath] = [];
+    }
+    this.listeners[recursivePath].push(fn);
     const isWildcard = this.isWildcard(userPath);
     if (execute && !isWildcard) {
       fn(path(this.split(userPath), this.data), userPath);
@@ -121,7 +138,11 @@ export default class DeepStore {
     }
     this.data = set(lens, newValue, this.data);
     for (const currentPath in this.listeners) {
-      if (this.match(currentPath, userPath)) {
+      if (this.isRecursive(currentPath) && this.recursiveMatch(currentPath, userPath)) {
+        for (const listener of this.listeners[currentPath]) {
+          listener(newValue, userPath);
+        }
+      } else if (this.match(currentPath, userPath)) {
         for (const listener of this.listeners[currentPath]) {
           listener(newValue, userPath);
         }
