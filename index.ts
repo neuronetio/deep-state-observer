@@ -1,6 +1,7 @@
 import { path, set, view, lensPath } from 'ramda';
 import clone from 'fast-copy';
 import wildcard from './wildcard-object-scan';
+import { normalize } from 'path';
 
 export type Listener = (value: any, path: string) => {};
 export type ListenerAll = (valueOrPath: any, value: any | undefined) => {};
@@ -65,7 +66,7 @@ export default class DeepStore {
 
   recursiveMatch(currentPath: string, userPath: string): boolean {
     const normalized = this.getRecursive(currentPath);
-    return userPath.slice(0, normalized.length) === normalized;
+    return userPath.slice(0, normalized.length) === normalized || normalized.slice(0, userPath.length) === userPath;
   }
 
   subscribeAll(userPaths: string[], fn: ListenerAll) {

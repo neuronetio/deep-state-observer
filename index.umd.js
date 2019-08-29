@@ -1389,7 +1389,7 @@
       }
       recursiveMatch(currentPath, userPath) {
           const normalized = this.getRecursive(currentPath);
-          return userPath.slice(0, normalized.length) === normalized;
+          return userPath.slice(0, normalized.length) === normalized || normalized.slice(0, userPath.length) === userPath;
       }
       subscribeAll(userPaths, fn) {
           let unsubscribers = [];

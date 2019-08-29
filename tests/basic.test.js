@@ -256,23 +256,43 @@ describe('Store', () => {
     expect(values[1]).toEqual({ two: { three: 33 }, 2: 2 });
   });
 
-  it('should watch recursively within path', () => {
-    const state = new Store({ one: { two: { three: 3 }, 2: 2 } });
+  it('should watch recursively within path (subscribe)', () => {
+    const state = new Store({ one: { two: { three: { four: 4 } }, 2: 2 } });
     const paths = [];
     const values = [];
-    state.subscribe('one.two...', (value, path) => {
+    state.subscribe('one.two.three...', (value, path) => {
       paths.push(path);
       values.push(value);
     });
     expect(paths.length).toEqual(1);
     expect(values.length).toEqual(1);
-    expect(paths[0]).toEqual('one.two');
-    expect(values[0]).toEqual({ three: 3 });
+    expect(paths[0]).toEqual('one.two.three');
+    expect(values[0]).toEqual({ four: 4 });
 
-    state.update('one.two.three', 33);
+    state.update('one.two.three', { four: 44 });
     expect(paths.length).toEqual(2);
     expect(values.length).toEqual(2);
     expect(paths[1]).toEqual('one.two.three');
-    expect(values[1]).toEqual({ three: 33 });
+    expect(values[1]).toEqual({ four: 44 });
+  });
+
+  it('should watch recursively within path (subscribeAll)', () => {
+    const state = new Store({ one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 } });
+    const paths = [];
+    const values = [];
+    state.subscribeAll(['one.two.three.four.0...'], (value, path) => {
+      paths.push(path);
+      values.push(value);
+    });
+    expect(paths.length).toEqual(1);
+    expect(values.length).toEqual(1);
+    expect(paths[0]).toEqual('one.two.three.four.0');
+    expect(values[0]).toEqual({ x: 1 });
+
+    state.update('one.two.three.four', [{ x: 2 }, { y: 2 }, { z: 3 }]);
+    expect(paths.length).toEqual(2);
+    expect(values.length).toEqual(2);
+    expect(paths[1]).toEqual('one.two.three.four');
+    expect(values[1]).toEqual({ x: 2 });
   });
 });
