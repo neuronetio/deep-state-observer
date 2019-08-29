@@ -2964,7 +2964,7 @@ class DeepState {
                 for (const listener of standardListeners) {
                     let time;
                     if (listener.options.debug) {
-                        time = performance.now();
+                        time = Date.now();
                     }
                     const params = listenersCollection.paramsInfo
                         ? this.getParams(listenersCollection.paramsInfo, userPath)
@@ -2972,7 +2972,7 @@ class DeepState {
                     listener.fn(value, userPath, params);
                     if (listener.options.debug) {
                         console.debug('listener updated', {
-                            time: performance.now() - time,
+                            time: Date.now() - time,
                             value,
                             params,
                             path: userPath,
@@ -2983,7 +2983,7 @@ class DeepState {
                 for (const listener of bulkListeners) {
                     let time;
                     if (listener.options.debug) {
-                        time = performance.now();
+                        time = Date.now();
                     }
                     const params = listenersCollection.paramsInfo
                         ? this.getParams(listenersCollection.paramsInfo, userPath)
@@ -2997,7 +2997,7 @@ class DeepState {
                     ]);
                     if (listener.options.debug) {
                         console.debug('listener updated', {
-                            time: performance.now() - time,
+                            time: Date.now() - time,
                             value,
                             params,
                             path: userPath,

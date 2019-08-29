@@ -2966,7 +2966,7 @@
                   for (const listener of standardListeners) {
                       let time;
                       if (listener.options.debug) {
-                          time = performance.now();
+                          time = Date.now();
                       }
                       const params = listenersCollection.paramsInfo
                           ? this.getParams(listenersCollection.paramsInfo, userPath)
@@ -2974,7 +2974,7 @@
                       listener.fn(value, userPath, params);
                       if (listener.options.debug) {
                           console.debug('listener updated', {
-                              time: performance.now() - time,
+                              time: Date.now() - time,
                               value,
                               params,
                               path: userPath,
@@ -2985,7 +2985,7 @@
                   for (const listener of bulkListeners) {
                       let time;
                       if (listener.options.debug) {
-                          time = performance.now();
+                          time = Date.now();
                       }
                       const params = listenersCollection.paramsInfo
                           ? this.getParams(listenersCollection.paramsInfo, userPath)
@@ -2999,7 +2999,7 @@
                       ]);
                       if (listener.options.debug) {
                           console.debug('listener updated', {
-                              time: performance.now() - time,
+                              time: Date.now() - time,
                               value,
                               params,
                               path: userPath,
