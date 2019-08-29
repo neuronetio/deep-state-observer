@@ -1,5 +1,4 @@
 import { path, set, view, lensPath } from 'ramda';
-import clone from 'fast-copy';
 import wildcard from './wildcard-object-scan';
 export type ListenerFunction = (value: any, path: string, params: any) => {};
 export type Match = (path: string) => boolean;
@@ -349,7 +348,12 @@ export default class DeepState {
 
   update(modifiedPath: string, fn: Updater) {
     const lens = lensPath(this.split(modifiedPath));
-    let oldValue = clone(view(lens, this.data));
+    let oldValue = view(lens, this.data);
+    if (oldValue.constructor.name === 'Object') {
+      oldValue = { ...oldValue };
+    } else if (Array.isArray(oldValue)) {
+      oldValue = oldValue.slice();
+    }
     let newValue;
     if (typeof fn === 'function') {
       newValue = fn(view(lens, this.data));

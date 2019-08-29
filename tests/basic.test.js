@@ -1,4 +1,4 @@
-const { State, wildcardToRegex } = require('../index.cjs.js');
+const { State } = require('../index.cjs.js');
 const R = require('ramda');
 
 describe('State', () => {
