@@ -2407,8 +2407,8 @@ class DeepState {
     cleanRecursivePath(path) {
         return this.isRecursive(path) ? path.slice(0, -this.options.recursive.length) : path;
     }
-    recursiveMatch(listenerPath, userPath) {
-        return this.cutPath(this.cleanRecursivePath(listenerPath), userPath) === listenerPath;
+    recursiveMatch(listenerPath, modifiedPath) {
+        return this.cutPath(modifiedPath, this.cleanRecursivePath(listenerPath)) === listenerPath;
     }
     hasParams(path) {
         return path.indexOf(this.options.param) > -1;
@@ -2605,9 +2605,9 @@ class DeepState {
                 continue;
             }
             const listenersCollection = this.listeners[listenerPath];
-            const nestedPath = this.cutPath(modifiedPath, listenerPath);
-            if (this.match(nestedPath, modifiedPath)) {
-                const restPath = this.trimPath(listenerPath.substr(nestedPath.length));
+            const currentCuttedPath = this.cutPath(listenerPath, modifiedPath);
+            if (this.match(currentCuttedPath, modifiedPath)) {
+                const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
                 const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
                 for (const currentRestPath in values) {
                     const value = values[currentRestPath];

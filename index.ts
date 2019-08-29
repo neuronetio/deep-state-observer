@@ -1,5 +1,6 @@
 import { path, set, view, lensPath } from 'ramda';
 import wildcard from './wildcard-object-scan';
+
 export type ListenerFunction = (value: any, path: string, params: any) => {};
 export type Match = (path: string) => boolean;
 
@@ -112,8 +113,8 @@ export default class DeepState {
     return this.isRecursive(path) ? path.slice(0, -this.options.recursive.length) : path;
   }
 
-  recursiveMatch(listenerPath: string, userPath: string): boolean {
-    return this.cutPath(this.cleanRecursivePath(listenerPath), userPath) === listenerPath;
+  recursiveMatch(listenerPath: string, modifiedPath: string): boolean {
+    return this.cutPath(modifiedPath, this.cleanRecursivePath(listenerPath)) === listenerPath;
   }
 
   hasParams(path: string) {
@@ -324,9 +325,9 @@ export default class DeepState {
         continue;
       }
       const listenersCollection = this.listeners[listenerPath];
-      const nestedPath = this.cutPath(modifiedPath, listenerPath);
-      if (this.match(nestedPath, modifiedPath)) {
-        const restPath = this.trimPath(listenerPath.substr(nestedPath.length));
+      const currentCuttedPath = this.cutPath(listenerPath, modifiedPath);
+      if (this.match(currentCuttedPath, modifiedPath)) {
+        const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
         const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
         for (const currentRestPath in values) {
           const value = values[currentRestPath];

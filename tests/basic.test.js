@@ -419,4 +419,34 @@ describe('State', () => {
     expect(paths[2]).toEqual('users.1.name');
     expect(values[2]).toEqual('madmax');
   });
+
+  it('should update proper leaf', () => {
+    const state = new State({
+      config: {
+        list: {
+          rows: {
+            1: { id: 'id-1' },
+            2: { id: 'id-2' },
+            3: { id: 'id-3' }
+          }
+        }
+      },
+      internal: {
+        list: {
+          rows: {
+            1: { id: 'id-1' },
+            2: { id: 'id-2' },
+            3: { id: 'id-3' }
+          }
+        }
+      }
+    });
+    const paths = [];
+    const values = [];
+    state.subscribe('config.list.rows', (value, path) => {
+      paths.push(path);
+      state.update('internal.list.rows', { ...value });
+    });
+    expect(paths[0]).toEqual('config.list.rows');
+  });
 });
