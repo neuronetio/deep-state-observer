@@ -53,7 +53,7 @@ describe('Store', () => {
     const state = new Store({ x: 10, y: 20, z: { xyz: 50 } });
     let result = {};
     const paths = [];
-    state.subscribeAll(['x', 'y', 'z.xyz'], (path, value) => {
+    state.subscribeAll(['x', 'y', 'z.xyz'], (value, path) => {
       result = R.set(R.lensPath(path.split('.')), value, result);
       paths.push(path);
     });
