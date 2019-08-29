@@ -2851,8 +2851,7 @@ class DeepState {
     getCleanListener(fn, options = defaultListenerOptions) {
         return {
             fn,
-            options: Object.assign({}, defaultListenerOptions, options),
-            match: undefined
+            options: Object.assign({}, defaultListenerOptions, options)
         };
     }
     subscribe(listenerPath, fn, options = defaultListenerOptions) {

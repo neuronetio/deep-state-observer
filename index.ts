@@ -18,7 +18,6 @@ export interface ListenerOptions {
 export interface Listener {
   fn: ListenerFunction;
   options: ListenerOptions;
-  match: Match | undefined;
 }
 
 export type Updater = (value: any) => {};
@@ -188,8 +187,7 @@ export default class DeepState {
   getCleanListener(fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions): Listener {
     return {
       fn,
-      options: { ...defaultListenerOptions, ...options },
-      match: undefined
+      options: { ...defaultListenerOptions, ...options }
     };
   }
 
