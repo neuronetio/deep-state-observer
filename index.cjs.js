@@ -1406,14 +1406,14 @@ class DeepStore {
             fn = userPath;
             userPath = '';
         }
-        let recursivePath = userPath;
+        let originalPath = userPath;
         if (this.isRecursive(userPath)) {
             userPath = this.getRecursive(userPath);
         }
-        if (!Array.isArray(this.listeners[recursivePath])) {
-            this.listeners[recursivePath] = [];
+        if (!Array.isArray(this.listeners[originalPath])) {
+            this.listeners[originalPath] = [];
         }
-        this.listeners[recursivePath].push(fn);
+        this.listeners[originalPath].push(fn);
         const isWildcard = this.isWildcard(userPath);
         if (execute && !isWildcard) {
             fn(path(this.split(userPath), this.data), userPath);
@@ -1454,7 +1454,7 @@ class DeepStore {
         for (const currentPath in this.listeners) {
             if (this.isRecursive(currentPath) && this.recursiveMatch(currentPath, userPath)) {
                 for (const listener of this.listeners[currentPath]) {
-                    listener(newValue, userPath);
+                    listener(this.get(this.getRecursive(currentPath)), userPath);
                 }
             }
             else if (this.match(currentPath, userPath)) {
