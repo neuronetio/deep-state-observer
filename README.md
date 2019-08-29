@@ -14,10 +14,10 @@ Deep state observer is framework agnostic with node and browser support, so you 
 
 ```javascript
 import { onDestroy } from 'svelte';
-import Store from 'deep-state-observer'; // const {Store} = require('deep-state-observer');
+import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
 
 // first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
-const state = new Store({ some: 'value', someOther: { nested: 'value' } }, { delimeter:'.' });
+const state = new State({ some: 'value', someOther: { nested: 'value' } }, { delimeter:'.' });
 
 // store some unsubscribe methods
 let subscribers = [];

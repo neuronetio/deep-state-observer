@@ -1,9 +1,9 @@
-const { Store, wildcardToRegex } = require('../index.cjs.js');
+const { State, wildcardToRegex } = require('../index.cjs.js');
 const R = require('ramda');
 
-describe('Store', () => {
+describe('State', () => {
   it('should check existence of methods and data', () => {
-    const state = new Store({ test: '123' });
+    const state = new State({ test: '123' });
     expect(typeof state).toEqual('object');
     expect(typeof state.unsubscribe).toBe('function');
     expect(typeof state.subscribe).toBe('function');
@@ -14,8 +14,8 @@ describe('Store', () => {
     state.destroy();
   });
 
-  it('should call Store', () => {
-    const state = new Store({ a: 'a', b: 'b', c: { d: 'd' } });
+  it('should call State', () => {
+    const state = new State({ a: 'a', b: 'b', c: { d: 'd' } });
     let $d;
     state.subscribe('c.d', (d) => {
       $d = d;
@@ -25,7 +25,7 @@ describe('Store', () => {
   });
 
   it('should update and watch', () => {
-    const state = new Store({
+    const state = new State({
       test: {
         test2: 123
       }
@@ -50,7 +50,7 @@ describe('Store', () => {
   });
 
   it('should watch all paths', () => {
-    const state = new Store({ x: 10, y: 20, z: { xyz: 50 } });
+    const state = new State({ x: 10, y: 20, z: { xyz: 50 } });
     let result = {};
     const paths = [];
     state.subscribeAll(['x', 'y', 'z.xyz'], (value, path) => {
@@ -63,7 +63,7 @@ describe('Store', () => {
   });
 
   it('should accept value instead of function inside update', () => {
-    const state = new Store({ x: 10, y: 20, z: { xyz: 50 } });
+    const state = new State({ x: 10, y: 20, z: { xyz: 50 } });
     expect(state.get()).toEqual({ x: 10, y: 20, z: { xyz: 50 } });
     state.update('z.xyz', 'string instead of fn');
     expect(state.get('z.xyz')).toEqual('string instead of fn');
@@ -71,7 +71,7 @@ describe('Store', () => {
   });
 
   it('should match simple wildcards (object)', () => {
-    const state = new Store({
+    const state = new State({
       one: {
         two: { three: { four: { five: 5 } } },
         '2': { three: { four: { five: 5, six: 6 } } }
@@ -104,7 +104,7 @@ describe('Store', () => {
   });
 
   it('should match advanced wildcards (object)', () => {
-    const state = new Store({
+    const state = new State({
       one: {
         two: { three: { four: { five: 5 } } },
         '2': { three: { four: { five: 5, six: 6 } } }
@@ -133,7 +133,7 @@ describe('Store', () => {
   });
 
   it('should match simple wildcards (array)', () => {
-    const state = new Store({
+    const state = new State({
       one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: 3 }, [{ test: 'x' }]]
     });
     const paths = [];
@@ -167,7 +167,7 @@ describe('Store', () => {
   });
 
   it('should match advanced wildcards (array)', () => {
-    const state = new Store({
+    const state = new State({
       one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: 3 }, [{ test: 'x' }]]
     });
     const paths = [];
@@ -202,7 +202,7 @@ describe('Store', () => {
   });
 
   it('should match advanced wildcards mixed (array)', () => {
-    const state = new Store({
+    const state = new State({
       one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: { four: 4 } }, [{ test: 'x' }]]
     });
     const paths = [];
@@ -237,7 +237,7 @@ describe('Store', () => {
   });
 
   it('should watch recursively', () => {
-    const state = new Store({ one: { two: { three: 3 }, 2: 2 } });
+    const state = new State({ one: { two: { three: 3 }, 2: 2 } });
     const paths = [];
     const values = [];
     state.subscribe('one...', (value, path) => {
@@ -257,7 +257,7 @@ describe('Store', () => {
   });
 
   it('should watch recursively within path (subscribe)', () => {
-    const state = new Store({ one: { two: { three: { four: 4 } }, 2: 2 } });
+    const state = new State({ one: { two: { three: { four: 4 } }, 2: 2 } });
     const paths = [];
     const values = [];
     state.subscribe('one.two.three...', (value, path) => {
@@ -277,7 +277,7 @@ describe('Store', () => {
   });
 
   it('should watch recursively within path (subscribeAll)', () => {
-    const state = new Store({ one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 } });
+    const state = new State({ one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 } });
     const paths = [];
     const values = [];
     state.subscribeAll(['one.two.three.four.0...'], (value, path) => {
@@ -297,7 +297,7 @@ describe('Store', () => {
   });
 
   it('should watch recursively within path and return final value if it is not an object/array', () => {
-    const state = new Store({ one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 } });
+    const state = new State({ one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 } });
     const paths = [];
     const values = [];
     state.subscribeAll(['one.two.three.four.0.x...'], (value, path) => {
@@ -317,7 +317,7 @@ describe('Store', () => {
   });
 
   it('should watch recursively within object with numeric values', () => {
-    const state = new Store({
+    const state = new State({
       one: {
         two: {
           1: { x: 1 },
@@ -350,5 +350,55 @@ describe('Store', () => {
       '2': { x: 22 },
       3: { x: 3 }
     });
+  });
+
+  it('should match simple params', () => {
+    const state = new State({ users: { 1: { name: 'john', age: 35 }, 2: { name: 'alice', age: 30 } } });
+    const paths = [];
+    const values = [];
+    const params = [];
+    state.subscribe('users.:id.name', (value, path, parameters) => {
+      paths.push(path);
+      values.push(value);
+      params.push(parameters);
+    });
+    expect(paths.length).toEqual(2);
+    expect(paths[0]).toEqual('users.1.name');
+    expect(paths[1]).toEqual('users.2.name');
+    expect(values[0]).toEqual('john');
+    expect(values[1]).toEqual('alice');
+
+    state.update('users.1.name', 'madmax');
+    expect(paths.length).toEqual(3);
+    expect(paths[2]).toEqual('users.1.name');
+    expect(values[2]).toEqual('madmax');
+  });
+
+  it('should match simple params and return bulk value', () => {
+    const state = new State({ users: { 1: { name: 'john', age: 35 }, 2: { name: 'alice', age: 30 } } });
+    const paths = [];
+    const values = [];
+    const params = [];
+    state.subscribe(
+      'users.:id.name',
+      (bulk) => {
+        bulk.forEach((item) => {
+          paths.push(item.path);
+          values.push(item.value);
+          params.push(item.params);
+        });
+      },
+      { bulk: true }
+    );
+    expect(paths.length).toEqual(2);
+    expect(paths[0]).toEqual('users.1.name');
+    expect(paths[1]).toEqual('users.2.name');
+    expect(values[0]).toEqual('john');
+    expect(values[1]).toEqual('alice');
+
+    state.update('users.1.name', 'madmax');
+    expect(paths.length).toEqual(3);
+    expect(paths[2]).toEqual('users.1.name');
+    expect(values[2]).toEqual('madmax');
   });
 });

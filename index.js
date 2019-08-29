@@ -1344,8 +1344,9 @@ var wildcard = { scanObject, match, wildcardToRegex };
 const scanObject$1 = wildcard.scanObject;
 const match$1 = wildcard.match;
 const wildcardToRegex$1 = wildcard.wildcardToRegex;
-const defaultOptions = { delimeter: '.', recursiveString: '...' };
-class DeepStore {
+const defaultOptions = { delimeter: '.', recursive: '...', param: ':' };
+const defaultListenerOptions = { bulk: false };
+class DeepState {
     constructor(data = {}, options = defaultOptions) {
         this.listeners = {};
         this.data = data;
@@ -1377,14 +1378,58 @@ class DeepStore {
         return path.indexOf('*') > -1;
     }
     isRecursive(path) {
-        return path.endsWith(this.options.recursiveString);
+        return path.endsWith(this.options.recursive);
     }
     getRecursive(path) {
-        return path.slice(0, -this.options.recursiveString.length);
+        return path.slice(0, -this.options.recursive.length);
     }
-    recursiveMatch(currentPath, userPath) {
-        const normalized = this.getRecursive(currentPath);
+    recursiveMatch(listenerPath, userPath) {
+        const normalized = this.getRecursive(listenerPath);
         return userPath.slice(0, normalized.length) === normalized || normalized.slice(0, userPath.length) === userPath;
+    }
+    hasParams(path) {
+        return path.indexOf(this.options.param) > -1;
+    }
+    getParamsInfo(path) {
+        let paramsInfo = { replaced: '', original: path, params: {} };
+        let partIndex = 0;
+        let fullReplaced = [];
+        for (const part of this.split(path)) {
+            paramsInfo.params[partIndex] = {
+                original: part,
+                replaced: '',
+                name: ''
+            };
+            const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimeter}\\${this.options.param}]+)`, 'g');
+            let param = reg.exec(part);
+            if (param) {
+                paramsInfo.params[partIndex].name = param[1];
+            }
+            else {
+                delete paramsInfo.params[partIndex];
+                fullReplaced.push(part);
+                partIndex++;
+                continue;
+            }
+            reg.lastIndex = 0;
+            paramsInfo.params[partIndex].replaced = part.replace(reg, '*');
+            fullReplaced.push(paramsInfo.params[partIndex].replaced);
+            partIndex++;
+        }
+        paramsInfo.replaced = fullReplaced.join(this.options.delimeter);
+        return paramsInfo;
+    }
+    getParams(paramsInfo, path) {
+        if (!paramsInfo) {
+            return undefined;
+        }
+        const split = this.split(path);
+        const result = {};
+        for (const partIndex in paramsInfo.params) {
+            const param = paramsInfo.params[partIndex];
+            result[param.name] = split[partIndex];
+        }
+        return result;
     }
     subscribeAll(userPaths, fn) {
         let unsubscribers = [];
@@ -1398,37 +1443,56 @@ class DeepStore {
             unsubscribers = [];
         };
     }
-    subscribe(userPath, fn, execute = true) {
+    subscribe(userPath, fn, options = defaultListenerOptions) {
         if (typeof userPath === 'function') {
             fn = userPath;
             userPath = '';
         }
+        let listener = { fn, options: Object.assign({}, defaultListenerOptions, options) };
         let originalPath = userPath;
+        let paramsInfo;
+        if (this.hasParams(userPath)) {
+            paramsInfo = this.getParamsInfo(userPath);
+            userPath = paramsInfo.replaced;
+        }
         if (this.isRecursive(userPath)) {
             userPath = this.getRecursive(userPath);
         }
         if (!Array.isArray(this.listeners[originalPath])) {
             this.listeners[originalPath] = [];
         }
-        this.listeners[originalPath].push(fn);
+        this.listeners[originalPath].push({ fn, options });
         const isWildcard = this.isWildcard(userPath);
-        if (execute && !isWildcard) {
-            fn(path(this.split(userPath), this.data), userPath);
+        if (!isWildcard) {
+            fn(path(this.split(userPath), this.data), userPath, this.getParams(paramsInfo, userPath));
         }
         if (isWildcard) {
             const paths = scanObject$1(this.data, this.options.delimeter).get(userPath);
-            for (const path in paths) {
-                fn(paths[path], path);
+            if (options.bulk) {
+                const bulkValue = [];
+                for (const path in paths) {
+                    bulkValue.push({
+                        path,
+                        params: this.getParams(paramsInfo, path),
+                        value: paths[path]
+                    });
+                }
+                fn(bulkValue, undefined, undefined);
+            }
+            else {
+                for (const path in paths) {
+                    fn(paths[path], path, this.getParams(paramsInfo, path));
+                }
             }
         }
-        return this.unsubscribe(fn);
+        return this.unsubscribe(listener);
     }
-    unsubscribe(fn) {
+    unsubscribe(listener) {
         return () => {
-            for (const currentPath in this.listeners) {
-                this.listeners[currentPath] = this.listeners[currentPath].filter((current) => current !== fn);
-                if (this.listeners[currentPath].length === 0) {
-                    delete this.listeners[currentPath];
+            for (const listenerPath in this.listeners) {
+                this.listeners[listenerPath] = this.listeners[listenerPath].filter((current) => current !== listener);
+                if (this.listeners[listenerPath].length === 0) {
+                    delete this.listeners[listenerPath];
                 }
             }
         };
@@ -1448,15 +1512,46 @@ class DeepStore {
             return newValue;
         }
         this.data = set(lens, newValue, this.data);
-        for (const currentPath in this.listeners) {
-            if (this.isRecursive(currentPath) && this.recursiveMatch(currentPath, userPath)) {
-                for (const listener of this.listeners[currentPath]) {
-                    listener(this.get(this.getRecursive(currentPath)), userPath);
-                }
+        for (let listenerPath in this.listeners) {
+            let originalListenerPath = listenerPath;
+            let match = false;
+            let recursive = false;
+            let paramsInfo;
+            if (this.hasParams(listenerPath)) {
+                paramsInfo = this.getParamsInfo(listenerPath);
+                listenerPath = paramsInfo.replaced;
             }
-            else if (this.match(currentPath, userPath)) {
-                for (const listener of this.listeners[currentPath]) {
-                    listener(newValue, userPath);
+            if (this.isRecursive(listenerPath) && this.recursiveMatch(listenerPath, userPath)) {
+                match = true;
+                listenerPath = this.getRecursive(listenerPath);
+                recursive = true;
+            }
+            if (this.match(listenerPath, userPath)) {
+                match = true;
+            }
+            if (match) {
+                const bulkListeners = [];
+                const standardListeners = [];
+                for (const listener of this.listeners[originalListenerPath]) {
+                    if (listener.options.bulk) {
+                        bulkListeners.push(listener);
+                    }
+                    else {
+                        standardListeners.push(listener);
+                    }
+                }
+                const value = recursive ? this.get(listenerPath) : newValue;
+                for (const listener of standardListeners) {
+                    listener.fn(value, userPath, paramsInfo ? paramsInfo.params : undefined);
+                }
+                for (const listener of bulkListeners) {
+                    listener.fn([
+                        {
+                            value,
+                            path: userPath,
+                            params: paramsInfo ? paramsInfo.params : undefined
+                        }
+                    ]);
                 }
             }
         }
@@ -1466,13 +1561,13 @@ class DeepStore {
         if (typeof userPath === 'undefined' || userPath === '') {
             return this.data;
         }
-        return path(userPath.split('.'), this.data);
+        return path(this.split(userPath), this.data);
     }
     static clone(obj) {
         return fastCopy(obj);
     }
 }
-const Store = DeepStore;
+const State = DeepState;
 
-export default DeepStore;
-export { Store, match$1 as match, scanObject$1 as scanObject, wildcardToRegex$1 as wildcardToRegex };
+export default DeepState;
+export { State, match$1 as match, scanObject$1 as scanObject, wildcardToRegex$1 as wildcardToRegex };
