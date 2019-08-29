@@ -4,8 +4,15 @@ import wildcard from './wildcard-object-scan';
 export type ListenerFunction = (value: any, path: string, params: any) => {};
 export type Match = (path: string) => boolean;
 
+export interface Options {
+  delimeter: string;
+  recursive: string;
+  param: string;
+}
+
 export interface ListenerOptions {
   bulk: boolean;
+  debug: boolean;
 }
 
 export interface Listener {
@@ -48,15 +55,15 @@ export interface ParamsInfo {
 export const scanObject = wildcard.scanObject;
 export const match = wildcard.match;
 
-const defaultOptions = { delimeter: '.', recursive: '...', param: ':' };
-const defaultListenerOptions = { bulk: false };
+const defaultOptions: Options = { delimeter: '.', recursive: '...', param: ':' };
+const defaultListenerOptions: ListenerOptions = { bulk: false, debug: false };
 
 export default class DeepState {
   listeners: Listeners;
   data: any;
   options: any;
 
-  constructor(data = {}, options = defaultOptions) {
+  constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = {};
     this.data = data;
     this.options = { ...defaultOptions, ...options };
@@ -178,7 +185,7 @@ export default class DeepState {
     };
   }
 
-  getCleanListener(fn, options = defaultListenerOptions): Listener {
+  getCleanListener(fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions): Listener {
     return {
       fn,
       options: { ...defaultListenerOptions, ...options },
@@ -293,22 +300,48 @@ export default class DeepState {
         }
         const value = listenersCollection.isRecursive ? this.get(this.getRecursive(listenerPath)) : newValue;
         for (const listener of standardListeners) {
-          listener.fn(
-            value,
-            userPath,
-            listenersCollection.paramsInfo ? this.getParams(listenersCollection.paramsInfo, userPath) : undefined
-          );
+          let time;
+          if (listener.options.debug) {
+            time = performance.now();
+          }
+          const params = listenersCollection.paramsInfo
+            ? this.getParams(listenersCollection.paramsInfo, userPath)
+            : undefined;
+          listener.fn(value, userPath, params);
+          if (listener.options.debug) {
+            console.debug('listener updated', {
+              time: performance.now() - time,
+              value,
+              params,
+              path: userPath,
+              listenerPath
+            });
+          }
         }
         for (const listener of bulkListeners) {
+          let time;
+          if (listener.options.debug) {
+            time = performance.now();
+          }
+          const params = listenersCollection.paramsInfo
+            ? this.getParams(listenersCollection.paramsInfo, userPath)
+            : undefined;
           listener.fn([
             {
               value,
               path: userPath,
-              params: listenersCollection.paramsInfo
-                ? this.getParams(listenersCollection.paramsInfo, userPath)
-                : undefined
+              params
             }
           ]);
+          if (listener.options.debug) {
+            console.debug('listener updated', {
+              time: performance.now() - time,
+              value,
+              params,
+              path: userPath,
+              listenerPath
+            });
+          }
         }
       }
     }

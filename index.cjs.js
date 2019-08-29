@@ -2737,7 +2737,7 @@ var wildcard = { scanObject, match };
 const scanObject$1 = wildcard.scanObject;
 const match$1 = wildcard.match;
 const defaultOptions = { delimeter: '.', recursive: '...', param: ':' };
-const defaultListenerOptions = { bulk: false };
+const defaultListenerOptions = { bulk: false, debug: false };
 class DeepState {
     constructor(data = {}, options = defaultOptions) {
         this.listeners = {};
@@ -2960,18 +2960,48 @@ class DeepState {
                 }
                 const value = listenersCollection.isRecursive ? this.get(this.getRecursive(listenerPath)) : newValue;
                 for (const listener of standardListeners) {
-                    listener.fn(value, userPath, listenersCollection.paramsInfo ? this.getParams(listenersCollection.paramsInfo, userPath) : undefined);
+                    let time;
+                    if (listener.options.debug) {
+                        time = performance.now();
+                    }
+                    const params = listenersCollection.paramsInfo
+                        ? this.getParams(listenersCollection.paramsInfo, userPath)
+                        : undefined;
+                    listener.fn(value, userPath, params);
+                    if (listener.options.debug) {
+                        console.debug('listener updated', {
+                            time: performance.now() - time,
+                            value,
+                            params,
+                            path: userPath,
+                            listenerPath
+                        });
+                    }
                 }
                 for (const listener of bulkListeners) {
+                    let time;
+                    if (listener.options.debug) {
+                        time = performance.now();
+                    }
+                    const params = listenersCollection.paramsInfo
+                        ? this.getParams(listenersCollection.paramsInfo, userPath)
+                        : undefined;
                     listener.fn([
                         {
                             value,
                             path: userPath,
-                            params: listenersCollection.paramsInfo
-                                ? this.getParams(listenersCollection.paramsInfo, userPath)
-                                : undefined
+                            params
                         }
                     ]);
+                    if (listener.options.debug) {
+                        console.debug('listener updated', {
+                            time: performance.now() - time,
+                            value,
+                            params,
+                            path: userPath,
+                            listenerPath
+                        });
+                    }
                 }
             }
         }
