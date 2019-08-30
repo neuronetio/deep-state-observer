@@ -2599,6 +2599,13 @@ class DeepState {
         }
         return alreadyNotified;
     }
+    makeBulk(objectScan, path, params) {
+        const bulk = [];
+        for (const objPath in objectScan) {
+            bulk.push({ value: objectScan[objPath], path, params });
+        }
+        return bulk;
+    }
     notifyNestedListeners(modifiedPath, newValue, alreadyNotified) {
         for (let listenerPath in this.listeners) {
             if (alreadyNotified.includes(listenerPath)) {
@@ -2609,18 +2616,24 @@ class DeepState {
             if (this.match(currentCuttedPath, modifiedPath)) {
                 const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
                 const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
+                const params = listenersCollection.paramsInfo
+                    ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
+                    : undefined;
+                const bulk = [];
                 for (const currentRestPath in values) {
                     const value = values[currentRestPath];
                     const fullPath = [modifiedPath, currentRestPath].join(this.options.delimeter);
-                    const params = listenersCollection.paramsInfo
-                        ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
-                        : undefined;
                     for (const listener of listenersCollection.listeners) {
                         const time = this.debugTime(listener);
-                        listener.options.bulk
-                            ? listener.fn([{ value, path: fullPath, params }], undefined, undefined)
-                            : listener.fn(value, fullPath, params);
+                        listener.options.bulk ? bulk.push({ value, path: fullPath, params }) : listener.fn(value, fullPath, params);
                         this.debugListener(listener, time, value, params, modifiedPath, listenerPath);
+                    }
+                }
+                for (const listener of listenersCollection.listeners) {
+                    if (listener.options.bulk) {
+                        const time = this.debugTime(listener);
+                        listener.fn(bulk, undefined, undefined);
+                        this.debugListener(listener, time, bulk, params, modifiedPath, listenerPath);
                     }
                 }
             }

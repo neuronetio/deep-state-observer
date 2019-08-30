@@ -449,4 +449,21 @@ describe('State', () => {
     });
     expect(paths[0]).toEqual('config.list.rows');
   });
+
+  it('should bulk wildcarded subscribeAll', () => {
+    const state = new State({
+      something: [{ x: 1 }, { x: 1 }, { x: 1 }, { x: 1 }]
+    });
+    let count = 0;
+    state.subscribeAll(
+      ['something', 'something.*.x'],
+      (bulk) => {
+        count++;
+      },
+      { bulk: true }
+    );
+    expect(count).toEqual(2);
+    state.update('something', [...state.get('something'), { x: 'added' }]);
+    expect(count).toEqual(4);
+  });
 });
