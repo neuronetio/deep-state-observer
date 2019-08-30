@@ -2485,8 +2485,8 @@ class DeepState {
     }
     getListenerCollectionMatch(listenerPath, isRecursive, isWildcard) {
         return (path) => {
-            if (isRecursive && this.recursiveMatch(listenerPath, path)) {
-                return true;
+            if (isRecursive) {
+                path = this.cutPath(path, listenerPath);
             }
             if (isWildcard && wildcard.match(listenerPath, path)) {
                 return true;
@@ -2593,8 +2593,8 @@ class DeepState {
         for (let listenerPath in this.listeners) {
             const listenersCollection = this.listeners[listenerPath];
             if (listenersCollection.match(modifiedPath)) {
-                alreadyNotified.push(listenerPath);
-                const value = listenersCollection.isRecursive ? this.get(this.cleanRecursivePath(listenerPath)) : newValue;
+                alreadyNotified.push(listenersCollection);
+                const value = listenersCollection.isRecursive ? this.get(this.cutPath(modifiedPath, listenerPath)) : newValue;
                 const params = listenersCollection.paramsInfo
                     ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
                     : undefined;
@@ -2611,10 +2611,10 @@ class DeepState {
     }
     notifyNestedListeners(modifiedPath, newValue, alreadyNotified) {
         for (let listenerPath in this.listeners) {
-            if (alreadyNotified.includes(listenerPath)) {
+            const listenersCollection = this.listeners[listenerPath];
+            if (alreadyNotified.includes(listenersCollection)) {
                 continue;
             }
-            const listenersCollection = this.listeners[listenerPath];
             const currentCuttedPath = this.cutPath(listenerPath, modifiedPath);
             if (this.match(currentCuttedPath, modifiedPath)) {
                 const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
@@ -2671,8 +2671,10 @@ class DeepState {
         }
         this.data = set(lens, newValue, this.data);
         const alreadyNotified = this.notifySubscribedListeners(modifiedPath, newValue);
-        if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {
-            this.notifyNestedListeners(modifiedPath, newValue, alreadyNotified);
+        if (typeof newValue !== 'undefined' && newValue !== null) {
+            if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {
+                this.notifyNestedListeners(modifiedPath, newValue, alreadyNotified);
+            }
         }
         return newValue;
     }
