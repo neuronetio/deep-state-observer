@@ -2595,8 +2595,7 @@
       debugTime(listener) {
           return listener.options.debug ? Date.now() : 0;
       }
-      notifySubscribedListeners(modifiedPath, newValue) {
-          const alreadyNotified = [];
+      notifySubscribedListeners(modifiedPath, newValue, alreadyNotified = []) {
           for (let listenerPath in this.listeners) {
               const listenersCollection = this.listeners[listenerPath];
               if (listenersCollection.match(modifiedPath)) {
@@ -2650,6 +2649,12 @@
           }
       }
       update(modifiedPath, fn) {
+          if (this.isWildcard(modifiedPath)) {
+              for (const path in wildcard.scanObject(this.data, this.options.delimeter).get(modifiedPath)) {
+                  this.update(path, fn);
+              }
+              return;
+          }
           const lens = lensPath(this.split(modifiedPath));
           let oldValue = view(lens, this.data);
           if (typeof oldValue !== 'undefined' && oldValue !== null) {

@@ -72,7 +72,12 @@ import { onDestroy } from 'svelte';
 import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
 
 // first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
-const state = new State({ some: 'value', someOther: { nested: { node: 'ok' } } }, { delimeter: '.' });
+const state = new State({
+  some: { thing: { test: 0 } },
+  someOther: { nested: { node: 'ok' } } },
+
+  { delimeter: '.' }
+);
 
 // store some unsubscribe methods
 let subscribers = [];
@@ -98,6 +103,9 @@ subscribers.push(
     // path='someOther.nested.node'
   })
 );
+
+// you can update wildcarded values too
+state.update('some.*.test','test);
 
 onDestroy(() => {
   subscribers.forEach((unsubscribe) => unsubscribe());
