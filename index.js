@@ -2366,13 +2366,46 @@ var wildcard = { scanObject, match };
 
 const scanObject$1 = wildcard.scanObject;
 const match$1 = wildcard.match;
-const defaultOptions = { delimeter: '.', recursive: '...', param: ':' };
+const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: true };
 const defaultListenerOptions = { bulk: false, debug: false };
+function createCache() {
+    const cache = {};
+    const api = {
+        has(key, secondKey) {
+            return typeof cache[key] !== 'undefined' && typeof cache[key][secondKey] !== 'undefined';
+        },
+        get(key, secondKey) {
+            if (this.has(key, secondKey)) {
+                return cache[key][secondKey];
+            }
+            return undefined;
+        },
+        set(key, secondKey, value) {
+            if (typeof cache[key] === 'undefined') {
+                cache[key] = {};
+            }
+            cache[key][secondKey] = value;
+            return value;
+        },
+        delete(key, secondKey) {
+            if (typeof cache[key] === 'undefined') {
+                return;
+            }
+            if (typeof secondKey === 'undefined') {
+                delete cache[key];
+                return;
+            }
+            delete cache[key][secondKey];
+        }
+    };
+    return api;
+}
 class DeepState {
     constructor(data = {}, options = defaultOptions) {
         this.listeners = {};
         this.data = data;
         this.options = Object.assign({}, defaultOptions, options);
+        this.cache = createCache();
     }
     getListeners() {
         return this.listeners;
@@ -2385,7 +2418,14 @@ class DeepState {
         if (first === second) {
             return true;
         }
-        return this.isWildcard(first) ? match$1(first, second) : false;
+        if (this.options.useCache && this.cache.has(first, second)) {
+            return this.cache.get(first, second).match;
+        }
+        const matched = this.isWildcard(first) ? match$1(first, second) : false;
+        if (this.options.useCache) {
+            this.cache.set(first, second, { match: matched, params: undefined });
+        }
+        return matched;
     }
     cutPath(longer, shorter) {
         return this.split(this.cleanRecursivePath(longer))
@@ -2485,13 +2525,24 @@ class DeepState {
     }
     getListenerCollectionMatch(listenerPath, isRecursive, isWildcard) {
         return (path) => {
+            const originalPath = path;
+            if (this.options.useCache && this.cache.has(listenerPath, path)) {
+                return this.cache.get(listenerPath, path).match;
+            }
+            let result = false;
             if (isRecursive) {
                 path = this.cutPath(path, listenerPath);
             }
             if (isWildcard && wildcard.match(listenerPath, path)) {
-                return true;
+                result = true;
             }
-            return listenerPath === path;
+            else {
+                result = listenerPath === path;
+            }
+            if (this.options.useCache) {
+                this.cache.set(listenerPath, originalPath, { match: result, params: undefined });
+            }
+            return result;
         };
     }
     debugSubscribe(listener, listenersCollection, listenerPath) {
