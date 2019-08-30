@@ -1,6 +1,6 @@
 {
   "name": "deep-state-observer",
-  "version": "1.0.23",
+  "version": "1.0.24",
   "description": "Deep state observer is an state management library that will fire listeners only when specified object node (which also can be a wildcard) was changed.",
   "main": "index.cjs.js",
   "module": "index.js",
