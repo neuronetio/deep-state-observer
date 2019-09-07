@@ -476,12 +476,33 @@ export default class DeepState {
       this.canBeNested(newValue)
     ) {
       options.only.forEach((notifyPath) => {
-        const wildcarded = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
-        for (const wildcardPath in wildcarded) {
-          this.notifySubscribedListeners(
-            modifiedPath + this.options.delimeter + wildcardPath,
-            wildcarded[wildcardPath]
-          );
+        const wildcardScan = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
+        const bulk = [];
+        const bulkListeners = [];
+        for (const wildcardPath in wildcardScan) {
+          const fullPath = modifiedPath + this.options.delimeter + wildcardPath;
+          for (const listenerPath in this.listeners) {
+            const listenersCollection = this.listeners[listenerPath];
+            if (this.match(listenerPath, fullPath)) {
+              const params = listenersCollection.paramsInfo
+                ? this.getParams(listenersCollection.paramsInfo, fullPath)
+                : undefined;
+              const value = wildcardScan[wildcardPath];
+              bulk.push({ value, path: fullPath, params });
+              for (const listener of listenersCollection.listeners) {
+                if (listener.options.bulk) {
+                  if (!bulkListeners.includes(listener)) {
+                    bulkListeners.push(listener);
+                  }
+                } else {
+                  listener.fn(value, fullPath, params);
+                }
+              }
+            }
+          }
+        }
+        for (const listener of bulkListeners) {
+          listener.fn(bulk, undefined, undefined);
         }
       });
       return true;
