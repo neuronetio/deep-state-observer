@@ -649,6 +649,28 @@ describe('State', () => {
     expect(state.get('one.two.three.four')).toEqual(44);
   });
 
+  it('should notify only specified strict listeners (nested & wildcard 2)', () => {
+    const state = new State({
+      one: { two: { three: { four: 4 } } }
+    });
+    const values = [];
+    const paths = [];
+    state.subscribe('one.two', (val, path) => {
+      values.push(val);
+      paths.push(path);
+    });
+    state.subscribe('one.two.*.four', (val, path) => {
+      values.push(val);
+      paths.push(path);
+    });
+    expect(values.length).toEqual(2);
+    state.update('one.two', { three: { four: 44 } }, { only: ['*.four'] });
+    expect(paths.length).toEqual(3);
+    expect(values[2]).toEqual(44);
+    expect(paths[2]).toEqual('one.two.three.four');
+    expect(state.get('one.two.three.four')).toEqual(44);
+  });
+
   it('should notify only specified strict listeners (nested & wildcard **)', () => {
     const state = new State({
       one: { two: { three: { four: 4 } } }

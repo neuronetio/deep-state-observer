@@ -2703,14 +2703,10 @@ class DeepState {
             Array.isArray(options.only) &&
             options.only.length &&
             this.canBeNested(newValue)) {
-            let alreadyNotified = [];
             options.only.forEach((notifyPath) => {
                 const wildcarded = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
                 for (const wildcardPath in wildcarded) {
-                    alreadyNotified = [
-                        ...alreadyNotified,
-                        ...this.notifySubscribedListeners(modifiedPath + this.options.delimeter + wildcardPath, wildcarded[wildcardPath])
-                    ];
+                    this.notifySubscribedListeners(modifiedPath + this.options.delimeter + wildcardPath, wildcarded[wildcardPath]);
                 }
             });
             return true;
