@@ -86,7 +86,7 @@ export interface CacheCollectionApi {
 export const scanObject = wildcard.scanObject;
 export const match = wildcard.match;
 
-const defaultOptions: Options = { delimeter: '.', recursive: '...', param: ':', useCache: true };
+const defaultOptions: Options = { delimeter: '.', recursive: '...', param: ':', useCache: false };
 const defaultListenerOptions: ListenerOptions = { bulk: false, debug: false };
 const defaultUpdateOptions: UpdateOptions = { only: [] };
 

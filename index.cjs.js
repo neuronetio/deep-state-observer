@@ -2370,7 +2370,7 @@ var wildcard = { scanObject, match };
 
 const scanObject$1 = wildcard.scanObject;
 const match$1 = wildcard.match;
-const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: true };
+const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: false };
 const defaultListenerOptions = { bulk: false, debug: false };
 const defaultUpdateOptions = { only: [] };
 function createCache() {
