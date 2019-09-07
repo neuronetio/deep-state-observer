@@ -2,10 +2,13 @@
 [![GitHub issues](https://img.shields.io/github/issues/neuronetio/deep-state-observer)](https://github.com/neuronetio/deep-state-observer/issues)
 [![Twitter](https://img.shields.io/twitter/url/https/github.com/neuronetio/deep-state-observer)](https://twitter.com/intent/tweet?text=Wow:&url=https%3A%2F%2Fgithub.com%2Fneuronetio%2Fdeep-state-observer)
 
-# deep-state-observer
+# deep-state-observer for high performance apps
 
 Deep state observer is an state management library which will be fired only when specified object node was changed.
 You don't need to reevaluate or re-render whole app/component when only one portion of the state was modified.
+
+### Used in the right hands can significantly increase performance!
+
 Deep state observer is framework agnostic with node and browser support, so you can use it in most of your projects.
 
 # Usage
@@ -299,13 +302,32 @@ onDestroy(() => {
 });
 ```
 
+## Update and notify only specified listeners
+
+```javascript
+const state = new State({
+  one: { two: { three: { four: 4 } } }
+});
+state.subscribe('one.two', (val, path) => {
+  // trigerred only once - immediately
+  // because update have option 'only' wich will update only selected nested paths even i you are updating whole 'one.two' object
+  // 'only' option works for object and arrays and it is usefull when you have changed only 'four'-th node of the object
+  // and don't want to listeners from 'one.two' be notified (it is kind of performance improvement hack)
+  // you can bypass those huge operation that is executed here because it is not needed (we are changing only one 'four'th leaf)
+});
+state.subscribe('one.two.three.four', (val, path) => {
+  // trigerred two times immediately and after update
+});
+state.update('one.two', { three: { four: 44 } }, { only: ['*.four'] });
+```
+
 ## Vue example
 
 ```javascript
 // main component
-import Store from 'deep-state-observer';
+import State from 'deep-state-observer';
 
-const state = new Store({ test: 1 });
+const state = new State({ test: 1 });
 const subscribers = [];
 
 export default {

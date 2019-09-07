@@ -2374,6 +2374,7 @@
   const match$1 = wildcard.match;
   const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: true };
   const defaultListenerOptions = { bulk: false, debug: false };
+  const defaultUpdateOptions = { only: [] };
   function createCache() {
       const cache = {};
       const api = {
@@ -2699,7 +2700,40 @@
               }
           }
       }
-      update(modifiedPath, fn, options = {}) {
+      notifyOnly(modifiedPath, newValue, options) {
+          if (typeof options.only !== 'undefined' &&
+              Array.isArray(options.only) &&
+              options.only.length &&
+              this.canBeNested(newValue)) {
+              let alreadyNotified = [];
+              options.only.forEach((notifyPath) => {
+                  const wildcarded = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
+                  for (const wildcardPath in wildcarded) {
+                      alreadyNotified = [
+                          ...alreadyNotified,
+                          ...this.notifySubscribedListeners(modifiedPath + this.options.delimeter + wildcardPath, wildcarded[wildcardPath])
+                      ];
+                  }
+              });
+              options.only.forEach((notifyPath) => {
+                  const wildcarded = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
+                  for (const wildcardPath in wildcarded) {
+                      this.notifyNestedListeners(modifiedPath + this.options.delimeter + wildcardPath, wildcarded[wildcardPath], alreadyNotified);
+                  }
+              });
+              return true;
+          }
+          return false;
+      }
+      canBeNested(newValue) {
+          if (typeof newValue !== 'undefined' && newValue !== null) {
+              if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {
+                  return true;
+              }
+          }
+          return false;
+      }
+      update(modifiedPath, fn, options = defaultUpdateOptions) {
           if (this.isWildcard(modifiedPath)) {
               for (const path in wildcard.scanObject(this.data, this.options.delimeter).get(modifiedPath)) {
                   this.update(path, fn);
@@ -2727,15 +2761,13 @@
               return newValue;
           }
           this.data = set(lens, newValue, this.data);
-          if (typeof options.notifyOnly !== 'undefined' && Array.isArray(options.notifyOnly)) {
-              options.notifyOnly.forEach((notifyPath) => this.notifySubscribedListeners(modifiedPath + this.options.delimeter + notifyPath, path(this.split(notifyPath), newValue)));
+          options = Object.assign({}, defaultUpdateOptions, options);
+          if (this.notifyOnly(modifiedPath, newValue, options)) {
               return newValue;
           }
           const alreadyNotified = this.notifySubscribedListeners(modifiedPath, newValue);
-          if (typeof newValue !== 'undefined' && newValue !== null) {
-              if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {
-                  this.notifyNestedListeners(modifiedPath, newValue, alreadyNotified);
-              }
+          if (this.canBeNested(newValue)) {
+              this.notifyNestedListeners(modifiedPath, newValue, alreadyNotified);
           }
           return newValue;
       }
