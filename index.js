@@ -2693,7 +2693,7 @@ class DeepState {
             }
         }
     }
-    update(modifiedPath, fn) {
+    update(modifiedPath, fn, options = {}) {
         if (this.isWildcard(modifiedPath)) {
             for (const path in wildcard.scanObject(this.data, this.options.delimeter).get(modifiedPath)) {
                 this.update(path, fn);
@@ -2721,6 +2721,10 @@ class DeepState {
             return newValue;
         }
         this.data = set(lens, newValue, this.data);
+        if (typeof options.notifyOnly !== 'undefined' && Array.isArray(options.notifyOnly)) {
+            options.notifyOnly.forEach((notifyPath) => this.notifySubscribedListeners(modifiedPath + this.options.delimeter + notifyPath, path(this.split(notifyPath), newValue)));
+            return newValue;
+        }
         const alreadyNotified = this.notifySubscribedListeners(modifiedPath, newValue);
         if (typeof newValue !== 'undefined' && newValue !== null) {
             if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {

@@ -70,6 +70,10 @@ export interface CacheCollection {
   [listenerPath: string]: Cache;
 }
 
+export interface UpdateOptions {
+  notifyOnly: string[];
+}
+
 export type CacheGetResult = CacheValue | any;
 
 export interface CacheCollectionApi {
@@ -463,7 +467,7 @@ export default class DeepState {
     }
   }
 
-  update(modifiedPath: string, fn: Updater) {
+  update(modifiedPath: string, fn: Updater, options: UpdateOptions = {}) {
     if (this.isWildcard(modifiedPath)) {
       for (const path in wildcard.scanObject(this.data, this.options.delimeter).get(modifiedPath)) {
         this.update(path, fn);
@@ -489,6 +493,15 @@ export default class DeepState {
       return newValue;
     }
     this.data = set(lens, newValue, this.data);
+    if (typeof options.notifyOnly !== 'undefined' && Array.isArray(options.notifyOnly)) {
+      options.notifyOnly.forEach((notifyPath) =>
+        this.notifySubscribedListeners(
+          modifiedPath + this.options.delimeter + notifyPath,
+          path(this.split(notifyPath), newValue)
+        )
+      );
+      return newValue;
+    }
     const alreadyNotified = this.notifySubscribedListeners(modifiedPath, newValue);
     if (typeof newValue !== 'undefined' && newValue !== null) {
       if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {
