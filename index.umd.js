@@ -2715,12 +2715,6 @@
                       ];
                   }
               });
-              options.only.forEach((notifyPath) => {
-                  const wildcarded = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
-                  for (const wildcardPath in wildcarded) {
-                      this.notifyNestedListeners(modifiedPath + this.options.delimeter + wildcardPath, wildcarded[wildcardPath], alreadyNotified);
-                  }
-              });
               return true;
           }
           return false;
