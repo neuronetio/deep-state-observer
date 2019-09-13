@@ -4,7 +4,7 @@
 
 # deep-state-observer for high performance apps
 
-Deep state observer is an state management library which will be fired only when specified object node was changed.
+Deep state observer is an state management library which will trigger an update only when specified object node was changed.
 You don't need to reevaluate or re-render whole app/component when only one portion of the state was modified.
 
 ### Used in the right hands can significantly increase performance!
