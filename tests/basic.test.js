@@ -733,4 +733,30 @@ describe('State', () => {
     expect(paths[2]).toEqual('one.two.three.four');
     expect(state.get('one.two.three.four')).toEqual(44);
   });
+
+  it('should destroy listeners', () => {
+    const state = new State({ test: 'x' });
+    const values = [];
+    const first = state.subscribe('test', (test) => {
+      values.push(test);
+    });
+    const second = state.subscribe('test', (test) => {
+      values.push(test + '2');
+    });
+    expect(values.length).toEqual(2);
+    expect(values[0]).toEqual('x');
+    expect(values[1]).toEqual('x2');
+    state.update('test', 'x3');
+    expect(values.length).toEqual(4);
+    expect(values[2]).toEqual('x3');
+    expect(values[3]).toEqual('x32');
+    first();
+    state.update('test', 'xx');
+    expect(values.length).toEqual(5);
+    expect(values[4]).toEqual('xx2');
+    second();
+    state.update('test', 'xxx');
+    expect(values.length).toEqual(5);
+    expect(values[4]).toEqual('xx2');
+  });
 });
