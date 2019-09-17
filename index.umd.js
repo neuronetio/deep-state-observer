@@ -2415,6 +2415,7 @@
           this.cache = createCache();
           this.id = 0;
           this.cutPathCache = createCache();
+          this.splitCache = {};
       }
       getListeners() {
           return this.listeners;
@@ -2453,7 +2454,14 @@
           return this.cleanRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`), '');
       }
       split(path) {
-          return path === '' ? [] : path.split(this.options.delimeter);
+          if (this.options.usePathCache && typeof this.splitCache[path] !== 'undefined') {
+              return this.splitCache[path];
+          }
+          const result = path === '' ? [] : path.split(this.options.delimeter);
+          if (this.options.usePathCache) {
+              this.splitCache[path] = result;
+          }
+          return result;
       }
       isWildcard(path) {
           return path.indexOf('*') > -1;

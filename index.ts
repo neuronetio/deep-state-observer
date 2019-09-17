@@ -89,6 +89,10 @@ export interface CacheCollectionApi {
   delete: (key: string, secondKey: string | undefined) => any;
 }
 
+export interface SimpleCache {
+  [key: string]: string[];
+}
+
 export const scanObject = wildcard.scanObject;
 export const match = wildcard.match;
 
@@ -139,6 +143,7 @@ export default class DeepState {
   cache: CacheCollectionApi;
   id: number;
   cutPathCache: CacheCollectionApi;
+  splitCache: SimpleCache;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = {};
@@ -147,6 +152,7 @@ export default class DeepState {
     this.cache = createCache();
     this.id = 0;
     this.cutPathCache = createCache();
+    this.splitCache = {};
   }
 
   getListeners(): Listeners {
@@ -194,7 +200,14 @@ export default class DeepState {
   }
 
   split(path: string) {
-    return path === '' ? [] : path.split(this.options.delimeter);
+    if (this.options.usePathCache && typeof this.splitCache[path] !== 'undefined') {
+      return this.splitCache[path];
+    }
+    const result = path === '' ? [] : path.split(this.options.delimeter);
+    if (this.options.usePathCache) {
+      this.splitCache[path] = result;
+    }
+    return result;
   }
 
   isWildcard(path: string): boolean {
