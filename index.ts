@@ -9,6 +9,7 @@ export interface Options {
   recursive: string;
   param: string;
   useCache: boolean;
+  usePathCache: boolean;
 }
 
 export interface ListenerOptions {
@@ -91,7 +92,7 @@ export interface CacheCollectionApi {
 export const scanObject = wildcard.scanObject;
 export const match = wildcard.match;
 
-const defaultOptions: Options = { delimeter: '.', recursive: '...', param: ':', useCache: false };
+const defaultOptions: Options = { delimeter: '.', recursive: '...', param: ':', useCache: false, usePathCache: true };
 const defaultListenerOptions: ListenerOptions = { bulk: false, debug: false };
 const defaultUpdateOptions: UpdateOptions = { only: [] };
 
@@ -137,6 +138,7 @@ export default class DeepState {
   options: any;
   cache: CacheCollectionApi;
   id: number;
+  cutPathCache: WeakMap<string[], string>;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = {};
@@ -144,6 +146,7 @@ export default class DeepState {
     this.options = { ...defaultOptions, ...options };
     this.cache = createCache();
     this.id = 0;
+    this.cutPathCache = new WeakMap();
   }
 
   getListeners(): Listeners {
@@ -170,9 +173,16 @@ export default class DeepState {
   }
 
   cutPath(longer: string, shorter: string): string {
-    return this.split(this.cleanRecursivePath(longer))
+    if (this.options.usePathCache && this.cutPathCache.has([longer, shorter])) {
+      return this.cutPathCache.get([longer, shorter]);
+    }
+    const result = this.split(this.cleanRecursivePath(longer))
       .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
       .join(this.options.delimeter);
+    if (this.options.usePathCache) {
+      this.cutPathCache.set([longer, shorter], result);
+    }
+    return result;
   }
 
   trimPath(path: string): string {

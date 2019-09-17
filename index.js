@@ -2366,7 +2366,7 @@ var wildcard = { scanObject, match };
 
 const scanObject$1 = wildcard.scanObject;
 const match$1 = wildcard.match;
-const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: false };
+const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: false, usePathCache: true };
 const defaultListenerOptions = { bulk: false, debug: false };
 const defaultUpdateOptions = { only: [] };
 function createCache() {
@@ -2408,6 +2408,7 @@ class DeepState {
         this.options = Object.assign({}, defaultOptions, options);
         this.cache = createCache();
         this.id = 0;
+        this.cutPathCache = new WeakMap();
     }
     getListeners() {
         return this.listeners;
@@ -2430,9 +2431,16 @@ class DeepState {
         return matched;
     }
     cutPath(longer, shorter) {
-        return this.split(this.cleanRecursivePath(longer))
+        if (this.options.usePathCache && this.cutPathCache.has([longer, shorter])) {
+            return this.cutPathCache.get([longer, shorter]);
+        }
+        const result = this.split(this.cleanRecursivePath(longer))
             .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
             .join(this.options.delimeter);
+        if (this.options.usePathCache) {
+            this.cutPathCache.set([longer, shorter], result);
+        }
+        return result;
     }
     trimPath(path) {
         return this.cleanRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`), '');
