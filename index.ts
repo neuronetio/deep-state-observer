@@ -23,9 +23,14 @@ export interface Listener {
 
 export type Updater = (value: any) => {};
 
+export interface ListenersObject {
+  [key: string]: Listener;
+  [key: number]: Listener;
+}
+
 export interface ListenersCollection {
   path: string;
-  listeners: Listener[];
+  listeners: ListenersObject;
   isWildcard: boolean;
   isRecursive: boolean;
   hasParams: boolean;
@@ -131,12 +136,14 @@ export default class DeepState {
   data: any;
   options: any;
   cache: CacheCollectionApi;
+  id: number;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = {};
     this.data = data;
     this.options = { ...defaultOptions, ...options };
     this.cache = createCache();
+    this.id = 0;
   }
 
   getListeners(): Listeners {
@@ -257,7 +264,7 @@ export default class DeepState {
   getCleanListenersCollection(values = {}): ListenersCollection {
     return {
       ...{
-        listeners: [],
+        listeners: {},
         isRecursive: false,
         isWildcard: false,
         hasParams: false,
@@ -332,7 +339,8 @@ export default class DeepState {
     } else {
       listenersCollection = this.listeners[collCfg.path];
     }
-    listenersCollection.listeners.push(listener);
+    this.id++;
+    listenersCollection.listeners[this.id] = listener;
     return listenersCollection;
   }
 
@@ -370,20 +378,15 @@ export default class DeepState {
       }
     }
     this.debugSubscribe(listener, listenersCollection, listenerPath);
-    return this.unsubscribe(listener);
+    return this.unsubscribe(listener, listenersCollection, listenerPath, this.id);
   }
 
-  unsubscribe(listener: Listener) {
+  unsubscribe(listener: Listener, listenerCollection: ListenersCollection, listenerPath: string, id: number) {
     return () => {
-      for (const listenerPath in this.listeners) {
-        const listeners = this.listeners[listenerPath].listeners;
-        const index = listeners.indexOf(listener);
-        if (index > -1) {
-          listeners.splice(index, 1);
-          if (this.listeners[listenerPath].listeners.length === 0) {
-            delete this.listeners[listenerPath];
-          }
-        }
+      const listeners = listenerCollection.listeners;
+      delete listeners[id];
+      if (Object.keys(listenerCollection.listeners).length === 0) {
+        delete this.listeners[listenerPath];
       }
     };
   }
@@ -424,7 +427,8 @@ export default class DeepState {
         const params = listenersCollection.paramsInfo
           ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
           : undefined;
-        for (const listener of listenersCollection.listeners) {
+        for (const listenerId in listenersCollection.listeners) {
+          const listener = listenersCollection.listeners[listenerId];
           const time = this.debugTime(listener);
           listener.options.bulk
             ? listener.fn([{ value, path: modifiedPath, params }], undefined, undefined)
@@ -453,13 +457,15 @@ export default class DeepState {
         for (const currentRestPath in values) {
           const value = values[currentRestPath];
           const fullPath = [modifiedPath, currentRestPath].join(this.options.delimeter);
-          for (const listener of listenersCollection.listeners) {
+          for (const listenerId in listenersCollection.listeners) {
+            const listener = listenersCollection.listeners[listenerId];
             const time = this.debugTime(listener);
             listener.options.bulk ? bulk.push({ value, path: fullPath, params }) : listener.fn(value, fullPath, params);
             this.debugListener(listener, time, value, params, modifiedPath, listenerPath);
           }
         }
-        for (const listener of listenersCollection.listeners) {
+        for (const listenerId in listenersCollection.listeners) {
+          const listener = listenersCollection.listeners[listenerId];
           if (listener.options.bulk) {
             const time = this.debugTime(listener);
             listener.fn(bulk, undefined, undefined);
@@ -491,7 +497,8 @@ export default class DeepState {
                 : undefined;
               const value = wildcardScan[wildcardPath];
               bulk.push({ value, path: fullPath, params });
-              for (const listener of listenersCollection.listeners) {
+              for (const listenerId in listenersCollection.listeners) {
+                const listener = listenersCollection.listeners[listenerId];
                 if (listener.options.bulk) {
                   if (!bulkListeners.includes(listener)) {
                     bulkListeners.push(listener);
