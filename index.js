@@ -2613,12 +2613,10 @@ class DeepState {
             }
         }
         this.debugSubscribe(listener, listenersCollection, listenerPath);
-        return this.unsubscribe(listener, listenersCollection, listenerPath, this.id);
+        return this.unsubscribe.bind({ id: this.id, listeners: listenersCollection.listeners });
     }
-    unsubscribe(listener, listenerCollection, listenerPath, id) {
-        return () => {
-            delete listenerCollection.listeners[id];
-        };
+    unsubscribe() {
+        delete this.listeners[this.id];
     }
     same(newValue, oldValue) {
         return ((['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) || newValue === null) &&

@@ -378,13 +378,11 @@ export default class DeepState {
       }
     }
     this.debugSubscribe(listener, listenersCollection, listenerPath);
-    return this.unsubscribe(listener, listenersCollection, listenerPath, this.id);
+    return this.unsubscribe.bind({ id: this.id, listeners: listenersCollection.listeners });
   }
 
-  unsubscribe(listener: Listener, listenerCollection: ListenersCollection, listenerPath: string, id: number) {
-    return () => {
-      delete listenerCollection.listeners[id];
-    };
+  unsubscribe() {
+    delete this.listeners[this.id];
   }
 
   same(newValue, oldValue): boolean {

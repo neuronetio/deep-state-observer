@@ -5,7 +5,6 @@ describe('State', () => {
   it('should check existence of methods and data', () => {
     const state = new State({ test: '123' });
     expect(typeof state).toEqual('object');
-    expect(typeof state.unsubscribe).toBe('function');
     expect(typeof state.subscribe).toBe('function');
     expect(typeof state.subscribeAll).toBe('function');
     expect(typeof state.update).toBe('function');
