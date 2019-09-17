@@ -376,11 +376,13 @@ export default class DeepState {
   unsubscribe(listener: Listener) {
     return () => {
       for (const listenerPath in this.listeners) {
-        this.listeners[listenerPath].listeners = this.listeners[listenerPath].listeners.filter(
-          (current) => current !== listener
-        );
-        if (this.listeners[listenerPath].listeners.length === 0) {
-          delete this.listeners[listenerPath];
+        const listeners = this.listeners[listenerPath].listeners;
+        const index = listeners.indexOf(listener);
+        if (index > -1) {
+          listeners.splice(index, 1);
+          if (this.listeners[listenerPath].listeners.length === 0) {
+            delete this.listeners[listenerPath];
+          }
         }
       }
     };
