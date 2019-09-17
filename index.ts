@@ -383,11 +383,7 @@ export default class DeepState {
 
   unsubscribe(listener: Listener, listenerCollection: ListenersCollection, listenerPath: string, id: number) {
     return () => {
-      const listeners = listenerCollection.listeners;
-      delete listeners[id];
-      if (Object.keys(listenerCollection.listeners).length === 0) {
-        delete this.listeners[listenerPath];
-      }
+      delete listenerCollection.listeners[id];
     };
   }
 

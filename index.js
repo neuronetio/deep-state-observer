@@ -2617,11 +2617,7 @@ class DeepState {
     }
     unsubscribe(listener, listenerCollection, listenerPath, id) {
         return () => {
-            const listeners = listenerCollection.listeners;
-            delete listeners[id];
-            if (Object.keys(listenerCollection.listeners).length === 0) {
-                delete this.listeners[listenerPath];
-            }
+            delete listenerCollection.listeners[id];
         };
     }
     same(newValue, oldValue) {
