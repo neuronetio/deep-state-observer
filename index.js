@@ -2408,7 +2408,7 @@ class DeepState {
         this.options = Object.assign({}, defaultOptions, options);
         this.cache = createCache();
         this.id = 0;
-        this.cutPathCache = new WeakMap();
+        this.cutPathCache = createCache();
     }
     getListeners() {
         return this.listeners;
@@ -2431,14 +2431,15 @@ class DeepState {
         return matched;
     }
     cutPath(longer, shorter) {
-        if (this.options.usePathCache && this.cutPathCache.has([longer, shorter])) {
-            return this.cutPathCache.get([longer, shorter]);
+        const cachePath = JSON.stringify([longer, shorter]);
+        if (this.options.usePathCache && this.cutPathCache.has(longer, shorter)) {
+            return this.cutPathCache.get(longer, shorter);
         }
         const result = this.split(this.cleanRecursivePath(longer))
             .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
             .join(this.options.delimeter);
         if (this.options.usePathCache) {
-            this.cutPathCache.set([longer, shorter], result);
+            this.cutPathCache.set(longer, shorter, result);
         }
         return result;
     }

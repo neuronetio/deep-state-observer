@@ -85,7 +85,7 @@ export type CacheGetResult = CacheValue | any;
 export interface CacheCollectionApi {
   get: (key: string, secondKey: string) => CacheGetResult;
   has: (key: string, secondKey: string) => boolean;
-  set: (key: string, secondKey: string, value: CacheValue) => CacheValue;
+  set: (key: string, secondKey: string, value: CacheValue | string) => CacheValue | string;
   delete: (key: string, secondKey: string | undefined) => any;
 }
 
@@ -138,7 +138,7 @@ export default class DeepState {
   options: any;
   cache: CacheCollectionApi;
   id: number;
-  cutPathCache: WeakMap<string[], string>;
+  cutPathCache: CacheCollectionApi;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = {};
@@ -146,7 +146,7 @@ export default class DeepState {
     this.options = { ...defaultOptions, ...options };
     this.cache = createCache();
     this.id = 0;
-    this.cutPathCache = new WeakMap();
+    this.cutPathCache = createCache();
   }
 
   getListeners(): Listeners {
@@ -173,14 +173,15 @@ export default class DeepState {
   }
 
   cutPath(longer: string, shorter: string): string {
-    if (this.options.usePathCache && this.cutPathCache.has([longer, shorter])) {
-      return this.cutPathCache.get([longer, shorter]);
+    const cachePath = JSON.stringify([longer, shorter]);
+    if (this.options.usePathCache && this.cutPathCache.has(longer, shorter)) {
+      return this.cutPathCache.get(longer, shorter);
     }
     const result = this.split(this.cleanRecursivePath(longer))
       .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
       .join(this.options.delimeter);
     if (this.options.usePathCache) {
-      this.cutPathCache.set([longer, shorter], result);
+      this.cutPathCache.set(longer, shorter, result);
     }
     return result;
   }
