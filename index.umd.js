@@ -2375,47 +2375,12 @@
   const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: false, usePathCache: true };
   const defaultListenerOptions = { bulk: false, debug: false };
   const defaultUpdateOptions = { only: [] };
-  function createCache() {
-      const cache = {};
-      const api = {
-          has(key, secondKey) {
-              return typeof cache[key] !== 'undefined' && typeof cache[key][secondKey] !== 'undefined';
-          },
-          get(key, secondKey) {
-              if (this.has(key, secondKey)) {
-                  return cache[key][secondKey];
-              }
-              return undefined;
-          },
-          set(key, secondKey, value) {
-              if (typeof cache[key] === 'undefined') {
-                  cache[key] = {};
-              }
-              cache[key][secondKey] = value;
-              return value;
-          },
-          delete(key, secondKey) {
-              if (typeof cache[key] === 'undefined') {
-                  return;
-              }
-              if (typeof secondKey === 'undefined') {
-                  delete cache[key];
-                  return;
-              }
-              delete cache[key][secondKey];
-          }
-      };
-      return api;
-  }
   class DeepState {
       constructor(data = {}, options = defaultOptions) {
           this.listeners = {};
           this.data = data;
           this.options = Object.assign({}, defaultOptions, options);
-          this.cache = createCache();
           this.id = 0;
-          this.cutPathCache = createCache();
-          this.splitCache = {};
       }
       getListeners() {
           return this.listeners;
@@ -2428,40 +2393,18 @@
           if (first === second) {
               return true;
           }
-          if (this.options.useCache && this.cache.has(first, second)) {
-              return this.cache.get(first, second).match;
-          }
-          const matched = this.isWildcard(first) ? match$1(first, second) : false;
-          if (this.options.useCache) {
-              this.cache.set(first, second, { match: matched, params: undefined });
-          }
-          return matched;
+          return this.isWildcard(first) ? match$1(first, second) : false;
       }
       cutPath(longer, shorter) {
-          const cachePath = JSON.stringify([longer, shorter]);
-          if (this.options.usePathCache && this.cutPathCache.has(longer, shorter)) {
-              return this.cutPathCache.get(longer, shorter);
-          }
-          const result = this.split(this.cleanRecursivePath(longer))
+          return this.split(this.cleanRecursivePath(longer))
               .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
               .join(this.options.delimeter);
-          if (this.options.usePathCache) {
-              this.cutPathCache.set(longer, shorter, result);
-          }
-          return result;
       }
       trimPath(path) {
           return this.cleanRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`), '');
       }
       split(path) {
-          if (this.options.usePathCache && typeof this.splitCache[path] !== 'undefined') {
-              return this.splitCache[path];
-          }
-          const result = path === '' ? [] : path.split(this.options.delimeter);
-          if (this.options.usePathCache) {
-              this.splitCache[path] = result;
-          }
-          return result;
+          return path === '' ? [] : path.split(this.options.delimeter);
       }
       isWildcard(path) {
           return path.indexOf('*') > -1;
@@ -2550,10 +2493,6 @@
       }
       getListenerCollectionMatch(listenerPath, isRecursive, isWildcard) {
           return (path) => {
-              const originalPath = path;
-              if (this.options.useCache && this.cache.has(listenerPath, path)) {
-                  return this.cache.get(listenerPath, path).match;
-              }
               let result = false;
               if (isRecursive) {
                   path = this.cutPath(path, listenerPath);
@@ -2563,9 +2502,6 @@
               }
               else {
                   result = listenerPath === path;
-              }
-              if (this.options.useCache) {
-                  this.cache.set(listenerPath, originalPath, { match: result, params: undefined });
               }
               return result;
           };

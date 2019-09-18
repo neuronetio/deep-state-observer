@@ -63,34 +63,8 @@ export interface ParamsInfo {
   original: string;
 }
 
-export interface CacheValue {
-  match: boolean;
-  params: Params | undefined;
-}
-
-export interface Cache {
-  [comparedWith: string]: CacheValue;
-}
-
-export interface CacheCollection {
-  [listenerPath: string]: Cache;
-}
-
 export interface UpdateOptions {
   only: string[];
-}
-
-export type CacheGetResult = CacheValue | any;
-
-export interface CacheCollectionApi {
-  get: (key: string, secondKey: string) => CacheGetResult;
-  has: (key: string, secondKey: string) => boolean;
-  set: (key: string, secondKey: string, value: CacheValue | string) => CacheValue | string;
-  delete: (key: string, secondKey: string | undefined) => any;
-}
-
-export interface SimpleCache {
-  [key: string]: string[];
 }
 
 export const scanObject = wildcard.scanObject;
@@ -100,59 +74,17 @@ const defaultOptions: Options = { delimeter: '.', recursive: '...', param: ':', 
 const defaultListenerOptions: ListenerOptions = { bulk: false, debug: false };
 const defaultUpdateOptions: UpdateOptions = { only: [] };
 
-function createCache(): CacheCollectionApi {
-  const cache: CacheCollection = {};
-  const api = {
-    has(key: string, secondKey: string): boolean {
-      return typeof cache[key] !== 'undefined' && typeof cache[key][secondKey] !== 'undefined';
-    },
-
-    get(key: string, secondKey: string): CacheGetResult {
-      if (this.has(key, secondKey)) {
-        return cache[key][secondKey];
-      }
-      return undefined;
-    },
-
-    set(key: string, secondKey: string, value: CacheValue): CacheValue {
-      if (typeof cache[key] === 'undefined') {
-        cache[key] = {};
-      }
-      cache[key][secondKey] = value;
-      return value;
-    },
-
-    delete(key: string, secondKey: string | undefined) {
-      if (typeof cache[key] === 'undefined') {
-        return;
-      }
-      if (typeof secondKey === 'undefined') {
-        delete cache[key];
-        return;
-      }
-      delete cache[key][secondKey];
-    }
-  };
-  return api;
-}
-
 export default class DeepState {
   listeners: Listeners;
   data: any;
   options: any;
-  cache: CacheCollectionApi;
   id: number;
-  cutPathCache: CacheCollectionApi;
-  splitCache: SimpleCache;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = {};
     this.data = data;
     this.options = { ...defaultOptions, ...options };
-    this.cache = createCache();
     this.id = 0;
-    this.cutPathCache = createCache();
-    this.splitCache = {};
   }
 
   getListeners(): Listeners {
@@ -168,28 +100,13 @@ export default class DeepState {
     if (first === second) {
       return true;
     }
-    if (this.options.useCache && this.cache.has(first, second)) {
-      return this.cache.get(first, second).match;
-    }
-    const matched = this.isWildcard(first) ? match(first, second) : false;
-    if (this.options.useCache) {
-      this.cache.set(first, second, { match: matched, params: undefined });
-    }
-    return matched;
+    return this.isWildcard(first) ? match(first, second) : false;
   }
 
   cutPath(longer: string, shorter: string): string {
-    const cachePath = JSON.stringify([longer, shorter]);
-    if (this.options.usePathCache && this.cutPathCache.has(longer, shorter)) {
-      return this.cutPathCache.get(longer, shorter);
-    }
-    const result = this.split(this.cleanRecursivePath(longer))
+    return this.split(this.cleanRecursivePath(longer))
       .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
       .join(this.options.delimeter);
-    if (this.options.usePathCache) {
-      this.cutPathCache.set(longer, shorter, result);
-    }
-    return result;
   }
 
   trimPath(path: string): string {
@@ -200,14 +117,7 @@ export default class DeepState {
   }
 
   split(path: string) {
-    if (this.options.usePathCache && typeof this.splitCache[path] !== 'undefined') {
-      return this.splitCache[path];
-    }
-    const result = path === '' ? [] : path.split(this.options.delimeter);
-    if (this.options.usePathCache) {
-      this.splitCache[path] = result;
-    }
-    return result;
+    return path === '' ? [] : path.split(this.options.delimeter);
   }
 
   isWildcard(path: string): boolean {
@@ -310,9 +220,6 @@ export default class DeepState {
   getListenerCollectionMatch(listenerPath: string, isRecursive: boolean, isWildcard: boolean) {
     return (path) => {
       const originalPath = path;
-      if (this.options.useCache && this.cache.has(listenerPath, path)) {
-        return this.cache.get(listenerPath, path).match;
-      }
       let result = false;
       if (isRecursive) {
         path = this.cutPath(path, listenerPath);
@@ -321,9 +228,6 @@ export default class DeepState {
         result = true;
       } else {
         result = listenerPath === path;
-      }
-      if (this.options.useCache) {
-        this.cache.set(listenerPath, originalPath, { match: result, params: undefined });
       }
       return result;
     };
