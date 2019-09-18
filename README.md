@@ -321,6 +321,14 @@ state.subscribe('one.two.three.four', (val, path) => {
 state.update('one.two', { three: { four: 44 } }, { only: ['*.four'] });
 ```
 
+## Debug
+
+```javascript
+// you can debug listeners and updates with 'debug' and 'source' options
+state.subscribe('something', () => {}, { debug: true, source: 'your.component.name.or.something' });
+state.update('something', 'someValue', { debug: true, source: 'your.component.name.or.something' });
+```
+
 ## Vue example
 
 ```javascript

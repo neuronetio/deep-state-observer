@@ -2367,8 +2367,8 @@ var wildcard = { scanObject, match };
 const scanObject$1 = wildcard.scanObject;
 const match$1 = wildcard.match;
 const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: false, usePathCache: true };
-const defaultListenerOptions = { bulk: false, debug: false };
-const defaultUpdateOptions = { only: [] };
+const defaultListenerOptions = { bulk: false, debug: false, source: '' };
+const defaultUpdateOptions = { only: [], source: '', debug: false };
 class DeepState {
     constructor(data = {}, options = defaultOptions) {
         this.listeners = {};
@@ -2502,7 +2502,7 @@ class DeepState {
     }
     debugSubscribe(listener, listenersCollection, listenerPath) {
         if (listener.options.debug) {
-            console.debug('listener subsrcibed', listenerPath, listener, listenersCollection);
+            console.debug('listener subscribed', listenerPath, listener, listenersCollection);
         }
     }
     getListenersCollection(listenerPath, listener) {
@@ -2577,12 +2577,13 @@ class DeepState {
     }
     debugListener(listener, time, value, params, path, listenerPath) {
         if (listener.options.debug) {
-            console.debug('listener updated', {
+            console.debug('listener fired', {
                 time: Date.now() - time,
                 value,
                 params,
                 path,
-                listenerPath
+                listenerPath,
+                options: listener.options
             });
         }
     }
@@ -2658,28 +2659,32 @@ class DeepState {
                     const fullPath = modifiedPath + this.options.delimeter + wildcardPath;
                     for (const listenerPath in this.listeners) {
                         const listenersCollection = this.listeners[listenerPath];
+                        const params = listenersCollection.paramsInfo
+                            ? this.getParams(listenersCollection.paramsInfo, fullPath)
+                            : undefined;
                         if (this.match(listenerPath, fullPath)) {
-                            const params = listenersCollection.paramsInfo
-                                ? this.getParams(listenersCollection.paramsInfo, fullPath)
-                                : undefined;
                             const value = wildcardScan[wildcardPath];
                             bulk.push({ value, path: fullPath, params });
                             for (const listenerId in listenersCollection.listeners) {
                                 const listener = listenersCollection.listeners[listenerId];
                                 if (listener.options.bulk) {
-                                    if (!bulkListeners.includes(listener)) {
-                                        bulkListeners.push(listener);
+                                    if (!bulkListeners.some((bulkListener) => bulkListener.listener === listener)) {
+                                        bulkListeners.push({ listener, params, listenerPath });
                                     }
                                 }
                                 else {
+                                    const time = this.debugTime(listener);
                                     listener.fn(value, fullPath, params);
+                                    this.debugListener(listener, time, bulk, params, modifiedPath, listenerPath);
                                 }
                             }
                         }
                     }
                 }
-                for (const listener of bulkListeners) {
-                    listener.fn(bulk, undefined, undefined);
+                for (const bulkListener of bulkListeners) {
+                    const time = this.debugTime(bulkListener.listener);
+                    bulkListener.listener.fn(bulk, undefined, undefined);
+                    this.debugListener(bulkListener.listener, time, bulk, bulkListener.params, modifiedPath, bulkListener.listenerPath);
                 }
             });
             return true;
@@ -2697,7 +2702,7 @@ class DeepState {
     update(modifiedPath, fn, options = defaultUpdateOptions) {
         if (this.isWildcard(modifiedPath)) {
             for (const path in wildcard.scanObject(this.data, this.options.delimeter).get(modifiedPath)) {
-                this.update(path, fn);
+                this.update(path, fn, options);
             }
             return;
         }
@@ -2717,6 +2722,9 @@ class DeepState {
         }
         else {
             newValue = fn;
+        }
+        if (options.debug) {
+            console.debug(`Updating ${modifiedPath} ${options.source ? `from ${options.source}` : ''}`, oldValue, newValue);
         }
         if (this.same(newValue, oldValue)) {
             return newValue;
