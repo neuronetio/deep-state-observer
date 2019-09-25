@@ -6,7 +6,7 @@ export type Match = (path: string) => boolean;
 
 export interface Options {
   delimeter: string;
-  recursive: string;
+  notRecursive: string;
   param: string;
   useCache: boolean;
   usePathCache: boolean;
@@ -73,7 +73,7 @@ export interface UpdateOptions {
 export const scanObject = wildcard.scanObject;
 export const match = wildcard.match;
 
-const defaultOptions: Options = { delimeter: '.', recursive: '...', param: ':', useCache: false, usePathCache: true };
+const defaultOptions: Options = { delimeter: '.', notRecursive: ';', param: ':', useCache: false, usePathCache: true };
 const defaultListenerOptions: ListenerOptions = { bulk: false, debug: false, source: '' };
 const defaultUpdateOptions: UpdateOptions = { only: [], source: '', debug: false };
 
@@ -107,13 +107,13 @@ export default class DeepState {
   }
 
   cutPath(longer: string, shorter: string): string {
-    return this.split(this.cleanRecursivePath(longer))
-      .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
+    return this.split(this.cleanNotRecursivePath(longer))
+      .slice(0, this.split(this.cleanNotRecursivePath(shorter)).length)
       .join(this.options.delimeter);
   }
 
   trimPath(path: string): string {
-    return this.cleanRecursivePath(path).replace(
+    return this.cleanNotRecursivePath(path).replace(
       new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`),
       ''
     );
@@ -128,15 +128,19 @@ export default class DeepState {
   }
 
   isRecursive(path: string): boolean {
-    return path.endsWith(this.options.recursive);
+    return !path.endsWith(this.options.notRecursive);
   }
 
-  cleanRecursivePath(path: string): string {
-    return this.isRecursive(path) ? path.slice(0, -this.options.recursive.length) : path;
+  isNotRecursive(path: string): boolean {
+    return !this.isRecursive(path);
+  }
+
+  cleanNotRecursivePath(path: string): string {
+    return this.isNotRecursive(path) ? path.slice(0, -this.options.notRecursive.length) : path;
   }
 
   recursiveMatch(listenerPath: string, modifiedPath: string): boolean {
-    return this.cutPath(modifiedPath, this.cleanRecursivePath(listenerPath)) === listenerPath;
+    return this.cutPath(modifiedPath, listenerPath) === listenerPath;
   }
 
   hasParams(path: string) {
@@ -243,7 +247,7 @@ export default class DeepState {
 
   getListenersCollection(listenerPath: string, listener: Listener): ListenersCollection {
     let collCfg = {
-      isRecursive: false,
+      isRecursive: true,
       isWildcard: false,
       hasParams: false,
       paramsInfo: undefined,
@@ -256,9 +260,9 @@ export default class DeepState {
       collCfg.hasParams = true;
     }
     collCfg.isWildcard = this.isWildcard(collCfg.path);
-    if (this.isRecursive(collCfg.path)) {
-      collCfg.path = this.cleanRecursivePath(collCfg.path);
-      collCfg.isRecursive = true;
+    if (this.isNotRecursive(collCfg.path)) {
+      collCfg.path = this.cleanNotRecursivePath(collCfg.path);
+      collCfg.isRecursive = false;
     }
     let listenersCollection;
     if (typeof this.listeners[collCfg.path] === 'undefined') {
@@ -348,7 +352,10 @@ export default class DeepState {
       const listenersCollection = this.listeners[listenerPath];
       if (listenersCollection.match(modifiedPath)) {
         alreadyNotified.push(listenersCollection);
-        const value = listenersCollection.isRecursive ? this.get(this.cutPath(modifiedPath, listenerPath)) : newValue;
+        const value =
+          listenersCollection.isRecursive || listenersCollection.isWildcard
+            ? this.get(this.cutPath(modifiedPath, listenerPath))
+            : newValue;
         const params = listenersCollection.paramsInfo
           ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
           : undefined;

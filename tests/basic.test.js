@@ -87,7 +87,7 @@ describe('State', () => {
     state.destroy();
   });
 
-  it('should match simple wildcards (object)', () => {
+  it('should match wildcards (object)', () => {
     const state = new State({
       one: {
         two: { three: { four: { five: 5 } } },
@@ -115,41 +115,13 @@ describe('State', () => {
 
     const fullPath = 'one.two.three.four.five';
     state.update(fullPath, 'mod');
-    expect(paths.length).toEqual(6);
-    expect(values.length).toEqual(6);
-    expect(values[5]).toEqual('mod');
+    expect(paths.length).toEqual(7);
+    expect(values.length).toEqual(7);
+    expect(values[5]).toEqual({ four: { five: 'mod' } });
+    expect(values[6]).toEqual('mod');
   });
 
-  it('should match advanced wildcards (object)', () => {
-    const state = new State({
-      one: {
-        two: { three: { four: { five: 5 } } },
-        '2': { three: { four: { five: 5, six: 6 } } }
-      }
-    });
-    const paths = [];
-    const values = [];
-    state.subscribe('one.two.three.**', (value, path) => {
-      paths.push(path); // 2
-      values.push(value);
-    });
-
-    expect(paths.length).toEqual(2);
-    expect(values.length).toEqual(2);
-    expect(paths[0]).toEqual('one.two.three.four');
-    expect(paths[1]).toEqual('one.two.three.four.five');
-    expect(values[0]).toEqual({ five: 5 });
-    expect(values[1]).toEqual(5);
-
-    const fullPath = 'one.two.three.four.five';
-    state.update(fullPath, 'mod');
-    expect(paths.length).toEqual(3);
-    expect(values.length).toEqual(3);
-    expect(paths[2]).toEqual('one.two.three.four.five');
-    expect(values[2]).toEqual('mod');
-  });
-
-  it('should match simple wildcards (array)', () => {
+  it('should match wildcards (array)', () => {
     const state = new State({
       one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: 3 }, [{ test: 'x' }]]
     });
@@ -183,81 +155,11 @@ describe('State', () => {
     expect(values[5]).toEqual('mod');
   });
 
-  it('should match advanced wildcards (array)', () => {
-    const state = new State({
-      one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: 3 }, [{ test: 'x' }]]
-    });
-    const paths = [];
-    const values = [];
-    state.subscribe('one.**.two', (value, path) => {
-      paths.push(path); // 3
-      values.push(value);
-    });
-    state.subscribe('one.**.test', (value, path) => {
-      paths.push(path); // 1
-      values.push(value);
-    });
-    state.subscribe('**.three', (value, path) => {
-      paths.push(path); // 1
-      values.push(value);
-    });
-
-    expect(paths.length).toEqual(5);
-    expect(values.length).toEqual(5);
-    expect(values[0]).toEqual(2);
-    expect(values[1]).toEqual(22);
-    expect(values[2]).toEqual(222);
-
-    expect(values[3]).toEqual('x');
-    expect(values[4]).toEqual(3);
-
-    const fullPath = 'one.0.two';
-    state.update(fullPath, 'mod');
-    expect(paths.length).toEqual(6);
-    expect(values.length).toEqual(6);
-    expect(values[5]).toEqual('mod');
-  });
-
-  it('should match advanced wildcards mixed (array)', () => {
-    const state = new State({
-      one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: { four: 4 } }, [{ test: 'x' }]]
-    });
-    const paths = [];
-    const values = [];
-    state.subscribe('one.**.tw*', (value, path) => {
-      paths.push(path); // 3
-      values.push(value);
-    });
-    state.subscribe('one.**.t*st', (value, path) => {
-      paths.push(path); // 1
-      values.push(value);
-    });
-    state.subscribe('**.three.*', (value, path) => {
-      paths.push(path); // 1
-      values.push(value);
-    });
-
-    expect(paths.length).toEqual(5);
-    expect(values.length).toEqual(5);
-    expect(values[0]).toEqual(2);
-    expect(values[1]).toEqual(22);
-    expect(values[2]).toEqual(222);
-
-    expect(values[3]).toEqual('x');
-    expect(values[4]).toEqual(4);
-
-    const fullPath = 'one.0.two';
-    state.update(fullPath, 'mod');
-    expect(paths.length).toEqual(6);
-    expect(values.length).toEqual(6);
-    expect(values[5]).toEqual('mod');
-  });
-
   it('should watch recursively', () => {
     const state = new State({ one: { two: { three: 3 }, 2: 2 } });
     const paths = [];
     const values = [];
-    state.subscribe('one...', (value, path) => {
+    state.subscribe('one', (value, path) => {
       paths.push(path);
       values.push(value);
     });
@@ -277,7 +179,7 @@ describe('State', () => {
     const state = new State({ one: { two: { three: { four: 4 } }, 2: 2 } });
     const paths = [];
     const values = [];
-    state.subscribe('one.two.three...', (value, path) => {
+    state.subscribe('one.two.three', (value, path) => {
       paths.push(path);
       values.push(value);
     });
@@ -297,7 +199,7 @@ describe('State', () => {
     const state = new State({ one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 } });
     const paths = [];
     const values = [];
-    state.subscribeAll(['one.two.three.four.0...'], (value, path) => {
+    state.subscribeAll(['one.two.three.four.0'], (value, path) => {
       paths.push(path);
       values.push(value);
     });
@@ -317,7 +219,7 @@ describe('State', () => {
     const state = new State({ one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 } });
     const paths = [];
     const values = [];
-    state.subscribeAll(['one.two.three.four.0.x...'], (value, path) => {
+    state.subscribeAll(['one.two.three.four.0.x'], (value, path) => {
       paths.push(path);
       values.push(value);
     });
@@ -345,7 +247,7 @@ describe('State', () => {
     });
     const paths = [];
     const values = [];
-    state.subscribeAll(['one.two...'], (value, path) => {
+    state.subscribeAll(['one.two'], (value, path) => {
       paths.push(path);
       values.push(value);
     });
@@ -484,7 +386,7 @@ describe('State', () => {
     expect(values[1]).toEqual(55);
     expect(state.get('one.two.three.four.five')).toEqual(55);
 
-    state.update('one.two.**.five', 555);
+    state.update('one.two.*.four.five', 555);
     expect(paths[2]).toEqual('one.two.three.four.five');
     expect(values[2]).toEqual(555);
     expect(state.get('one.two.three.four.five')).toEqual(555);
@@ -492,6 +394,35 @@ describe('State', () => {
     state.update('*.two.*.four.five', 5555);
     expect(paths[3]).toEqual('one.two.three.four.five');
     expect(values[3]).toEqual(5555);
+    expect(state.get('one.two.three.four.five')).toEqual(5555);
+  });
+
+  it('should not listen to recursive changes', () => {
+    const state = new State({
+      one: { two: { three: { four: { five: 5 } } } }
+    });
+    const paths = [];
+    const values = [];
+    state.subscribe('one.*.three;', (value, path) => {
+      paths.push(path);
+      values.push(value);
+    });
+    expect(paths[0]).toEqual('one.two.three');
+    expect(values[0]).toEqual({ four: { five: 5 } });
+
+    state.update('one.two.*.four.five', 55);
+    expect(paths.length).toEqual(1);
+    expect(values.length).toEqual(1);
+    expect(state.get('one.two.three.four.five')).toEqual(55);
+
+    state.update('one.two.*', { four: { five: 555 } });
+    expect(paths[1]).toEqual('one.two.three');
+    expect(values[1]).toEqual({ four: { five: 555 } });
+    expect(state.get('one.two.three.four.five')).toEqual(555);
+
+    state.update('*.two.*.four.five', 5555);
+    expect(paths.length).toEqual(2);
+    expect(values.length).toEqual(2);
     expect(state.get('one.two.three.four.five')).toEqual(5555);
   });
 
@@ -530,7 +461,7 @@ describe('State', () => {
     });
     const paths = [];
     const values = [];
-    state.subscribe('one.two.three.four...', (value, path) => {
+    state.subscribe('one.two.three.four', (value, path) => {
       paths.push(path);
       values.push(value);
     });
@@ -542,7 +473,7 @@ describe('State', () => {
     expect(values[1]).toEqual({ five: 55 });
     expect(state.get('one.two.three.four.five')).toEqual(55);
 
-    state.update('one.two.**.five', 555);
+    state.update('one.two.*.four.five', 555);
     expect(paths[2]).toEqual('one.two.three.four.five');
     expect(values[2]).toEqual({ five: 555 });
     expect(state.get('one.two.three.four.five')).toEqual(555);
@@ -559,7 +490,7 @@ describe('State', () => {
     });
     const paths = [];
     const values = [];
-    state.subscribe('one.*.three.four...', (value, path) => {
+    state.subscribe('one.*.three.four', (value, path) => {
       paths.push(path);
       values.push(value);
     });
@@ -571,7 +502,7 @@ describe('State', () => {
     expect(values[1]).toEqual({ five: 55 });
     expect(state.get('one.two.three.four.five')).toEqual(55);
 
-    state.update('one.two.**.five', 555);
+    state.update('one.two.*.four.five', 555);
     expect(paths[2]).toEqual('one.two.three.four.five');
     expect(values[2]).toEqual({ five: 555 });
     expect(state.get('one.two.three.four.five')).toEqual(555);

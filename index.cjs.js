@@ -2323,8 +2323,6 @@ function scanObject(obj, delimeter = '.') {
     function handleArray(wildcardSplit, currentArr, partIndex, path, result = {}) {
         const currentWildcardPath = wildcardSplit.slice(0, partIndex + 1).join(delimeter);
         const end = isEnd(wildcardSplit, partIndex);
-        const fullWildcard = currentWildcardPath.indexOf('**') > -1;
-        const traverse = !end || fullWildcard;
         let index = 0;
         for (const item of currentArr) {
             const currentPath = path === '' ? path + index : path + delimeter + index;
@@ -2332,12 +2330,9 @@ function scanObject(obj, delimeter = '.') {
                 if (end) {
                     result[currentPath] = item;
                 }
-                if (traverse) {
+                else {
                     goFurther(wildcardSplit, item, partIndex + 1, currentPath, result);
                 }
-            }
-            else if (fullWildcard) {
-                goFurther(wildcardSplit, item, partIndex + 1, currentPath, result);
             }
             index++;
         }
@@ -2346,20 +2341,15 @@ function scanObject(obj, delimeter = '.') {
     function handleObject(wildcardSplit, currentObj, partIndex, path, result = {}) {
         const currentWildcardPath = wildcardSplit.slice(0, partIndex + 1).join(delimeter);
         const end = isEnd(wildcardSplit, partIndex);
-        const fullWildcard = currentWildcardPath.indexOf('**') > -1;
-        const traverse = !end || fullWildcard;
         for (const key in currentObj) {
             const currentPath = path === '' ? path + key : path + delimeter + key;
             if (match(currentWildcardPath, currentPath)) {
                 if (end) {
                     result[currentPath] = currentObj[key];
                 }
-                if (traverse) {
+                else {
                     goFurther(wildcardSplit, currentObj[key], partIndex + 1, currentPath, result);
                 }
-            }
-            else if (fullWildcard) {
-                goFurther(wildcardSplit, currentObj[key], partIndex + 1, currentPath, result);
             }
         }
         return result;
@@ -2370,7 +2360,7 @@ var wildcard = { scanObject, match };
 
 const scanObject$1 = wildcard.scanObject;
 const match$1 = wildcard.match;
-const defaultOptions = { delimeter: '.', recursive: '...', param: ':', useCache: false, usePathCache: true };
+const defaultOptions = { delimeter: '.', notRecursive: ';', param: ':', useCache: false, usePathCache: true };
 const defaultListenerOptions = { bulk: false, debug: false, source: '' };
 const defaultUpdateOptions = { only: [], source: '', debug: false };
 class DeepState {
@@ -2394,12 +2384,12 @@ class DeepState {
         return this.isWildcard(first) ? match$1(first, second) : false;
     }
     cutPath(longer, shorter) {
-        return this.split(this.cleanRecursivePath(longer))
-            .slice(0, this.split(this.cleanRecursivePath(shorter)).length)
+        return this.split(this.cleanNotRecursivePath(longer))
+            .slice(0, this.split(this.cleanNotRecursivePath(shorter)).length)
             .join(this.options.delimeter);
     }
     trimPath(path) {
-        return this.cleanRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`), '');
+        return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`), '');
     }
     split(path) {
         return path === '' ? [] : path.split(this.options.delimeter);
@@ -2408,13 +2398,16 @@ class DeepState {
         return path.indexOf('*') > -1;
     }
     isRecursive(path) {
-        return path.endsWith(this.options.recursive);
+        return !path.endsWith(this.options.notRecursive);
     }
-    cleanRecursivePath(path) {
-        return this.isRecursive(path) ? path.slice(0, -this.options.recursive.length) : path;
+    isNotRecursive(path) {
+        return !this.isRecursive(path);
+    }
+    cleanNotRecursivePath(path) {
+        return this.isNotRecursive(path) ? path.slice(0, -this.options.notRecursive.length) : path;
     }
     recursiveMatch(listenerPath, modifiedPath) {
-        return this.cutPath(modifiedPath, this.cleanRecursivePath(listenerPath)) === listenerPath;
+        return this.cutPath(modifiedPath, listenerPath) === listenerPath;
     }
     hasParams(path) {
         return path.indexOf(this.options.param) > -1;
@@ -2511,7 +2504,7 @@ class DeepState {
     }
     getListenersCollection(listenerPath, listener) {
         let collCfg = {
-            isRecursive: false,
+            isRecursive: true,
             isWildcard: false,
             hasParams: false,
             paramsInfo: undefined,
@@ -2524,9 +2517,9 @@ class DeepState {
             collCfg.hasParams = true;
         }
         collCfg.isWildcard = this.isWildcard(collCfg.path);
-        if (this.isRecursive(collCfg.path)) {
-            collCfg.path = this.cleanRecursivePath(collCfg.path);
-            collCfg.isRecursive = true;
+        if (this.isNotRecursive(collCfg.path)) {
+            collCfg.path = this.cleanNotRecursivePath(collCfg.path);
+            collCfg.isRecursive = false;
         }
         let listenersCollection;
         if (typeof this.listeners[collCfg.path] === 'undefined') {
@@ -2599,7 +2592,9 @@ class DeepState {
             const listenersCollection = this.listeners[listenerPath];
             if (listenersCollection.match(modifiedPath)) {
                 alreadyNotified.push(listenersCollection);
-                const value = listenersCollection.isRecursive ? this.get(this.cutPath(modifiedPath, listenerPath)) : newValue;
+                const value = listenersCollection.isRecursive || listenersCollection.isWildcard
+                    ? this.get(this.cutPath(modifiedPath, listenerPath))
+                    : newValue;
                 const params = listenersCollection.paramsInfo
                     ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
                     : undefined;

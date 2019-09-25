@@ -49,20 +49,15 @@ export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
   function handleArray(wildcardSplit: string[], currentArr: any, partIndex: number, path: string, result = {}) {
     const currentWildcardPath = wildcardSplit.slice(0, partIndex + 1).join(delimeter);
     const end = isEnd(wildcardSplit, partIndex);
-    const fullWildcard = currentWildcardPath.indexOf('**') > -1;
-    const traverse = !end || fullWildcard;
     let index = 0;
     for (const item of currentArr) {
       const currentPath = path === '' ? path + index : path + delimeter + index;
       if (match(currentWildcardPath, currentPath)) {
         if (end) {
           result[currentPath] = item;
-        }
-        if (traverse) {
+        } else {
           goFurther(wildcardSplit, item, partIndex + 1, currentPath, result);
         }
-      } else if (fullWildcard) {
-        goFurther(wildcardSplit, item, partIndex + 1, currentPath, result);
       }
       index++;
     }
@@ -72,19 +67,14 @@ export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
   function handleObject(wildcardSplit: string[], currentObj: any, partIndex: number, path: string, result = {}) {
     const currentWildcardPath = wildcardSplit.slice(0, partIndex + 1).join(delimeter);
     const end = isEnd(wildcardSplit, partIndex);
-    const fullWildcard = currentWildcardPath.indexOf('**') > -1;
-    const traverse = !end || fullWildcard;
     for (const key in currentObj) {
       const currentPath = path === '' ? path + key : path + delimeter + key;
       if (match(currentWildcardPath, currentPath)) {
         if (end) {
           result[currentPath] = currentObj[key];
-        }
-        if (traverse) {
+        } else {
           goFurther(wildcardSplit, currentObj[key], partIndex + 1, currentPath, result);
         }
-      } else if (fullWildcard) {
-        goFurther(wildcardSplit, currentObj[key], partIndex + 1, currentPath, result);
       }
     }
     return result;

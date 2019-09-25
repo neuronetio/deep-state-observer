@@ -93,20 +93,6 @@ subscribers.push(
   })
 );
 
-subscribers.push(
-  state.subscribe('someOther.**', (value, path) => {
-    // this function will be fired two times with those parameters:
-    //
-    // value={node:'ok'}
-    // path = 'someOther.nested'
-    //
-    // OR
-    //
-    // value='ok'
-    // path='someOther.nested.node'
-  })
-);
-
 // you can update wildcarded values too
 state.update('some.*.test','test);
 
@@ -255,47 +241,38 @@ onDestroy(() => {
 });
 ```
 
-## Observe all node changes (recursive, nested)
+## Observe only chosen node changes (not recursive, not nested, for immutable data)
 
 ```javascript
 import { onDestroy } from 'svelte';
 import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
 
-// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
-const state = new State({ some: 'value', someOther: { nested: { node: 'ok' } } }, { delimeter: '.' });
+const state = new State({ some: 'value', someOther: { nested: { node: 'ok' } } });
 
 // store some unsubscribe methods
 let subscribers = [];
 
 subscribers.push(
-  state.subscribe('someOther...', (value, path) => {
-    // fired two times
+  state.subscribe('someOther;', (value, path) => {
+    // fired once
     //
     // #1 - immediately with
     // value = { nested: { node: 'ok' } }
     // path = 'someOther'
-    //
-    // #2 - after update
-    // value = { nested: { node: 'modified' } }
-    // path = 'someOther.nested.node'
   })
 );
 
 subscribers.push(
-  state.subscribe('someOther.nested...', (value, path) => {
-    // fired two times
+  state.subscribe('someOther.nested;', (value, path) => {
+    // fired once
     //
     // #1 - immediately with
     // value =  { node: 'ok' }
     // path = 'someOther'
-    //
-    // #2 - after update
-    // value = { node: 'modified' }
-    // path = 'someOther.nested.node'
   })
 );
 
-state.update('someOther.nested.node', 'modified');
+state.update('someOther.nested.node', 'modified'); // subscribers aren't fired
 
 onDestroy(() => {
   subscribers.forEach((unsubscribe) => unsubscribe());
