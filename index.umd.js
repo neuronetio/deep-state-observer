@@ -1464,9 +1464,12 @@
 
     const scanObject$1 = wildcard.scanObject;
     const match$1 = wildcard.match;
-    const defaultOptions = { delimeter: '.', notRecursive: ';', param: ':', useCache: false, usePathCache: true };
-    const defaultListenerOptions = { bulk: false, debug: false, source: '' };
-    const defaultUpdateOptions = { only: [], source: '', debug: false };
+    function log(message, info) {
+        console.debug(message, info);
+    }
+    const defaultOptions = { delimeter: '.', notRecursive: ';', param: ':', log };
+    const defaultListenerOptions = { bulk: false, debug: false, source: '', data: undefined };
+    const defaultUpdateOptions = { only: [], source: '', debug: false, data: undefined };
     class DeepState {
         constructor(data = {}, options = defaultOptions) {
             this.listeners = {};
@@ -1512,9 +1515,6 @@
         }
         cleanNotRecursivePath(path) {
             return this.isNotRecursive(path) ? path.slice(0, -this.options.notRecursive.length) : path;
-        }
-        recursiveMatch(listenerPath, modifiedPath) {
-            return this.cutPath(modifiedPath, listenerPath) === listenerPath;
         }
         hasParams(path) {
             return path.indexOf(this.options.param) > -1;
@@ -1604,11 +1604,6 @@
                 return result;
             };
         }
-        debugSubscribe(listener, listenersCollection, listenerPath) {
-            if (listener.options.debug) {
-                console.debug('listener subscribed', listenerPath, listener, listenersCollection);
-            }
-        }
         getListenersCollection(listenerPath, listener) {
             let collCfg = {
                 isRecursive: true,
@@ -1639,7 +1634,7 @@
             listenersCollection.listeners[this.id] = listener;
             return listenersCollection;
         }
-        subscribe(listenerPath, fn, options = defaultListenerOptions) {
+        subscribe(listenerPath, fn, options = defaultListenerOptions, type = 'subscribe') {
             if (typeof listenerPath === 'function') {
                 fn = listenerPath;
                 listenerPath = '';
@@ -1648,7 +1643,16 @@
             const listenersCollection = this.getListenersCollection(listenerPath, listener);
             listenerPath = listenersCollection.path;
             if (!listenersCollection.isWildcard) {
-                fn(this.pathGet(this.split(listenerPath), this.data), listenerPath, this.getParams(listenersCollection.paramsInfo, listenerPath));
+                fn(this.pathGet(this.split(listenerPath), this.data), {
+                    type,
+                    path: {
+                        listener: listenerPath,
+                        update: undefined,
+                        resolved: listenerPath
+                    },
+                    params: this.getParams(listenersCollection.paramsInfo, listenerPath),
+                    options
+                });
             }
             else {
                 const paths = this.scan.get(listenerPath);
@@ -1661,11 +1665,29 @@
                             value: paths[path]
                         });
                     }
-                    fn(bulkValue, undefined, undefined);
+                    fn(bulkValue, {
+                        type,
+                        path: {
+                            listener: listenerPath,
+                            update: undefined,
+                            resolved: undefined
+                        },
+                        options,
+                        params: undefined
+                    });
                 }
                 else {
                     for (const path in paths) {
-                        fn(paths[path], path, this.getParams(listenersCollection.paramsInfo, path));
+                        fn(paths[path], {
+                            type,
+                            path: {
+                                listener: listenerPath,
+                                update: undefined,
+                                resolved: path
+                            },
+                            params: this.getParams(listenersCollection.paramsInfo, path),
+                            options
+                        });
                     }
                 }
             }
@@ -1684,123 +1706,194 @@
             return ((['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) || newValue === null) &&
                 oldValue === newValue);
         }
-        debugListener(listener, time, value, params, path, listenerPath) {
-            if (listener.options.debug) {
-                console.debug('listener fired', {
-                    time: Date.now() - time,
-                    value,
-                    params,
-                    path,
-                    listenerPath,
-                    options: listener.options
-                });
-            }
-        }
-        debugTime(listener) {
-            return listener.options.debug ? Date.now() : 0;
-        }
-        notifySubscribedListeners(modifiedPath, newValue, alreadyNotified = []) {
-            for (let listenerPath in this.listeners) {
-                const listenersCollection = this.listeners[listenerPath];
-                if (listenersCollection.match(modifiedPath)) {
-                    alreadyNotified.push(listenersCollection);
-                    const value = listenersCollection.isRecursive || listenersCollection.isWildcard
-                        ? this.get(this.cutPath(modifiedPath, listenerPath))
-                        : newValue;
-                    const params = listenersCollection.paramsInfo
-                        ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
-                        : undefined;
-                    for (const listenerId in listenersCollection.listeners) {
-                        const listener = listenersCollection.listeners[listenerId];
-                        const time = this.debugTime(listener);
-                        listener.options.bulk
-                            ? listener.fn([{ value, path: modifiedPath, params }], undefined, undefined)
-                            : listener.fn(value, modifiedPath, params);
-                        this.debugListener(listener, time, value, params, modifiedPath, listenerPath);
+        notifyListeners(listeners, exclude = []) {
+            const alreadyNotified = [];
+            for (const path in listeners) {
+                const { single, bulk } = listeners[path];
+                for (const singleListener of single) {
+                    if (exclude.includes(singleListener)) {
+                        continue;
                     }
+                    const time = this.debugTime(singleListener);
+                    singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                    alreadyNotified.push(singleListener);
+                    this.debugListener(time, singleListener);
+                }
+                for (const bulkListener of bulk) {
+                    if (exclude.includes(bulkListener)) {
+                        continue;
+                    }
+                    const time = this.debugTime(bulkListener);
+                    const bulkValue = bulkListener.value.map((bulk) => (Object.assign({}, bulk, { value: bulk.value() })));
+                    bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                    alreadyNotified.push(bulkListener);
+                    this.debugListener(time, bulkListener);
                 }
             }
             return alreadyNotified;
         }
-        notifyNestedListeners(modifiedPath, newValue, alreadyNotified) {
+        getSubscribedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
+            options = Object.assign({}, defaultUpdateOptions, options);
+            const listeners = {};
             for (let listenerPath in this.listeners) {
                 const listenersCollection = this.listeners[listenerPath];
-                if (alreadyNotified.includes(listenersCollection)) {
-                    continue;
-                }
-                const currentCuttedPath = this.cutPath(listenerPath, modifiedPath);
-                if (this.match(currentCuttedPath, modifiedPath)) {
-                    const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
-                    const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
+                listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
+                if (listenersCollection.match(updatePath)) {
                     const params = listenersCollection.paramsInfo
-                        ? this.getParams(listenersCollection.paramsInfo, modifiedPath)
+                        ? this.getParams(listenersCollection.paramsInfo, updatePath)
                         : undefined;
-                    const bulk = [];
-                    for (const currentRestPath in values) {
-                        const value = values[currentRestPath];
-                        const fullPath = [modifiedPath, currentRestPath].join(this.options.delimeter);
-                        for (const listenerId in listenersCollection.listeners) {
-                            const listener = listenersCollection.listeners[listenerId];
-                            const time = this.debugTime(listener);
-                            listener.options.bulk ? bulk.push({ value, path: fullPath, params }) : listener.fn(value, fullPath, params);
-                            this.debugListener(listener, time, value, params, modifiedPath, listenerPath);
-                        }
-                    }
+                    const value = listenersCollection.isRecursive || listenersCollection.isWildcard
+                        ? () => this.get(this.cutPath(updatePath, listenerPath))
+                        : () => newValue;
+                    const bulkValue = [{ value, path: updatePath, params }];
                     for (const listenerId in listenersCollection.listeners) {
                         const listener = listenersCollection.listeners[listenerId];
+                        const eventInfo = {
+                            type,
+                            path: {
+                                listener: listenerPath,
+                                update: originalPath ? originalPath : updatePath,
+                                resolved: undefined
+                            },
+                            params,
+                            options
+                        };
                         if (listener.options.bulk) {
-                            const time = this.debugTime(listener);
-                            listener.fn(bulk, undefined, undefined);
-                            this.debugListener(listener, time, bulk, params, modifiedPath, listenerPath);
+                            listeners[listenerPath].bulk.push({ listener, listenersCollection, eventInfo, value: bulkValue });
+                        }
+                        else {
+                            listeners[listenerPath].single.push({
+                                listener,
+                                listenersCollection,
+                                eventInfo: Object.assign({}, eventInfo, { path: Object.assign({}, eventInfo.path, { resolved: updatePath }) }),
+                                value
+                            });
                         }
                     }
                 }
             }
+            return listeners;
         }
-        notifyOnly(modifiedPath, newValue, options) {
-            if (typeof options.only !== 'undefined' &&
-                Array.isArray(options.only) &&
-                options.only.length &&
-                this.canBeNested(newValue)) {
-                options.only.forEach((notifyPath) => {
-                    const wildcardScan = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
+        notifySubscribedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
+            const listeners = this.getSubscribedListeners(updatePath, newValue, options, type, originalPath);
+            return this.notifyListeners(listeners);
+        }
+        getNestedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
+            const listeners = {};
+            for (let listenerPath in this.listeners) {
+                listeners[listenerPath] = { single: [], bulk: [] };
+                const listenersCollection = this.listeners[listenerPath];
+                const currentCuttedPath = this.cutPath(listenerPath, updatePath);
+                if (this.match(currentCuttedPath, updatePath)) {
+                    const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
+                    const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
+                    const params = listenersCollection.paramsInfo
+                        ? this.getParams(listenersCollection.paramsInfo, updatePath)
+                        : undefined;
                     const bulk = [];
-                    const bulkListeners = [];
-                    for (const wildcardPath in wildcardScan) {
-                        const fullPath = modifiedPath + this.options.delimeter + wildcardPath;
-                        for (const listenerPath in this.listeners) {
-                            const listenersCollection = this.listeners[listenerPath];
-                            const params = listenersCollection.paramsInfo
-                                ? this.getParams(listenersCollection.paramsInfo, fullPath)
-                                : undefined;
-                            if (this.match(listenerPath, fullPath)) {
-                                const value = wildcardScan[wildcardPath];
+                    const bulkListeners = {};
+                    for (const currentRestPath in values) {
+                        const value = () => values[currentRestPath];
+                        const fullPath = [updatePath, currentRestPath].join(this.options.delimeter);
+                        for (const listenerId in listenersCollection.listeners) {
+                            const listener = listenersCollection.listeners[listenerId];
+                            const eventInfo = {
+                                type,
+                                path: {
+                                    listener: listenerPath,
+                                    update: originalPath ? originalPath : updatePath,
+                                    resolved: fullPath
+                                },
+                                params,
+                                options
+                            };
+                            if (listener.options.bulk) {
                                 bulk.push({ value, path: fullPath, params });
-                                for (const listenerId in listenersCollection.listeners) {
-                                    const listener = listenersCollection.listeners[listenerId];
-                                    if (listener.options.bulk) {
-                                        if (!bulkListeners.some((bulkListener) => bulkListener.listener === listener)) {
-                                            bulkListeners.push({ listener, params, listenerPath });
-                                        }
+                                bulkListeners[listenerId] = listener;
+                            }
+                            else {
+                                listeners[listenerPath].single.push({ listener, listenersCollection, eventInfo, value });
+                            }
+                        }
+                    }
+                    for (const listenerId in bulkListeners) {
+                        const listener = bulkListeners[listenerId];
+                        const eventInfo = {
+                            type,
+                            path: {
+                                listener: listenerPath,
+                                update: updatePath,
+                                resolved: undefined
+                            },
+                            options,
+                            params
+                        };
+                        listeners[listenerPath].bulk.push({ listener, listenersCollection, eventInfo, value: bulk });
+                    }
+                }
+            }
+            return listeners;
+        }
+        notifyNestedListeners(updatePath, newValue, options, type = 'update', alreadyNotified, originalPath = null) {
+            const listeners = this.getNestedListeners(updatePath, newValue, options, type, originalPath);
+            return this.notifyListeners(listeners, alreadyNotified);
+        }
+        getNotifyOnlyListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
+            const listeners = {};
+            if (typeof options.only === 'undefined' ||
+                !Array.isArray(options.only) ||
+                options.only.length === 0 ||
+                !this.canBeNested(newValue)) {
+                return listeners;
+            }
+            options.only.forEach((notifyPath) => {
+                const wildcardScan = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
+                listeners[notifyPath] = { bulk: [], single: [] };
+                for (const wildcardPath in wildcardScan) {
+                    const fullPath = updatePath + this.options.delimeter + wildcardPath;
+                    for (const listenerPath in this.listeners) {
+                        const listenersCollection = this.listeners[listenerPath];
+                        const params = listenersCollection.paramsInfo
+                            ? this.getParams(listenersCollection.paramsInfo, fullPath)
+                            : undefined;
+                        if (this.match(listenerPath, fullPath)) {
+                            const value = () => wildcardScan[wildcardPath];
+                            const bulkValue = [{ value, path: fullPath, params }];
+                            for (const listenerId in listenersCollection.listeners) {
+                                const listener = listenersCollection.listeners[listenerId];
+                                const eventInfo = {
+                                    type: 'update',
+                                    path: {
+                                        listener: listenerPath,
+                                        update: originalPath ? originalPath : updatePath,
+                                        resolved: fullPath
+                                    },
+                                    params,
+                                    options
+                                };
+                                if (listener.options.bulk) {
+                                    if (!listeners[notifyPath].bulk.some((bulkListener) => bulkListener.listener === listener)) {
+                                        listeners[notifyPath].bulk.push({ listener, listenersCollection, eventInfo, value: bulkValue });
                                     }
-                                    else {
-                                        const time = this.debugTime(listener);
-                                        listener.fn(value, fullPath, params);
-                                        this.debugListener(listener, time, bulk, params, modifiedPath, listenerPath);
-                                    }
+                                }
+                                else {
+                                    listeners[notifyPath].single.push({
+                                        listener,
+                                        listenersCollection,
+                                        eventInfo,
+                                        value
+                                    });
                                 }
                             }
                         }
                     }
-                    for (const bulkListener of bulkListeners) {
-                        const time = this.debugTime(bulkListener.listener);
-                        bulkListener.listener.fn(bulk, undefined, undefined);
-                        this.debugListener(bulkListener.listener, time, bulk, bulkListener.params, modifiedPath, bulkListener.listenerPath);
-                    }
-                });
-                return true;
-            }
-            return false;
+                }
+            });
+            return listeners;
+        }
+        notifyOnly(updatePath, newValue, options, type = 'update', originalPath = null) {
+            const listeners = this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath);
+            return this.notifyListeners(listeners).length > 0;
         }
         canBeNested(newValue) {
             if (typeof newValue !== 'undefined' && newValue !== null) {
@@ -1810,15 +1903,7 @@
             }
             return false;
         }
-        update(modifiedPath, fn, options = defaultUpdateOptions) {
-            if (this.isWildcard(modifiedPath)) {
-                for (const path in this.scan.get(modifiedPath)) {
-                    this.update(path, fn, options);
-                }
-                return;
-            }
-            const split = this.split(modifiedPath);
-            let oldValue = this.pathGet(split, this.data);
+        getUpdateValues(oldValue, split, fn) {
             if (typeof oldValue !== 'undefined' && oldValue !== null) {
                 if (typeof oldValue === 'object' && oldValue.constructor.name === 'Object') {
                     oldValue = Object.assign({}, oldValue);
@@ -1834,20 +1919,61 @@
             else {
                 newValue = fn;
             }
+            return { newValue, oldValue };
+        }
+        wildcardUpdate(updatePath, fn, options = defaultUpdateOptions) {
+            options = Object.assign({}, defaultUpdateOptions, options);
+            const scanned = this.scan.get(updatePath);
+            const bulk = {};
+            for (const path in scanned) {
+                const split = this.split(path);
+                const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn);
+                if (!this.same(newValue, oldValue)) {
+                    bulk[path] = newValue;
+                }
+            }
+            const groupedListenersPack = [];
+            for (const path in bulk) {
+                const newValue = bulk[path];
+                if (options.only.length) {
+                    groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, 'update', updatePath));
+                }
+                else {
+                    groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, 'update', updatePath));
+                    if (this.canBeNested(newValue)) {
+                        groupedListenersPack.push(this.getNestedListeners(path, newValue, options, 'update', updatePath));
+                    }
+                }
+                if (options.debug) {
+                    console.debug('Wildcard update', { path, newValue });
+                }
+                this.pathSet(this.split(path), newValue, this.data);
+            }
+            let alreadyNotified = [];
+            for (const groupedListeners of groupedListenersPack) {
+                alreadyNotified = [...alreadyNotified, ...this.notifyListeners(groupedListeners, alreadyNotified)];
+            }
+        }
+        update(updatePath, fn, options = defaultUpdateOptions) {
+            if (this.isWildcard(updatePath)) {
+                return this.wildcardUpdate(updatePath, fn, options);
+            }
+            const split = this.split(updatePath);
+            const { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fn);
             if (options.debug) {
-                console.debug(`Updating ${modifiedPath} ${options.source ? `from ${options.source}` : ''}`, oldValue, newValue);
+                console.debug(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ''}`, oldValue, newValue);
             }
             if (this.same(newValue, oldValue)) {
                 return newValue;
             }
             this.pathSet(split, newValue, this.data);
             options = Object.assign({}, defaultUpdateOptions, options);
-            if (this.notifyOnly(modifiedPath, newValue, options)) {
+            if (this.notifyOnly(updatePath, newValue, options)) {
                 return newValue;
             }
-            const alreadyNotified = this.notifySubscribedListeners(modifiedPath, newValue);
+            const alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, options);
             if (this.canBeNested(newValue)) {
-                this.notifyNestedListeners(modifiedPath, newValue, alreadyNotified);
+                this.notifyNestedListeners(updatePath, newValue, options, 'update', alreadyNotified);
             }
             return newValue;
         }
@@ -1856,6 +1982,23 @@
                 return this.data;
             }
             return this.pathGet(this.split(userPath), this.data);
+        }
+        debugSubscribe(listener, listenersCollection, listenerPath) {
+            if (listener.options.debug) {
+                this.options.log('listener subscribed', listenerPath, listener, listenersCollection);
+            }
+        }
+        debugListener(time, groupedListener) {
+            if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
+                this.options.log('Listener fired', {
+                    time: Date.now() - time,
+                    info: groupedListener,
+                    jsonInfo: JSON.stringify(groupedListener, null, 2)
+                });
+            }
+        }
+        debugTime(groupedListener) {
+            return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
         }
     }
     const State = DeepState;

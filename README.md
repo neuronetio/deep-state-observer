@@ -19,8 +19,16 @@ Deep state observer is framework agnostic with node and browser support, so you 
 import { onDestroy } from 'svelte';
 import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
 
-// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
-const state = new State({ some: 'value', someOther: { nested: 'value' } }, { delimeter:'.' });
+// first parameter is an object that hold the state, and the second one is just options
+const state = new State({
+  some: 'value',
+  someOther: {
+      nested: 'value'
+    }
+  },
+  // options
+  { delimeter:'.' , notRecursive:';',  param: ':', log: console.log }
+);
 
 // store some unsubscribe methods
 let subscribers = [];
@@ -28,17 +36,17 @@ let subscribers = [];
 // change local variable - it can be vueComponent.data property or react function with setState in react
 let nestedValue;
 subscribers.push(
-  state.subscribe('someOther.nested', (value, path) => {
+  state.subscribe('someOther.nested', (value, eventInfo) => {
     nestedValue = value;
   })
 );
 
 let some;
 subscribers.push(
-  state.subscribeAll(['some', 'someOther'], (value, path) => {
-    if (path === 'some') {
+  state.subscribeAll(['some', 'someOther'], (value, eventInfo) => {
+    if (eventInfo.path.resolved === 'some') {
       some = value;
-    } else if (path === 'someOther') {
+    } else if (eventInfo.path.resolved === 'someOther') {
       nestedValue = value.nested;
     }
   })
@@ -50,17 +58,17 @@ state.update('someOther.nested', (currentValue) => {
 
 // you can use function to modify data
 subscribers.push(
-  state.subscribe('some', (value, path) => {
+  state.subscribe('some', (value, eventInfo) => {
     state.update('someOther.nested', (oldValue) => {
-      return 'nested changed after some changed';
+      return 'nested changed too';
     });
   })
 );
 
 // or you can just set the value (it cannot be function :) )
 subscribers.push(
-  state.subscribe('some', (value, path) => {
-    state.update('someOther.nested', 'nested changed after some changed');
+  state.subscribe('some', (value, eventInfo) => {
+    state.update('someOther.nested', 'nested changed too');
 );
 
 onDestroy(() => {
@@ -77,19 +85,17 @@ import State from 'deep-state-observer'; // const { State } = require('deep-stat
 // first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
 const state = new State({
   some: { thing: { test: 0 } },
-  someOther: { nested: { node: 'ok' } } },
-
-  { delimeter: '.' }
+  someOther: { nested: { node: 'ok' } } }
 );
 
 // store some unsubscribe methods
 let subscribers = [];
 
 subscribers.push(
-  state.subscribe('someOther.*.n*e', (value, path) => {
+  state.subscribe('someOther.*.n*e', (value, eventInfo) => {
     // fired only once with
     // value = 'ok'
-    // path = 'someOther.nested.node'
+    // eventInfo.path.resolved = 'someOther.nested.node'
   })
 );
 
@@ -121,44 +127,44 @@ const state = new State({
 let subscribers = [];
 
 subscribers.push(
-  state.subscribe('items.:index.val', (value, path, params) => {
+  state.subscribe('items.:index.val', (value, eventInfo) => {
     // fired three times
     //
     // #1
     // value = 1
-    // path = 'items.0.val'
-    // params = { index: 0 }
+    // eventInfo.path.resolved = 'items.0.val'
+    // eventInfo.params = { index: 0 }
     //
     // #2
     // value = 2
-    // path = 'items.1.val'
-    // params = { index: 1 }
+    // eventInfo.path.resolved = 'items.1.val'
+    // eventInfo.params = { index: 1 }
     //
     // #3
     // value = 3
-    // path = 'items.2.val'
-    // params = { index: 2 }
+    // eventInfo.path.resolved = 'items.2.val'
+    // eventInfo.params = { index: 2 }
   })
 );
 
 subscribers.push(
-  state.subscribe('byId.:id.val', (value, path, params) => {
+  state.subscribe('byId.:id.val', (value, eventInfo) => {
     // fired three times
     //
     // #1
     // value = 1
-    // path = 'byId.1.val'
-    // params = { id: 1 }
+    // eventInfo.path.resolved = 'byId.1.val'
+    // eventInfo.params = { id: 1 }
     //
     // #2
     // value = 2
-    // path = 'byId.2.val'
-    // params = { id: 2 }
+    // eventInfo.path.resolved = 'byId.2.val'
+    // eventInfo.params = { id: 2 }
     //
     // #3
     // value = 3
-    // path = 'byId.3.val'
-    // params = { id: 3 }
+    // eventInfo.path.resolved = 'byId.3.val'
+    // eventInfo.params = { id: 3 }
   })
 );
 onDestroy(() => {
@@ -187,22 +193,22 @@ let subscribers = [];
 subscribers.push(
   state.subscribe(
     'byId.:id.val',
-    (bulk) => {
+    (bulk, eventInfo) => {
       // fired only once where bulk = [
       //  {
       //    value: 1,
-      //    path: 'byId.1.val',
-      //    params: { id: 1 }
+      //    eventInfo.path.resovled: 'byId.1.val',
+      //    eventInfo.params: { id: 1 }
       //  },
       //  {
       //    value: 2,
-      //    path: 'byId.2.val',
-      //    params: { id: 2 }
+      //    eventInfo.path.resovled: 'byId.2.val',
+      //    eventInfo.params: { id: 2 }
       //  },
       //  {
       //    value: 3,
-      //    path: 'byId.3.val',
-      //    params: { id: 3 }
+      //    eventInfo.path.resovled: 'byId.3.val',
+      //    eventInfo.params: { id: 3 }
       //  },
       // ]
     },
@@ -213,22 +219,22 @@ subscribers.push(
 subscribers.push(
   state.subscribe(
     'byId.*.val',
-    (bulk) => {
+    (bulk, eventInfo) => {
       // fired only once where bulk = [
       //  {
       //    value: 1,
-      //    path: 'byId.1.val',
-      //    params: undefined
+      //    eventInfo.path.resolved: 'byId.1.val',
+      //    eventInfo.params: undefined
       //  },
       //  {
       //    value: 2,
-      //    path: 'byId.2.val',
-      //    params: undefined
+      //    eventInfo.path.resolved: 'byId.2.val',
+      //    eventInfo.params: undefined
       //  },
       //  {
       //    value: 3,
-      //    path: 'byId.3.val',
-      //    params: undefined
+      //    eventInfo.path.resolved: 'byId.3.val',
+      //    eventInfo.params: undefined
       //  },
       // ]
     },
@@ -253,22 +259,22 @@ const state = new State({ some: 'value', someOther: { nested: { node: 'ok' } } }
 let subscribers = [];
 
 subscribers.push(
-  state.subscribe('someOther;', (value, path) => {
+  state.subscribe('someOther;', (value, eventInfo) => {
     // fired once
     //
     // #1 - immediately with
     // value = { nested: { node: 'ok' } }
-    // path = 'someOther'
+    // eventInfo.path.resovled = 'someOther'
   })
 );
 
 subscribers.push(
-  state.subscribe('someOther.nested;', (value, path) => {
+  state.subscribe('someOther.nested;', (value, eventInfo) => {
     // fired once
     //
     // #1 - immediately with
     // value =  { node: 'ok' }
-    // path = 'someOther'
+    // eventInfo.path.resolved = 'someOther'
   })
 );
 
@@ -285,14 +291,14 @@ onDestroy(() => {
 const state = new State({
   one: { two: { three: { four: 4 } } }
 });
-state.subscribe('one.two', (val, path) => {
+state.subscribe('one.two', (val, eventInfo) => {
   // trigerred only once - immediately
   // because update have option 'only' wich will update only selected nested paths even i you are updating whole 'one.two' object
   // 'only' option works for object and arrays and it is usefull when you have changed only 'four'-th node of the object
   // and don't want to listeners from 'one.two' be notified (it is kind of performance improvement hack)
   // you can bypass those huge operation that is executed here because it is not needed (we are changing only one 'four'th leaf)
 });
-state.subscribe('one.two.three.four', (val, path) => {
+state.subscribe('one.two.three.four', (val, eventInfo) => {
   // trigerred two times immediately and after update
 });
 state.update('one.two', { three: { four: 44 } }, { only: ['*.four'] });
