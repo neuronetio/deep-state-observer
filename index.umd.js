@@ -1680,10 +1680,15 @@
                 }
             }
             this.debugSubscribe(listener, listenersCollection, listenerPath);
-            return this.unsubscribe.bind({ id: this.id, listeners: listenersCollection.listeners });
+            return this.unsubscribe(listenerPath, this.id);
         }
-        unsubscribe() {
-            delete this.listeners[this.id];
+        unsubscribe(path, id) {
+            return () => {
+                delete this.listeners[path].listeners[id];
+                if (Object.keys(this.listeners[path].listeners).length === 0) {
+                    delete this.listeners[path];
+                }
+            };
         }
         same(newValue, oldValue) {
             return ((['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) || newValue === null) &&

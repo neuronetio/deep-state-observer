@@ -710,5 +710,7 @@ describe('State', () => {
     state.update('test', 'xxx');
     expect(values.length).toEqual(5);
     expect(values[4]).toEqual('xx2');
+
+    expect(state.listeners).toEqual({});
   });
 });
