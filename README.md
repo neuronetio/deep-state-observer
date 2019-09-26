@@ -2,7 +2,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/neuronetio/deep-state-observer)](https://github.com/neuronetio/deep-state-observer/issues)
 [![Twitter](https://img.shields.io/twitter/url/https/github.com/neuronetio/deep-state-observer)](https://twitter.com/intent/tweet?text=Wow:&url=https%3A%2F%2Fgithub.com%2Fneuronetio%2Fdeep-state-observer)
 
-# deep-state-observer for high performance apps
+# :dart: deep-state-observer for high performance apps
 
 Deep state observer is an state management library which will trigger an update only when specified object node was changed.
 You don't need to reevaluate or re-render whole app/component when only one portion of the state was modified.
