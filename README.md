@@ -85,8 +85,8 @@ import State from 'deep-state-observer'; // const { State } = require('deep-stat
 // first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
 const state = new State({
   some: { thing: { test: 0 } },
-  someOther: { nested: { node: 'ok' } } }
-);
+  someOther: { nested: { node: 'ok' } }
+});
 
 // store some unsubscribe methods
 let subscribers = [];
@@ -100,7 +100,7 @@ subscribers.push(
 );
 
 // you can update wildcarded values too
-state.update('some.*.test','test);
+state.update('some.*.test', 'test');
 
 onDestroy(() => {
   subscribers.forEach((unsubscribe) => unsubscribe());
