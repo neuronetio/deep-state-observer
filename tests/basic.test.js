@@ -1,5 +1,4 @@
 const { State } = require('../index.cjs.js');
-const R = require('ramda');
 
 describe('State', () => {
   it('should check existence of methods and data', () => {
@@ -21,6 +20,29 @@ describe('State', () => {
     });
     expect($d).toEqual('d');
     state.destroy();
+  });
+
+  it('should get and set properties', () => {
+    const state = new State({});
+    const data = {
+      one: { two: { three: { four: { five: 5 } } } }
+    };
+    expect(state.pathGet(['one', 'two', 'three', 'four', 'five'], data)).toEqual(5);
+    state.pathSet(['one', 'two', 'three', 'four', 'five'], 55, data);
+    expect(state.pathGet(['one', 'two', 'three', 'four', 'five'], data)).toEqual(55);
+    expect(data.one.two.three.four.five).toEqual(55);
+
+    const data2 = {};
+    state.pathSet(['one', 'two', 'three'], 3, data2);
+    expect(data2).toEqual({ one: { two: { three: 3 } } });
+
+    const data3 = {};
+    state.pathSet(['one'], 1, data3);
+    expect(data3).toEqual({ one: 1 });
+
+    const data4 = {};
+    state.pathSet([], { one: 1 }, data4);
+    expect(data4).toEqual({ one: 1 });
   });
 
   it('should update and watch', () => {
@@ -71,7 +93,7 @@ describe('State', () => {
     let result = {};
     const paths = [];
     state.subscribeAll(['x', 'y', 'z.xyz'], (value, path) => {
-      result = R.set(R.lensPath(path.split('.')), value, result);
+      state.pathSet(path.split('.'), value, result);
       paths.push(path);
     });
     expect(result).toEqual({ x: 10, y: 20, z: { xyz: 50 } });

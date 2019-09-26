@@ -1,4 +1,3 @@
-import { path, set, view, lensPath } from 'ramda';
 import wildcard from './wildcard-object-scan';
 
 export type ListenerFunction = (value: any, path: string, params: any) => {};
@@ -113,10 +112,7 @@ export default class DeepState {
   }
 
   trimPath(path: string): string {
-    return this.cleanNotRecursivePath(path).replace(
-      new RegExp(`^\\${this.options.delimeter}+|\\${this.options.delimeter}+$`),
-      ''
-    );
+    return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}*`), '');
   }
 
   split(path: string) {
@@ -278,6 +274,46 @@ export default class DeepState {
     return listenersCollection;
   }
 
+  pathGet(path: string[], obj, copiedPath: string[] = null) {
+    if (copiedPath === null) {
+      copiedPath = path.slice();
+    }
+    if (copiedPath.length === 0 || typeof obj === 'undefined') {
+      return obj;
+    }
+    const currentPath = copiedPath.shift();
+    if (!obj.hasOwnProperty(currentPath)) {
+      return undefined;
+    }
+    if (copiedPath.length === 0) {
+      return obj[currentPath];
+    }
+    return this.pathGet(path, obj[currentPath], copiedPath);
+  }
+
+  pathSet(path: string[], newValue, obj, copiedPath: string[] = null) {
+    if (copiedPath === null) {
+      copiedPath = path.slice();
+    }
+    if (copiedPath.length === 0) {
+      for (const key in obj) {
+        delete obj[key];
+      }
+      for (const key in newValue) {
+        obj[key] = newValue[key];
+      }
+      return obj;
+    }
+    const currentPath = copiedPath.shift();
+    if (copiedPath.length === 0) {
+      return (obj[currentPath] = newValue);
+    }
+    if (!obj.hasOwnProperty(currentPath)) {
+      obj[currentPath] = {};
+    }
+    return this.pathSet(path, newValue, obj[currentPath], copiedPath);
+  }
+
   subscribe(listenerPath: string, fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions) {
     if (typeof listenerPath === 'function') {
       fn = listenerPath;
@@ -288,7 +324,7 @@ export default class DeepState {
     listenerPath = listenersCollection.path;
     if (!listenersCollection.isWildcard) {
       fn(
-        path(this.split(listenerPath), this.data),
+        this.pathGet(this.split(listenerPath), this.data),
         listenerPath,
         this.getParams(listenersCollection.paramsInfo, listenerPath)
       );
@@ -478,8 +514,8 @@ export default class DeepState {
       }
       return;
     }
-    const lens = lensPath(this.split(modifiedPath));
-    let oldValue = view(lens, this.data);
+    const split = this.split(modifiedPath);
+    let oldValue = this.pathGet(split, this.data);
     if (typeof oldValue !== 'undefined' && oldValue !== null) {
       if (typeof oldValue === 'object' && oldValue.constructor.name === 'Object') {
         oldValue = { ...oldValue };
@@ -489,7 +525,7 @@ export default class DeepState {
     }
     let newValue;
     if (typeof fn === 'function') {
-      newValue = fn(view(lens, this.data));
+      newValue = fn(this.pathGet(split, this.data));
     } else {
       newValue = fn;
     }
@@ -499,7 +535,7 @@ export default class DeepState {
     if (this.same(newValue, oldValue)) {
       return newValue;
     }
-    this.data = set(lens, newValue, this.data);
+    this.pathSet(split, newValue, this.data);
     options = { ...defaultUpdateOptions, ...options };
     if (this.notifyOnly(modifiedPath, newValue, options)) {
       return newValue;
@@ -515,7 +551,7 @@ export default class DeepState {
     if (typeof userPath === 'undefined' || userPath === '') {
       return this.data;
     }
-    return path(this.split(userPath), this.data);
+    return this.pathGet(this.split(userPath), this.data);
   }
 }
 

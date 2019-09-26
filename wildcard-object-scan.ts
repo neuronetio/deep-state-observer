@@ -8,9 +8,9 @@ export interface wildcardResult {
   [key: string]: any;
 }
 
-export const match = (first, second) => {
-  return getWildcardStringMatcher(first)(second);
-};
+export function match(first, second) {
+  return first === second || getWildcardStringMatcher(first)(second);
+}
 
 export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
   const api = {
@@ -47,12 +47,12 @@ export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
   }
 
   function handleArray(wildcardSplit: string[], currentArr: any, partIndex: number, path: string, result = {}) {
-    const currentWildcardPath = wildcardSplit.slice(0, partIndex + 1).join(delimeter);
+    const currentWildcardPath = wildcardSplit.slice(partIndex, partIndex + 1).join(delimeter);
     const end = isEnd(wildcardSplit, partIndex);
     let index = 0;
     for (const item of currentArr) {
-      const currentPath = path === '' ? path + index : path + delimeter + index;
-      if (match(currentWildcardPath, currentPath)) {
+      const currentPath = path === '' ? index.toString() : path + delimeter + index;
+      if (currentWildcardPath.endsWith('*') || match(currentWildcardPath, currentPath)) {
         if (end) {
           result[currentPath] = item;
         } else {
@@ -65,11 +65,11 @@ export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
   }
 
   function handleObject(wildcardSplit: string[], currentObj: any, partIndex: number, path: string, result = {}) {
-    const currentWildcardPath = wildcardSplit.slice(0, partIndex + 1).join(delimeter);
+    const currentWildcardPath = wildcardSplit.slice(partIndex, partIndex + 1).join(delimeter);
     const end = isEnd(wildcardSplit, partIndex);
     for (const key in currentObj) {
-      const currentPath = path === '' ? path + key : path + delimeter + key;
-      if (match(currentWildcardPath, currentPath)) {
+      const currentPath = path === '' ? key : path + delimeter + key;
+      if (currentWildcardPath.endsWith('*') || match(currentWildcardPath, key)) {
         if (end) {
           result[currentPath] = currentObj[key];
         } else {
