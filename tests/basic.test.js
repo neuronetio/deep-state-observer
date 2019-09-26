@@ -400,6 +400,7 @@ describe('State', () => {
       paths.push(path);
       values.push(value);
     });
+    expect(paths.length).toEqual(1);
     expect(paths[0]).toEqual('one.two.three.four.five');
     expect(values[0]).toEqual(5);
 

@@ -1,4 +1,5 @@
-import wildcard from './wildcard-object-scan';
+import wildcard, { wildcardApi } from './wildcard-object-scan';
+import Path from './ObjectPath';
 
 export type ListenerFunction = (value: any, path: string, params: any) => {};
 export type Match = (path: string) => boolean;
@@ -81,12 +82,18 @@ export default class DeepState {
   data: any;
   options: any;
   id: number;
+  pathGet: (path: string[], obj) => {};
+  pathSet: (path: string[], value, obj) => void;
+  scan: wildcardApi;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = {};
     this.data = data;
     this.options = { ...defaultOptions, ...options };
     this.id = 0;
+    this.pathGet = Path.get;
+    this.pathSet = Path.set;
+    this.scan = scanObject(this.data, this.options.delimeter);
   }
 
   getListeners(): Listeners {
@@ -274,46 +281,6 @@ export default class DeepState {
     return listenersCollection;
   }
 
-  pathGet(path: string[], obj, copiedPath: string[] = null) {
-    if (copiedPath === null) {
-      copiedPath = path.slice();
-    }
-    if (copiedPath.length === 0 || typeof obj === 'undefined') {
-      return obj;
-    }
-    const currentPath = copiedPath.shift();
-    if (!obj.hasOwnProperty(currentPath)) {
-      return undefined;
-    }
-    if (copiedPath.length === 0) {
-      return obj[currentPath];
-    }
-    return this.pathGet(path, obj[currentPath], copiedPath);
-  }
-
-  pathSet(path: string[], newValue, obj, copiedPath: string[] = null) {
-    if (copiedPath === null) {
-      copiedPath = path.slice();
-    }
-    if (copiedPath.length === 0) {
-      for (const key in obj) {
-        delete obj[key];
-      }
-      for (const key in newValue) {
-        obj[key] = newValue[key];
-      }
-      return obj;
-    }
-    const currentPath = copiedPath.shift();
-    if (copiedPath.length === 0) {
-      return (obj[currentPath] = newValue);
-    }
-    if (!obj.hasOwnProperty(currentPath)) {
-      obj[currentPath] = {};
-    }
-    return this.pathSet(path, newValue, obj[currentPath], copiedPath);
-  }
-
   subscribe(listenerPath: string, fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions) {
     if (typeof listenerPath === 'function') {
       fn = listenerPath;
@@ -328,9 +295,8 @@ export default class DeepState {
         listenerPath,
         this.getParams(listenersCollection.paramsInfo, listenerPath)
       );
-    }
-    if (listenersCollection.isWildcard) {
-      const paths = scanObject(this.data, this.options.delimeter).get(listenerPath);
+    } else {
+      const paths = this.scan.get(listenerPath);
       if (options.bulk) {
         const bulkValue = [];
         for (const path in paths) {
@@ -514,7 +480,7 @@ export default class DeepState {
 
   update(modifiedPath: string, fn: Updater, options: UpdateOptions = defaultUpdateOptions) {
     if (this.isWildcard(modifiedPath)) {
-      for (const path in wildcard.scanObject(this.data, this.options.delimeter).get(modifiedPath)) {
+      for (const path in this.scan.get(modifiedPath)) {
         this.update(path, fn, options);
       }
       return;
