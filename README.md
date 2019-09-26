@@ -11,6 +11,14 @@ You don't need to reevaluate or re-render whole app/component when only one port
 
 Deep state observer is framework agnostic with node and browser support, so you can use it in most of your projects.
 
+# Install
+
+`npm i deep-state-observer`
+
+# Examples
+
+[here](https://svelte.dev/repl/a3637b5e83914c9b89f10c8cd422c747?version=3.12.1) and [here](https://svelte.dev/repl/3e9f95108e5f44c0921b1c3fab8574e7?version=3.12.1)
+
 # Usage
 
 ## Svelte example
