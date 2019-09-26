@@ -52,12 +52,8 @@ export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
     let index = 0;
     for (const item of currentArr) {
       const currentPath = path === '' ? index.toString() : path + delimeter + index;
-      if (currentWildcardPath.endsWith('*') || match(currentWildcardPath, currentPath)) {
-        if (end) {
-          result[currentPath] = item;
-        } else {
-          goFurther(wildcardSplit, item, partIndex + 1, currentPath, result);
-        }
+      if (currentWildcardPath === '*' || match(currentWildcardPath, index.toString())) {
+        end ? (result[currentPath] = item) : goFurther(wildcardSplit, item, partIndex + 1, currentPath, result);
       }
       index++;
     }
@@ -69,12 +65,10 @@ export function scanObject(obj: any, delimeter: string = '.'): wildcardApi {
     const end = isEnd(wildcardSplit, partIndex);
     for (const key in currentObj) {
       const currentPath = path === '' ? key : path + delimeter + key;
-      if (currentWildcardPath.endsWith('*') || match(currentWildcardPath, key)) {
-        if (end) {
-          result[currentPath] = currentObj[key];
-        } else {
-          goFurther(wildcardSplit, currentObj[key], partIndex + 1, currentPath, result);
-        }
+      if (currentWildcardPath === '*' || match(currentWildcardPath, key)) {
+        end
+          ? (result[currentPath] = currentObj[key])
+          : goFurther(wildcardSplit, currentObj[key], partIndex + 1, currentPath, result);
       }
     }
     return result;
