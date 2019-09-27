@@ -43,9 +43,7 @@
     "url": "https://github.com/neuronetio/deep-state-observer/issues"
   },
   "homepage": "https://github.com/neuronetio/deep-state-observer#readme",
-  "dependencies": {
-    "superwild": "0.0.7"
-  },
+  "dependencies": {},
   "devDependencies": {
     "jasmine": "^3.4.0",
     "rollup": "^1.19.4",
