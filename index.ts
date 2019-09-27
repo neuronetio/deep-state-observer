@@ -151,12 +151,24 @@ export default class DeepState {
       .join(this.options.delimeter);
   }
 
+  private matchSlices(longer: string, shorter: string) {
+    const left = this.split(longer);
+    const right = this.split(shorter);
+    if (left.length !== right.length) return false;
+    let index = 0;
+    for (const part of left) {
+      if (!this.match(part, right[index])) return false;
+      index++;
+    }
+    return true;
+  }
+
   private trimPath(path: string): string {
     return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}{1}`), ``);
   }
 
   public split(path: string) {
-    return path === `` ? [] : path.split(this.options.delimeter);
+    return path === '' ? [] : path.split(this.options.delimeter);
   }
 
   private isWildcard(path: string): boolean {
@@ -255,7 +267,7 @@ export default class DeepState {
   private getListenerCollectionMatch(listenerPath: string, isRecursive: boolean, isWildcard: boolean) {
     return (path) => {
       if (isRecursive) path = this.cutPath(path, listenerPath);
-      if (isWildcard && match(listenerPath, path)) return true;
+      if (isWildcard && this.matchSlices(listenerPath, path)) return true;
       return listenerPath === path;
     };
   }
@@ -579,7 +591,9 @@ export default class DeepState {
           const params = listenersCollection.paramsInfo
             ? this.getParams(listenersCollection.paramsInfo, fullPath)
             : undefined;
-          if (this.match(listenerPath, fullPath)) {
+          const listenerPathCut = this.cutPath(listenerPath, updatePath);
+          const listenerPathCut2 = listenerPath.substr(listenerPathCut.length + 1);
+          if (this.matchSlices(listenerPathCut, updatePath) && this.matchSlices(listenerPathCut2, wildcardPath)) {
             const value = () => wildcardScan[wildcardPath];
             const bulkValue = [{ value, path: fullPath, params }];
             for (const listenerId in listenersCollection.listeners) {

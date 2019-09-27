@@ -1492,11 +1492,24 @@ class DeepState {
             .slice(0, this.split(this.cleanNotRecursivePath(shorter)).length)
             .join(this.options.delimeter);
     }
+    matchSlices(longer, shorter) {
+        const left = this.split(longer);
+        const right = this.split(shorter);
+        if (left.length !== right.length)
+            return false;
+        let index = 0;
+        for (const part of left) {
+            if (!this.match(part, right[index]))
+                return false;
+            index++;
+        }
+        return true;
+    }
     trimPath(path) {
         return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}{1}`), ``);
     }
     split(path) {
-        return path === `` ? [] : path.split(this.options.delimeter);
+        return path === '' ? [] : path.split(this.options.delimeter);
     }
     isWildcard(path) {
         return path.includes(this.options.wildcard);
@@ -1584,7 +1597,7 @@ class DeepState {
         return (path) => {
             if (isRecursive)
                 path = this.cutPath(path, listenerPath);
-            if (isWildcard && match$1(listenerPath, path))
+            if (isWildcard && this.matchSlices(listenerPath, path))
                 return true;
             return listenerPath === path;
         };
@@ -1854,7 +1867,9 @@ class DeepState {
                     const params = listenersCollection.paramsInfo
                         ? this.getParams(listenersCollection.paramsInfo, fullPath)
                         : undefined;
-                    if (this.match(listenerPath, fullPath)) {
+                    const listenerPathCut = this.cutPath(listenerPath, updatePath);
+                    const listenerPathCut2 = listenerPath.substr(listenerPathCut.length + 1);
+                    if (this.matchSlices(listenerPathCut, updatePath) && this.matchSlices(listenerPathCut2, wildcardPath)) {
                         const value = () => wildcardScan[wildcardPath];
                         const bulkValue = [{ value, path: fullPath, params }];
                         for (const listenerId in listenersCollection.listeners) {
