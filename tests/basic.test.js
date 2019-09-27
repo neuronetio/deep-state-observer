@@ -1,6 +1,18 @@
-const { State } = require('../index.cjs.js');
+const { State, sMatch } = require('../index.cjs.js');
 
 describe('State', () => {
+  it('should match simple wildcards', () => {
+    expect(sMatch('te*t', 'test')).toEqual(true);
+    expect(sMatch('*est', 'test')).toEqual(true);
+    expect(sMatch('te*', 'test')).toEqual(true);
+    expect(sMatch('*', 'test')).toEqual(true);
+    expect(sMatch('*', '')).toEqual(true);
+
+    expect(sMatch('', 'test')).toEqual(false);
+    expect(sMatch('xy*', 'test')).toEqual(false);
+    expect(sMatch('*xy', 'test')).toEqual(false);
+  });
+
   it('should check existence of methods and data', () => {
     const state = new State({ test: '123' });
     expect(typeof state).toEqual('object');
@@ -681,7 +693,7 @@ describe('State', () => {
       paths.push(eventInfo.path.resolved);
     });
     expect(values.length).toEqual(2);
-    state.update('one.two', { three: { four: 44 } }, { only: ['**.four'] });
+    state.update('one.two', { three: { four: 44 } }, { only: ['*.four'] });
     expect(paths.length).toEqual(3);
     expect(values[2]).toEqual(44);
     expect(paths[2]).toEqual('one.two.three.four');

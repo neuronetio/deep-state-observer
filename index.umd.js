@@ -1364,8 +1364,30 @@
     var browser_38 = browser.SegmentsMatcher;
     var browser_39 = browser.subsetKeySet;
 
+    function simpleMatch(first, second) {
+        if (first === second)
+            return true;
+        if (first === '*')
+            return true;
+        const index = first.indexOf('*');
+        if (index > -1) {
+            const end = first.substr(index + 1);
+            if (index === 0 || second.substring(0, index) === first.substring(0, index)) {
+                const len = end.length;
+                if (len > 0) {
+                    return second.substr(-len) === end;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
     function match(first, second) {
-        return first === second || browser_8(first)(second);
+        return (first === second ||
+            first === '*' ||
+            second === '*' ||
+            simpleMatch(first, second) ||
+            browser_8(first)(second));
     }
     const WildcardObject = class WildcardObject {
         constructor(obj, delimeter, wildcard) {
@@ -1383,8 +1405,11 @@
             const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
             let index = 0;
             for (const item of currentArr) {
-                const currentPath = path === '' ? index.toString() : path + this.delimeter + index;
-                if (currentWildcardPath === this.wildcard || match(currentWildcardPath, index.toString())) {
+                const key = index.toString();
+                const currentPath = path === '' ? key : path + this.delimeter + index;
+                if (currentWildcardPath === this.wildcard ||
+                    currentWildcardPath === key ||
+                    simpleMatch(currentWildcardPath, key)) {
                     end ? (result[currentPath] = item) : this.goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
                 }
                 index++;
@@ -1399,9 +1424,12 @@
                 nextPartIndex = wildcard.length;
             }
             const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
-            for (const key in currentObj) {
+            for (let key in currentObj) {
+                key = key.toString();
                 const currentPath = path === '' ? key : path + this.delimeter + key;
-                if (currentWildcardPath === this.wildcard || match(currentWildcardPath, key)) {
+                if (currentWildcardPath === this.wildcard ||
+                    currentWildcardPath === key ||
+                    simpleMatch(currentWildcardPath, key)) {
                     end
                         ? (result[currentPath] = currentObj[key])
                         : this.goFurther(wildcard, currentObj[key], nextPartIndex + 1, currentPath, result);
@@ -1465,6 +1493,7 @@
 
     const WildcardObject$1 = wildcard.WildcardObject;
     const match$1 = wildcard.match;
+    const sMatch = simpleMatch;
     function log(message, info) {
         console.debug(message, info);
     }
@@ -1491,25 +1520,14 @@
         match(first, second) {
             if (first === second)
                 return true;
+            if (first === this.options.wildcard || second === this.options.wildcard)
+                return true;
             return match$1(first, second);
         }
         cutPath(longer, shorter) {
             return this.split(this.cleanNotRecursivePath(longer))
                 .slice(0, this.split(this.cleanNotRecursivePath(shorter)).length)
                 .join(this.options.delimeter);
-        }
-        matchSlices(longer, shorter) {
-            const left = this.split(longer);
-            const right = this.split(shorter);
-            if (left.length !== right.length)
-                return false;
-            let index = 0;
-            for (const part of left) {
-                if (!this.match(part, right[index]))
-                    return false;
-                index++;
-            }
-            return true;
         }
         trimPath(path) {
             return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}{1}`), ``);
@@ -2006,6 +2024,7 @@
     exports.WildcardObject = WildcardObject$1;
     exports.default = DeepState;
     exports.match = match$1;
+    exports.sMatch = sMatch;
 
     Object.defineProperty(exports, '__esModule', { value: true });
 

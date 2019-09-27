@@ -1,5 +1,4 @@
 import { getWildcardStringMatcher } from 'superwild';
-
 export interface wildcardApi {
   get: (wildcard: string) => {};
 }
@@ -8,8 +7,31 @@ export interface wildcardResult {
   [key: string]: any;
 }
 
-export function match(first, second) {
-  return first === second || getWildcardStringMatcher(first)(second);
+export function simpleMatch(first: string, second: string): boolean {
+  if (first === second) return true;
+  if (first === '*') return true;
+  const index = first.indexOf('*');
+  if (index > -1) {
+    const end = first.substr(index + 1);
+    if (index === 0 || second.substring(0, index) === first.substring(0, index)) {
+      const len = end.length;
+      if (len > 0) {
+        return second.substr(-len) === end;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+export function match(first: string, second: string) {
+  return (
+    first === second ||
+    first === '*' ||
+    second === '*' ||
+    simpleMatch(first, second) ||
+    getWildcardStringMatcher(first)(second)
+  );
 }
 
 export const WildcardObject = class WildcardObject {
@@ -33,8 +55,13 @@ export const WildcardObject = class WildcardObject {
     const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
     let index = 0;
     for (const item of currentArr) {
-      const currentPath = path === '' ? index.toString() : path + this.delimeter + index;
-      if (currentWildcardPath === this.wildcard || match(currentWildcardPath, index.toString())) {
+      const key = index.toString();
+      const currentPath = path === '' ? key : path + this.delimeter + index;
+      if (
+        currentWildcardPath === this.wildcard ||
+        currentWildcardPath === key ||
+        simpleMatch(currentWildcardPath, key)
+      ) {
         end ? (result[currentPath] = item) : this.goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
       }
       index++;
@@ -50,9 +77,14 @@ export const WildcardObject = class WildcardObject {
       nextPartIndex = wildcard.length;
     }
     const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
-    for (const key in currentObj) {
+    for (let key in currentObj) {
+      key = key.toString();
       const currentPath = path === '' ? key : path + this.delimeter + key;
-      if (currentWildcardPath === this.wildcard || match(currentWildcardPath, key)) {
+      if (
+        currentWildcardPath === this.wildcard ||
+        currentWildcardPath === key ||
+        simpleMatch(currentWildcardPath, key)
+      ) {
         end
           ? (result[currentPath] = currentObj[key])
           : this.goFurther(wildcard, currentObj[key], nextPartIndex + 1, currentPath, result);
