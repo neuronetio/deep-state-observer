@@ -21,6 +21,7 @@ export interface Options {
   delimeter: string;
   notRecursive: string;
   param: string;
+  wildcard: string;
   log: (message: string, info: any) => void;
 }
 
@@ -107,7 +108,7 @@ function log(message: string, info: any) {
   console.debug(message, info);
 }
 
-const defaultOptions: Options = { delimeter: '.', notRecursive: ';', param: ':', log };
+const defaultOptions: Options = { delimeter: `.`, notRecursive: `;`, param: `:`, wildcard: `*`, log };
 const defaultListenerOptions: ListenerOptions = { bulk: false, debug: false, source: '', data: undefined };
 const defaultUpdateOptions: UpdateOptions = { only: [], source: '', debug: false, data: undefined };
 
@@ -153,23 +154,19 @@ export default class DeepState {
   }
 
   private trimPath(path: string): string {
-    return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}*`), '');
+    return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}{1}`), ``);
   }
 
   public split(path: string) {
-    return path === '' ? [] : path.split(this.options.delimeter);
+    return path === `` ? [] : path.split(this.options.delimeter);
   }
 
   private isWildcard(path: string): boolean {
-    return path.indexOf('*') > -1;
-  }
-
-  private isRecursive(path: string): boolean {
-    return !path.endsWith(this.options.notRecursive);
+    return path.includes(this.options.wildcard);
   }
 
   private isNotRecursive(path: string): boolean {
-    return !this.isRecursive(path);
+    return path.endsWith(this.options.notRecursive);
   }
 
   private cleanNotRecursivePath(path: string): string {
@@ -177,7 +174,7 @@ export default class DeepState {
   }
 
   private hasParams(path: string) {
-    return path.indexOf(this.options.param) > -1;
+    return path.includes(this.options.param);
   }
 
   private getParamsInfo(path: string): ParamsInfo {
@@ -311,10 +308,6 @@ export default class DeepState {
     options: ListenerOptions = defaultListenerOptions,
     type: string = 'subscribe'
   ) {
-    if (typeof listenerPath === 'function') {
-      fn = listenerPath;
-      listenerPath = '';
-    }
     let listener = this.getCleanListener(fn, options);
     const listenersCollection = this.getListenersCollection(listenerPath, listener);
     listenerPath = listenersCollection.path;
@@ -369,10 +362,17 @@ export default class DeepState {
     return this.unsubscribe(listenerPath, this.id);
   }
 
+  private empty(obj) {
+    for (const key in obj) {
+      return false;
+    }
+    return true;
+  }
+
   private unsubscribe(path: string, id: number) {
     return () => {
       delete this.listeners[path].listeners[id];
-      if (Object.keys(this.listeners[path].listeners).length === 0) {
+      if (this.empty(this.listeners[path].listeners)) {
         delete this.listeners[path];
       }
     };
@@ -385,7 +385,11 @@ export default class DeepState {
     );
   }
 
-  private notifyListeners(listeners: GroupedListeners, exclude: GroupedListener[] = []): GroupedListener[] {
+  private notifyListeners(
+    listeners: GroupedListeners,
+    exclude: GroupedListener[] = [],
+    returnNotified: boolean = true
+  ): GroupedListener[] {
     const alreadyNotified = [];
     for (const path in listeners) {
       const { single, bulk } = listeners[path];
@@ -395,7 +399,7 @@ export default class DeepState {
         }
         const time = this.debugTime(singleListener);
         singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
-        alreadyNotified.push(singleListener);
+        returnNotified && alreadyNotified.push(singleListener);
         this.debugListener(time, singleListener);
       }
       for (const bulkListener of bulk) {
@@ -405,7 +409,7 @@ export default class DeepState {
         const time = this.debugTime(bulkListener);
         const bulkValue = bulkListener.value.map((bulk) => ({ ...bulk, value: bulk.value() }));
         bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
-        alreadyNotified.push(bulkListener);
+        returnNotified && alreadyNotified.push(bulkListener);
         this.debugListener(time, bulkListener);
       }
     }
@@ -468,8 +472,7 @@ export default class DeepState {
     type: string = 'update',
     originalPath: string = null
   ): GroupedListener[] {
-    const listeners = this.getSubscribedListeners(updatePath, newValue, options, type, originalPath);
-    return this.notifyListeners(listeners);
+    return this.notifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
   }
 
   private getNestedListeners(
@@ -542,8 +545,11 @@ export default class DeepState {
     alreadyNotified: GroupedListener[],
     originalPath: string = null
   ) {
-    const listeners = this.getNestedListeners(updatePath, newValue, options, type, originalPath);
-    return this.notifyListeners(listeners, alreadyNotified);
+    return this.notifyListeners(
+      this.getNestedListeners(updatePath, newValue, options, type, originalPath),
+      alreadyNotified,
+      false
+    );
   }
 
   private getNotifyOnlyListeners(
@@ -614,22 +620,19 @@ export default class DeepState {
     type: string = 'update',
     originalPath: string = null
   ): boolean {
-    const listeners = this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath);
-    return this.notifyListeners(listeners).length > 0;
+    return (
+      typeof this.notifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath))[0] !==
+      'undefined'
+    );
   }
 
   private canBeNested(newValue): boolean {
-    if (typeof newValue !== 'undefined' && newValue !== null) {
-      if (newValue.constructor.name === 'Object' || Array.isArray(newValue)) {
-        return true;
-      }
-    }
-    return false;
+    return typeof newValue === 'object' && newValue !== null;
   }
 
   private getUpdateValues(oldValue, split, fn) {
     if (typeof oldValue !== 'undefined' && oldValue !== null) {
-      if (typeof oldValue === 'object' && oldValue.constructor.name === 'Object') {
+      if (oldValue.constructor.name === 'Object') {
         oldValue = { ...oldValue };
       } else if (Array.isArray(oldValue)) {
         oldValue = oldValue.slice();
