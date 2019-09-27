@@ -208,7 +208,7 @@ export default class DeepState {
         continue;
       }
       reg.lastIndex = 0;
-      paramsInfo.params[partIndex].replaced = part.replace(reg, '*');
+      paramsInfo.params[partIndex].replaced = part.replace(reg, this.options.wildcard);
       fullReplaced.push(paramsInfo.params[partIndex].replaced);
       partIndex++;
     }
@@ -267,7 +267,7 @@ export default class DeepState {
   private getListenerCollectionMatch(listenerPath: string, isRecursive: boolean, isWildcard: boolean) {
     return (path) => {
       if (isRecursive) path = this.cutPath(path, listenerPath);
-      if (isWildcard && this.matchSlices(listenerPath, path)) return true;
+      if (isWildcard && this.match(listenerPath, path)) return true;
       return listenerPath === path;
     };
   }
@@ -593,7 +593,7 @@ export default class DeepState {
             : undefined;
           const listenerPathCut = this.cutPath(listenerPath, updatePath);
           const listenerPathCut2 = listenerPath.substr(listenerPathCut.length + 1);
-          if (this.matchSlices(listenerPathCut, updatePath) && this.matchSlices(listenerPathCut2, wildcardPath)) {
+          if (this.match(listenerPathCut, updatePath) && this.match(listenerPathCut2, wildcardPath)) {
             const value = () => wildcardScan[wildcardPath];
             const bulkValue = [{ value, path: fullPath, params }];
             for (const listenerId in listenersCollection.listeners) {

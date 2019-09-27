@@ -1551,7 +1551,7 @@
                     continue;
                 }
                 reg.lastIndex = 0;
-                paramsInfo.params[partIndex].replaced = part.replace(reg, '*');
+                paramsInfo.params[partIndex].replaced = part.replace(reg, this.options.wildcard);
                 fullReplaced.push(paramsInfo.params[partIndex].replaced);
                 partIndex++;
             }
@@ -1603,7 +1603,7 @@
             return (path) => {
                 if (isRecursive)
                     path = this.cutPath(path, listenerPath);
-                if (isWildcard && this.matchSlices(listenerPath, path))
+                if (isWildcard && this.match(listenerPath, path))
                     return true;
                 return listenerPath === path;
             };
@@ -1875,7 +1875,7 @@
                             : undefined;
                         const listenerPathCut = this.cutPath(listenerPath, updatePath);
                         const listenerPathCut2 = listenerPath.substr(listenerPathCut.length + 1);
-                        if (this.matchSlices(listenerPathCut, updatePath) && this.matchSlices(listenerPathCut2, wildcardPath)) {
+                        if (this.match(listenerPathCut, updatePath) && this.match(listenerPathCut2, wildcardPath)) {
                             const value = () => wildcardScan[wildcardPath];
                             const bulkValue = [{ value, path: fullPath, params }];
                             for (const listenerId in listenersCollection.listeners) {
