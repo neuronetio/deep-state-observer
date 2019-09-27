@@ -101,7 +101,7 @@ export interface UpdateOptions {
   data: any;
 }
 
-export const scanObject = wildcard.scanObject;
+export const WildcardObject = wildcard.WildcardObject;
 export const match = wildcard.match;
 
 function log(message: string, info: any) {
@@ -128,7 +128,7 @@ export default class DeepState {
     this.id = 0;
     this.pathGet = Path.get;
     this.pathSet = Path.set;
-    this.scan = scanObject(this.data, this.options.delimeter);
+    this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
   }
 
   public getListeners(): Listeners {
@@ -489,7 +489,7 @@ export default class DeepState {
       const currentCuttedPath = this.cutPath(listenerPath, updatePath);
       if (this.match(currentCuttedPath, updatePath)) {
         const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
-        const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
+        const values = new WildcardObject(newValue, this.options.delimeter, this.options.wildcard).get(restPath);
         const params = listenersCollection.paramsInfo
           ? this.getParams(listenersCollection.paramsInfo, updatePath)
           : undefined;
@@ -569,7 +569,7 @@ export default class DeepState {
       return listeners;
     }
     options.only.forEach((notifyPath) => {
-      const wildcardScan = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
+      const wildcardScan = new WildcardObject(newValue, this.options.delimeter, this.options.wildcard).get(notifyPath);
       listeners[notifyPath] = { bulk: [], single: [] };
       for (const wildcardPath in wildcardScan) {
         const fullPath = updatePath + this.options.delimeter + wildcardPath;

@@ -1361,58 +1361,59 @@ var browser_39 = browser.subsetKeySet;
 function match(first, second) {
     return first === second || browser_8(first)(second);
 }
-function goFurther(wildcard, currentObj, partIndex, currentPath, result = {}, delimeter = '.') {
-    if (Array.isArray(currentObj)) {
-        return handleArray(wildcard, currentObj, partIndex, currentPath, result);
+const WildcardObject = class WildcardObject {
+    constructor(obj, delimeter, wildcard) {
+        this.obj = obj;
+        this.delimeter = delimeter;
+        this.wildcard = wildcard;
     }
-    else if (currentObj.constructor.name === 'Object') {
-        return handleObject(wildcard, currentObj, partIndex, currentPath, result);
-    }
-}
-function handleArray(wildcard, currentArr, partIndex, path, result = {}, delimeter = '.') {
-    let nextPartIndex = wildcard.indexOf(delimeter, partIndex);
-    let end = false;
-    if (nextPartIndex === -1) {
-        end = true;
-        nextPartIndex = wildcard.length;
-    }
-    const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
-    let index = 0;
-    for (const item of currentArr) {
-        const currentPath = path === `` ? index.toString() : `${path}${delimeter}${index}`;
-        if (currentWildcardPath === `*` || match(currentWildcardPath, index.toString())) {
-            end ? (result[currentPath] = item) : goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
+    handleArray(wildcard, currentArr, partIndex, path, result = {}) {
+        let nextPartIndex = wildcard.indexOf(this.delimeter, partIndex);
+        let end = false;
+        if (nextPartIndex === -1) {
+            end = true;
+            nextPartIndex = wildcard.length;
         }
-        index++;
-    }
-    return result;
-}
-function handleObject(wildcard, currentObj, partIndex, path, result = {}, delimeter = '.') {
-    let nextPartIndex = wildcard.indexOf(delimeter, partIndex);
-    let end = false;
-    if (nextPartIndex === -1) {
-        end = true;
-        nextPartIndex = wildcard.length;
-    }
-    const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
-    for (const key in currentObj) {
-        const currentPath = path === `` ? key : `${path}${delimeter}${key}`;
-        if (currentWildcardPath === `*` || match(currentWildcardPath, key)) {
-            end
-                ? (result[currentPath] = currentObj[key])
-                : goFurther(wildcard, currentObj[key], nextPartIndex + 1, currentPath, result);
+        const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
+        let index = 0;
+        for (const item of currentArr) {
+            const currentPath = path === '' ? index.toString() : path + this.delimeter + index;
+            if (currentWildcardPath === this.wildcard || match(currentWildcardPath, index.toString())) {
+                end ? (result[currentPath] = item) : this.goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
+            }
+            index++;
         }
+        return result;
     }
-    return result;
-}
-function scanObject(obj, delimeter = '.') {
-    return {
-        get(wildcard) {
-            return goFurther(wildcard, obj, 0, '', {}, delimeter);
+    handleObject(wildcard, currentObj, partIndex, path, result = {}) {
+        let nextPartIndex = wildcard.indexOf(this.delimeter, partIndex);
+        let end = false;
+        if (nextPartIndex === -1) {
+            end = true;
+            nextPartIndex = wildcard.length;
         }
-    };
-}
-var wildcard = { scanObject, match };
+        const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
+        for (const key in currentObj) {
+            const currentPath = path === '' ? key : path + this.delimeter + key;
+            if (currentWildcardPath === this.wildcard || match(currentWildcardPath, key)) {
+                end
+                    ? (result[currentPath] = currentObj[key])
+                    : this.goFurther(wildcard, currentObj[key], nextPartIndex + 1, currentPath, result);
+            }
+        }
+        return result;
+    }
+    goFurther(wildcard, currentObj, partIndex, currentPath, result = {}) {
+        if (Array.isArray(currentObj)) {
+            return this.handleArray(wildcard, currentObj, partIndex, currentPath, result);
+        }
+        return this.handleObject(wildcard, currentObj, partIndex, currentPath, result);
+    }
+    get(wildcard) {
+        return this.goFurther(wildcard, this.obj, 0, '');
+    }
+};
+var wildcard = { WildcardObject, match };
 
 class ObjectPath {
     static get(path, obj, copiedPath = null) {
@@ -1456,7 +1457,7 @@ class ObjectPath {
     }
 }
 
-const scanObject$1 = wildcard.scanObject;
+const WildcardObject$1 = wildcard.WildcardObject;
 const match$1 = wildcard.match;
 function log(message, info) {
     console.debug(message, info);
@@ -1472,7 +1473,7 @@ class DeepState {
         this.id = 0;
         this.pathGet = ObjectPath.get;
         this.pathSet = ObjectPath.set;
-        this.scan = scanObject$1(this.data, this.options.delimeter);
+        this.scan = new WildcardObject$1(this.data, this.options.delimeter, this.options.wildcard);
     }
     getListeners() {
         return this.listeners;
@@ -1778,7 +1779,7 @@ class DeepState {
             const currentCuttedPath = this.cutPath(listenerPath, updatePath);
             if (this.match(currentCuttedPath, updatePath)) {
                 const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
-                const values = wildcard.scanObject(newValue, this.options.delimeter).get(restPath);
+                const values = new WildcardObject$1(newValue, this.options.delimeter, this.options.wildcard).get(restPath);
                 const params = listenersCollection.paramsInfo
                     ? this.getParams(listenersCollection.paramsInfo, updatePath)
                     : undefined;
@@ -1838,7 +1839,7 @@ class DeepState {
             return listeners;
         }
         options.only.forEach((notifyPath) => {
-            const wildcardScan = wildcard.scanObject(newValue, this.options.delimeter).get(notifyPath);
+            const wildcardScan = new WildcardObject$1(newValue, this.options.delimeter, this.options.wildcard).get(notifyPath);
             listeners[notifyPath] = { bulk: [], single: [] };
             for (const wildcardPath in wildcardScan) {
                 const fullPath = updatePath + this.options.delimeter + wildcardPath;
@@ -1990,4 +1991,4 @@ class DeepState {
 const State = DeepState;
 
 export default DeepState;
-export { State, match$1 as match, scanObject$1 as scanObject };
+export { State, WildcardObject$1 as WildcardObject, match$1 as match };
