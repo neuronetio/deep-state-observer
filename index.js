@@ -31,7 +31,7 @@ class Matcher {
         }
     }
     match(match) {
-        if (this.pattern === '*') {
+        if (this.pattern === this.wchar) {
             return true;
         }
         if (this.segments.length === 0) {
