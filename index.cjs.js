@@ -1871,9 +1871,7 @@ class DeepState {
                     const params = listenersCollection.paramsInfo
                         ? this.getParams(listenersCollection.paramsInfo, fullPath)
                         : undefined;
-                    const listenerPathCut = this.cutPath(listenerPath, updatePath);
-                    const listenerPathCut2 = listenerPath.substr(listenerPathCut.length + 1);
-                    if (this.match(listenerPathCut, updatePath) && this.match(listenerPathCut2, wildcardPath)) {
+                    if (this.match(listenerPath, fullPath)) {
                         const value = () => wildcardScan[wildcardPath];
                         const bulkValue = [{ value, path: fullPath, params }];
                         for (const listenerId in listenersCollection.listeners) {
