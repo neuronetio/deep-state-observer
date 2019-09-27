@@ -1,4 +1,4 @@
-import { getWildcardStringMatcher } from 'superwild';
+import Matcher from './stringMatcher';
 export interface wildcardApi {
   get: (wildcard: string) => {};
   match: (first: string, second: string) => boolean;
@@ -37,25 +37,13 @@ export default class WildcardObject {
     return false;
   }
 
-  matchSlices(longer: string, shorter: string) {
-    const left = longer.split(this.delimeter);
-    const right = shorter.split(this.delimeter);
-    if (left.length !== right.length) return false;
-    let index = 0;
-    for (const part of left) {
-      if (!this.simpleMatch(part, right[index])) return false;
-      index++;
-    }
-    return true;
-  }
-
   match(first: string, second: string) {
     return (
       first === second ||
       first === this.wildcard ||
       second === this.wildcard ||
       this.simpleMatch(first, second) ||
-      this.matchSlices(first, second)
+      new Matcher(first).match(second)
     );
   }
 
