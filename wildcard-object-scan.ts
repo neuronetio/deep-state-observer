@@ -1,40 +1,15 @@
 import { getWildcardStringMatcher } from 'superwild';
 export interface wildcardApi {
   get: (wildcard: string) => {};
+  match: (first: string, second: string) => boolean;
+  simpleMatch: (first: string, second: string) => boolean;
 }
 
 export interface wildcardResult {
   [key: string]: any;
 }
 
-export function simpleMatch(first: string, second: string): boolean {
-  if (first === second) return true;
-  if (first === '*') return true;
-  const index = first.indexOf('*');
-  if (index > -1) {
-    const end = first.substr(index + 1);
-    if (index === 0 || second.substring(0, index) === first.substring(0, index)) {
-      const len = end.length;
-      if (len > 0) {
-        return second.substr(-len) === end;
-      }
-      return true;
-    }
-  }
-  return false;
-}
-
-export function match(first: string, second: string) {
-  return (
-    first === second ||
-    first === '*' ||
-    second === '*' ||
-    simpleMatch(first, second) ||
-    getWildcardStringMatcher(first)(second)
-  );
-}
-
-export const WildcardObject = class WildcardObject {
+export default class WildcardObject {
   private obj: any;
   private delimeter: string;
   private wildcard: string;
@@ -43,6 +18,45 @@ export const WildcardObject = class WildcardObject {
     this.obj = obj;
     this.delimeter = delimeter;
     this.wildcard = wildcard;
+  }
+
+  simpleMatch(first: string, second: string): boolean {
+    if (first === second) return true;
+    if (first === this.wildcard) return true;
+    const index = first.indexOf(this.wildcard);
+    if (index > -1) {
+      const end = first.substr(index + 1);
+      if (index === 0 || second.substring(0, index) === first.substring(0, index)) {
+        const len = end.length;
+        if (len > 0) {
+          return second.substr(-len) === end;
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  matchSlices(longer: string, shorter: string) {
+    const left = longer.split(this.delimeter);
+    const right = shorter.split(this.delimeter);
+    if (left.length !== right.length) return false;
+    let index = 0;
+    for (const part of left) {
+      if (!this.simpleMatch(part, right[index])) return false;
+      index++;
+    }
+    return true;
+  }
+
+  match(first: string, second: string) {
+    return (
+      first === second ||
+      first === this.wildcard ||
+      second === this.wildcard ||
+      this.simpleMatch(first, second) ||
+      this.matchSlices(first, second)
+    );
   }
 
   private handleArray(wildcard: string, currentArr: any, partIndex: number, path: string, result = {}) {
@@ -60,7 +74,7 @@ export const WildcardObject = class WildcardObject {
       if (
         currentWildcardPath === this.wildcard ||
         currentWildcardPath === key ||
-        simpleMatch(currentWildcardPath, key)
+        this.simpleMatch(currentWildcardPath, key)
       ) {
         end ? (result[currentPath] = item) : this.goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
       }
@@ -83,7 +97,7 @@ export const WildcardObject = class WildcardObject {
       if (
         currentWildcardPath === this.wildcard ||
         currentWildcardPath === key ||
-        simpleMatch(currentWildcardPath, key)
+        this.simpleMatch(currentWildcardPath, key)
       ) {
         end
           ? (result[currentPath] = currentObj[key])
@@ -103,6 +117,4 @@ export const WildcardObject = class WildcardObject {
   public get(wildcard: string): any {
     return this.goFurther(wildcard, this.obj, 0, '');
   }
-};
-
-export default { WildcardObject, match };
+}

@@ -1,16 +1,17 @@
-const { State, sMatch } = require('../index.cjs.js');
+const { State } = require('../index.cjs.js');
 
 describe('State', () => {
   it('should match simple wildcards', () => {
-    expect(sMatch('te*t', 'test')).toEqual(true);
-    expect(sMatch('*est', 'test')).toEqual(true);
-    expect(sMatch('te*', 'test')).toEqual(true);
-    expect(sMatch('*', 'test')).toEqual(true);
-    expect(sMatch('*', '')).toEqual(true);
+    const state = new State({});
+    expect(state.match('te*t', 'test')).toEqual(true);
+    expect(state.match('*est', 'test')).toEqual(true);
+    expect(state.match('te*', 'test')).toEqual(true);
+    expect(state.match('*', 'test')).toEqual(true);
+    expect(state.match('*', '')).toEqual(true);
 
-    expect(sMatch('', 'test')).toEqual(false);
-    expect(sMatch('xy*', 'test')).toEqual(false);
-    expect(sMatch('*xy', 'test')).toEqual(false);
+    expect(state.match('', 'test')).toEqual(false);
+    expect(state.match('xy*', 'test')).toEqual(false);
+    expect(state.match('*xy', 'test')).toEqual(false);
   });
 
   it('should check existence of methods and data', () => {

@@ -1,4 +1,4 @@
-import wildcard, { wildcardApi, simpleMatch } from './wildcard-object-scan';
+import WildcardObject, { wildcardApi } from './wildcard-object-scan';
 import Path from './ObjectPath';
 
 export interface PathInfo {
@@ -101,11 +101,6 @@ export interface UpdateOptions {
   data: any;
 }
 
-export const WildcardObject = wildcard.WildcardObject;
-export const match = wildcard.match;
-
-export const sMatch = simpleMatch;
-
 function log(message: string, info: any) {
   console.debug(message, info);
 }
@@ -145,7 +140,7 @@ export default class DeepState {
   public match(first: string, second: string): boolean {
     if (first === second) return true;
     if (first === this.options.wildcard || second === this.options.wildcard) return true;
-    return match(first, second);
+    return this.scan.match(first, second);
   }
 
   private cutPath(longer: string, shorter: string): string {
