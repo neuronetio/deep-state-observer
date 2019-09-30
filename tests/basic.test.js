@@ -575,6 +575,35 @@ describe('State', () => {
     expect(state.get('one.two.three')).toEqual(33);
   });
 
+  it('should notify only specified strict listeners #2', () => {
+    const state = new State({
+      one: { two: { three: { four: { five: 5 } } } }
+    });
+    const values = [];
+    const paths = [];
+    state.subscribe('one.two.*.four', (val, eventInfo) => {
+      values.push(val);
+      paths.push(eventInfo.path.resolved);
+    });
+    state.subscribe('one.two.three.*.five', (val, eventInfo) => {
+      values.push(val);
+      paths.push(eventInfo.path.resolved);
+    });
+    expect(values.length).toEqual(2);
+    state.update(
+      'one.two.three',
+      function three(value) {
+        value.four = { five: 55 };
+        return value;
+      },
+      { only: ['four'] }
+    );
+    expect(paths.length).toEqual(3);
+    expect(values[2]).toEqual({ five: 55 });
+    expect(paths[2]).toEqual('one.two.three.four');
+    expect(state.get('one.two.three.four.five')).toEqual(55);
+  });
+
   it('should notify only specified strict listeners (nested)', () => {
     const state = new State({
       one: { two: { three: { four: 4 } } }

@@ -46,6 +46,7 @@
   "dependencies": {},
   "devDependencies": {
     "jasmine": "^3.4.0",
+    "loglevel": "^1.6.4",
     "rollup": "^1.19.4",
     "rollup-plugin-commonjs": "^10.0.2",
     "rollup-plugin-node-resolve": "^5.2.0",
