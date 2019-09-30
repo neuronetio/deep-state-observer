@@ -12,6 +12,9 @@ describe('State', () => {
     expect(state.match('', 'test')).toEqual(false);
     expect(state.match('xy*', 'test')).toEqual(false);
     expect(state.match('*xy', 'test')).toEqual(false);
+
+    expect(state.match('one.two.three.*.five', 'one.two.three.four.five')).toEqual(true);
+    expect(state.match('one.two.three.*.five', 'one.two.three.four')).toEqual(false);
   });
 
   it('should check existence of methods and data', () => {
