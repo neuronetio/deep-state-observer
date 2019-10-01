@@ -68,6 +68,7 @@ export interface ListenersCollection {
   hasParams: boolean;
   paramsInfo: ParamsInfo | undefined;
   match: Match;
+  count: number;
 }
 
 export interface Listeners {
@@ -237,7 +238,8 @@ export default class DeepState {
         hasParams: false,
         match: undefined,
         paramsInfo: undefined,
-        path: undefined
+        path: undefined,
+        count: 0
       },
       ...values
     };
@@ -300,6 +302,7 @@ export default class DeepState {
   ) {
     let listener = this.getCleanListener(fn, options);
     const listenersCollection = this.getListenersCollection(listenerPath, listener);
+    listenersCollection.count++;
     listenerPath = listenersCollection.path;
     if (!listenersCollection.isWildcard) {
       fn(this.pathGet(this.split(listenerPath), this.data), {
@@ -360,10 +363,13 @@ export default class DeepState {
   }
 
   private unsubscribe(path: string, id: number) {
-    return () => {
-      delete this.listeners[path].listeners[id];
-      if (this.empty(this.listeners[path].listeners)) {
-        delete this.listeners[path];
+    const listeners = this.listeners;
+    const listenersCollection = listeners[path];
+    return function unsub() {
+      delete listenersCollection.listeners[id];
+      listenersCollection.count--;
+      if (listenersCollection.count === 0) {
+        delete listeners[path];
       }
     };
   }

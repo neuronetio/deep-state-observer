@@ -316,7 +316,8 @@ class DeepState {
             hasParams: false,
             match: undefined,
             paramsInfo: undefined,
-            path: undefined
+            path: undefined,
+            count: 0
         }, values);
     }
     getCleanListener(fn, options = defaultListenerOptions) {
@@ -367,6 +368,7 @@ class DeepState {
     subscribe(listenerPath, fn, options = defaultListenerOptions, type = 'subscribe') {
         let listener = this.getCleanListener(fn, options);
         const listenersCollection = this.getListenersCollection(listenerPath, listener);
+        listenersCollection.count++;
         listenerPath = listenersCollection.path;
         if (!listenersCollection.isWildcard) {
             fn(this.pathGet(this.split(listenerPath), this.data), {
@@ -427,10 +429,13 @@ class DeepState {
         return true;
     }
     unsubscribe(path, id) {
-        return () => {
-            delete this.listeners[path].listeners[id];
-            if (this.empty(this.listeners[path].listeners)) {
-                delete this.listeners[path];
+        const listeners = this.listeners;
+        const listenersCollection = listeners[path];
+        return function unsub() {
+            delete listenersCollection.listeners[id];
+            listenersCollection.count--;
+            if (listenersCollection.count === 0) {
+                delete listeners[path];
             }
         };
     }
