@@ -333,6 +333,7 @@
             };
         }
         getListenerCollectionMatch(listenerPath, isRecursive, isWildcard) {
+            listenerPath = this.cleanNotRecursivePath(listenerPath);
             return (path) => {
                 if (isRecursive)
                     path = this.cutPath(path, listenerPath);
@@ -363,7 +364,6 @@
             }
             collCfg.isWildcard = this.isWildcard(collCfg.path);
             if (this.isNotRecursive(collCfg.path)) {
-                collCfg.path = this.cleanNotRecursivePath(collCfg.path);
                 collCfg.isRecursive = false;
             }
             let listenersCollection = (this.listeners[collCfg.path] = this.getCleanListenersCollection(Object.assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) })));
@@ -377,19 +377,21 @@
             listenersCollection.count++;
             listenerPath = listenersCollection.path;
             if (!listenersCollection.isWildcard) {
-                fn(this.pathGet(this.split(listenerPath), this.data), {
+                fn(this.pathGet(this.split(this.cleanNotRecursivePath(listenerPath)), this.data), {
                     type,
+                    listener,
+                    listenersCollection,
                     path: {
                         listener: listenerPath,
                         update: undefined,
-                        resolved: listenerPath
+                        resolved: this.cleanNotRecursivePath(listenerPath)
                     },
                     params: this.getParams(listenersCollection.paramsInfo, listenerPath),
                     options
                 });
             }
             else {
-                const paths = this.scan.get(listenerPath);
+                const paths = this.scan.get(this.cleanNotRecursivePath(listenerPath));
                 if (options.bulk) {
                     const bulkValue = [];
                     for (const path in paths) {
@@ -401,6 +403,8 @@
                     }
                     fn(bulkValue, {
                         type,
+                        listener,
+                        listenersCollection,
                         path: {
                             listener: listenerPath,
                             update: undefined,
@@ -414,10 +418,12 @@
                     for (const path in paths) {
                         fn(paths[path], {
                             type,
+                            listener,
+                            listenersCollection,
                             path: {
                                 listener: listenerPath,
                                 update: undefined,
-                                resolved: path
+                                resolved: this.cleanNotRecursivePath(path)
                             },
                             params: this.getParams(listenersCollection.paramsInfo, path),
                             options
@@ -427,12 +433,6 @@
             }
             this.debugSubscribe(listener, listenersCollection, listenerPath);
             return this.unsubscribe(listenerPath, this.id);
-        }
-        empty(obj) {
-            for (const key in obj) {
-                return false;
-            }
-            return true;
         }
         unsubscribe(path, id) {
             const listeners = this.listeners;
@@ -497,6 +497,7 @@
                                 listenersCollection,
                                 eventInfo: {
                                     type,
+                                    listener,
                                     path: {
                                         listener: listenerPath,
                                         update: originalPath ? originalPath : updatePath,
@@ -514,10 +515,11 @@
                                 listenersCollection,
                                 eventInfo: {
                                     type,
+                                    listener,
                                     path: {
                                         listener: listenerPath,
                                         update: originalPath ? originalPath : updatePath,
-                                        resolved: updatePath
+                                        resolved: this.cleanNotRecursivePath(updatePath)
                                     },
                                     params,
                                     options
@@ -554,10 +556,12 @@
                             const listener = listenersCollection.listeners[listenerId];
                             const eventInfo = {
                                 type,
+                                listener,
+                                listenersCollection,
                                 path: {
                                     listener: listenerPath,
                                     update: originalPath ? originalPath : updatePath,
-                                    resolved: fullPath
+                                    resolved: this.cleanNotRecursivePath(fullPath)
                                 },
                                 params,
                                 options
@@ -575,6 +579,8 @@
                         const listener = bulkListeners[listenerId];
                         const eventInfo = {
                             type,
+                            listener,
+                            listenersCollection,
                             path: {
                                 listener: listenerPath,
                                 update: updatePath,
@@ -617,10 +623,12 @@
                                 const listener = listenersCollection.listeners[listenerId];
                                 const eventInfo = {
                                     type,
+                                    listener,
+                                    listenersCollection,
                                     path: {
                                         listener: listenerPath,
                                         update: originalPath ? originalPath : updatePath,
-                                        resolved: fullPath
+                                        resolved: this.cleanNotRecursivePath(fullPath)
                                     },
                                     params,
                                     options

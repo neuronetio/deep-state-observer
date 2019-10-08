@@ -1,3 +1,4 @@
+// @ts-nocheck
 const { State } = require('../index.cjs.js');
 
 describe('State', () => {
@@ -456,6 +457,7 @@ describe('State', () => {
     expect(state.get('one.two.three.four.five')).toEqual(55);
 
     state.update('one.two.*', { four: { five: 555 } });
+    expect(paths.length).toEqual(2);
     expect(paths[1]).toEqual('one.two.three');
     expect(values[1]).toEqual({ four: { five: 555 } });
     expect(state.get('one.two.three.four.five')).toEqual(555);
@@ -849,5 +851,29 @@ describe('State', () => {
     expect(events[3].type).toEqual('update');
     expect(events[4].type).toEqual('update');
     expect(events[5].type).toEqual('update');
+  });
+
+  it('should add two listeners with the same path but with different recursive option', () => {
+    const state = new State({
+      one: { two: { three: { four: 4 } } }
+    });
+    const values = [];
+    const events = [];
+    state.subscribe('one.two', (val, eventInfo) => {
+      values.push(val);
+      events.push({ ...eventInfo, ...{ listenersCollection: eventInfo.listenersCollection } });
+    });
+    state.subscribe('one.two;', (val, eventInfo) => {
+      values.push(val);
+      events.push({ ...eventInfo, ...{ listenersCollection: eventInfo.listenersCollection } });
+    });
+    expect(values.length).toEqual(2);
+    expect(events[0].path.listener).toEqual('one.two');
+    expect(events[1].path.listener).toEqual('one.two;');
+    expect(events[0].listenersCollection.isRecursive).toEqual(true);
+    expect(events[1].listenersCollection.isRecursive).toEqual(false);
+    expect(events[0].listenersCollection).not.toEqual(events[1].listenersCollection);
+    expect(state.listeners['one.two'].count).toEqual(1);
+    expect(state.listeners['one.two;'].count).toEqual(1);
   });
 });
