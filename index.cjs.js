@@ -236,15 +236,43 @@ class DeepState {
             return true;
         return this.scan.match(first, second);
     }
+    getIndicesOf(searchStr, str) {
+        const searchStrLen = searchStr.length;
+        if (searchStrLen == 0) {
+            return [];
+        }
+        let startIndex = 0, index, indices = [];
+        while ((index = str.indexOf(searchStr, startIndex)) > -1) {
+            indices.push(index);
+            startIndex = index + searchStrLen;
+        }
+        return indices;
+    }
+    getIndicesCount(searchStr, str) {
+        const searchStrLen = searchStr.length;
+        if (searchStrLen == 0) {
+            return 0;
+        }
+        let startIndex = 0, index, indices = 0;
+        while ((index = str.indexOf(searchStr, startIndex)) > -1) {
+            indices++;
+            startIndex = index + searchStrLen;
+        }
+        return indices;
+    }
     cutPath(longer, shorter) {
         longer = this.cleanNotRecursivePath(longer);
         shorter = this.cleanNotRecursivePath(shorter);
-        let split = this.split(longer);
-        split.length = this.split(shorter).length;
-        return split.join(this.options.delimeter);
+        const shorterPartsLen = this.getIndicesCount(this.options.delimeter, shorter);
+        const longerParts = this.getIndicesOf(this.options.delimeter, longer);
+        return longer.substr(0, longerParts[shorterPartsLen]);
     }
     trimPath(path) {
-        return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}{1}`), ``);
+        path = this.cleanNotRecursivePath(path);
+        if (path.charAt(0) === this.options.delimeter) {
+            return path.substr(1);
+        }
+        return path;
     }
     split(path) {
         return path === '' ? [] : path.split(this.options.delimeter);
@@ -256,7 +284,7 @@ class DeepState {
         return path.endsWith(this.options.notRecursive);
     }
     cleanNotRecursivePath(path) {
-        return this.isNotRecursive(path) ? path.slice(0, -this.options.notRecursive.length) : path;
+        return this.isNotRecursive(path) ? path.substring(0, path.length - 1) : path;
     }
     hasParams(path) {
         return path.includes(this.options.param);

@@ -146,16 +146,50 @@ export default class DeepState {
     return this.scan.match(first, second);
   }
 
+  private getIndicesOf(searchStr: string, str: string): number[] {
+    const searchStrLen = searchStr.length;
+    if (searchStrLen == 0) {
+      return [];
+    }
+    let startIndex = 0,
+      index,
+      indices = [];
+    while ((index = str.indexOf(searchStr, startIndex)) > -1) {
+      indices.push(index);
+      startIndex = index + searchStrLen;
+    }
+    return indices;
+  }
+
+  private getIndicesCount(searchStr: string, str: string): number {
+    const searchStrLen = searchStr.length;
+    if (searchStrLen == 0) {
+      return 0;
+    }
+    let startIndex = 0,
+      index,
+      indices = 0;
+    while ((index = str.indexOf(searchStr, startIndex)) > -1) {
+      indices++;
+      startIndex = index + searchStrLen;
+    }
+    return indices;
+  }
+
   private cutPath(longer: string, shorter: string): string {
     longer = this.cleanNotRecursivePath(longer);
     shorter = this.cleanNotRecursivePath(shorter);
-    let split = this.split(longer);
-    split.length = this.split(shorter).length;
-    return split.join(this.options.delimeter);
+    const shorterPartsLen = this.getIndicesCount(this.options.delimeter, shorter);
+    const longerParts = this.getIndicesOf(this.options.delimeter, longer);
+    return longer.substr(0, longerParts[shorterPartsLen]);
   }
 
   private trimPath(path: string): string {
-    return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}{1}`), ``);
+    path = this.cleanNotRecursivePath(path);
+    if (path.charAt(0) === this.options.delimeter) {
+      return path.substr(1);
+    }
+    return path;
   }
 
   public split(path: string) {
@@ -171,7 +205,7 @@ export default class DeepState {
   }
 
   private cleanNotRecursivePath(path: string): string {
-    return this.isNotRecursive(path) ? path.slice(0, -this.options.notRecursive.length) : path;
+    return this.isNotRecursive(path) ? path.substring(0, path.length - 1) : path;
   }
 
   private hasParams(path: string) {
