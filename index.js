@@ -737,7 +737,8 @@ class DeepState {
         }
         this.pathSet(split, newValue, this.data);
         options = Object.assign({}, defaultUpdateOptions, options);
-        if (this.notifyOnly(updatePath, newValue, options)) {
+        if (options.only.length) {
+            this.notifyOnly(updatePath, newValue, options);
             return newValue;
         }
         const alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, options);
