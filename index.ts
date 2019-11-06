@@ -733,6 +733,9 @@ export default class DeepState {
     }
     this.pathSet(split, newValue, this.data);
     options = { ...defaultUpdateOptions, ...options };
+    if (options.only === null) {
+      return newValue;
+    }
     if (options.only.length) {
       this.notifyOnly(updatePath, newValue, options);
       return newValue;

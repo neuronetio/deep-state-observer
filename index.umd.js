@@ -743,6 +743,9 @@
             }
             this.pathSet(split, newValue, this.data);
             options = Object.assign({}, defaultUpdateOptions, options);
+            if (options.only === null) {
+                return newValue;
+            }
             if (options.only.length) {
                 this.notifyOnly(updatePath, newValue, options);
                 return newValue;
