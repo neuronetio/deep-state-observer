@@ -239,9 +239,11 @@
             return this.scan.match(first, second);
         }
         cutPath(longer, shorter) {
-            return this.split(this.cleanNotRecursivePath(longer))
-                .slice(0, this.split(this.cleanNotRecursivePath(shorter)).length)
-                .join(this.options.delimeter);
+            longer = this.cleanNotRecursivePath(longer);
+            shorter = this.cleanNotRecursivePath(shorter);
+            let split = this.split(longer);
+            split.length = this.split(shorter).length;
+            return split.join(this.options.delimeter);
         }
         trimPath(path) {
             return this.cleanNotRecursivePath(path).replace(new RegExp(`^\\${this.options.delimeter}{1}`), ``);
