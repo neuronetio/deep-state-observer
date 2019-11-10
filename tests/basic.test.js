@@ -760,7 +760,7 @@ describe('State', () => {
     expect(values.length).toEqual(5);
     expect(values[4]).toEqual('xx2');
 
-    expect(state.listeners).toEqual({});
+    expect(state.listeners.size).toEqual(0);
   });
 
   it('should add valid event info path object', () => {
@@ -873,7 +873,7 @@ describe('State', () => {
     expect(events[0].listenersCollection.isRecursive).toEqual(true);
     expect(events[1].listenersCollection.isRecursive).toEqual(false);
     expect(events[0].listenersCollection).not.toEqual(events[1].listenersCollection);
-    expect(state.listeners['one.two'].count).toEqual(1);
-    expect(state.listeners['one.two;'].count).toEqual(1);
+    expect(state.listeners.get('one.two').count).toEqual(1);
+    expect(state.listeners.get('one.two;').count).toEqual(1);
   });
 });

@@ -1,5 +1,6 @@
 import WildcardObject, { wildcardApi } from './wildcard-object-scan';
 import Path from './ObjectPath';
+import { stringify } from 'querystring';
 
 export interface PathInfo {
   listener: string;
@@ -73,9 +74,7 @@ export interface ListenersCollection {
   count: number;
 }
 
-export interface Listeners {
-  [path: string]: ListenersCollection;
-}
+export type Listeners = Map<string, ListenersCollection>;
 
 export interface ParamInfo {
   name: string;
@@ -122,7 +121,7 @@ export default class DeepState {
   private scan: wildcardApi;
 
   constructor(data = {}, options: Options = defaultOptions) {
-    this.listeners = {};
+    this.listeners = new Map();
     this.data = data;
     this.options = { ...defaultOptions, ...options };
     this.id = 0;
@@ -137,7 +136,7 @@ export default class DeepState {
 
   public destroy() {
     this.data = undefined;
-    this.listeners = {};
+    this.listeners = new Map();
   }
 
   public match(first: string, second: string): boolean {
@@ -292,16 +291,17 @@ export default class DeepState {
 
   private getListenerCollectionMatch(listenerPath: string, isRecursive: boolean, isWildcard: boolean) {
     listenerPath = this.cleanNotRecursivePath(listenerPath);
-    return (path) => {
-      if (isRecursive) path = this.cutPath(path, listenerPath);
-      if (isWildcard && this.match(listenerPath, path)) return true;
+    const self = this;
+    return function listenerCollectionMatch(path) {
+      if (isRecursive) path = self.cutPath(path, listenerPath);
+      if (isWildcard && self.match(listenerPath, path)) return true;
       return listenerPath === path;
     };
   }
 
   private getListenersCollection(listenerPath: string, listener: Listener): ListenersCollection {
-    if (typeof this.listeners[listenerPath] !== 'undefined') {
-      let listenersCollection = this.listeners[listenerPath];
+    if (this.listeners.has(listenerPath)) {
+      let listenersCollection = this.listeners.get(listenerPath);
       this.id++;
       listenersCollection.listeners[this.id] = listener;
       return listenersCollection;
@@ -323,12 +323,13 @@ export default class DeepState {
     if (this.isNotRecursive(collCfg.path)) {
       collCfg.isRecursive = false;
     }
-    let listenersCollection = (this.listeners[collCfg.path] = this.getCleanListenersCollection({
+    let listenersCollection = this.getCleanListenersCollection({
       ...collCfg,
       match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard)
-    }));
+    });
     this.id++;
     listenersCollection.listeners[this.id] = listener;
+    this.listeners.set(collCfg.path, listenersCollection);
     return listenersCollection;
   }
 
@@ -401,12 +402,12 @@ export default class DeepState {
 
   private unsubscribe(path: string, id: number) {
     const listeners = this.listeners;
-    const listenersCollection = listeners[path];
+    const listenersCollection = listeners.get(path);
     return function unsub() {
       delete listenersCollection.listeners[id];
       listenersCollection.count--;
       if (listenersCollection.count === 0) {
-        delete listeners[path];
+        listeners.delete(path);
       }
     };
   }
@@ -454,8 +455,7 @@ export default class DeepState {
   ): GroupedListeners {
     options = { ...defaultUpdateOptions, ...options };
     const listeners = {};
-    for (let listenerPath in this.listeners) {
-      const listenersCollection = this.listeners[listenerPath];
+    for (let [listenerPath, listenersCollection] of this.listeners) {
       listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
       if (listenersCollection.match(updatePath)) {
         const params = listenersCollection.paramsInfo
@@ -527,9 +527,8 @@ export default class DeepState {
     originalPath: string = null
   ): GroupedListeners {
     const listeners: GroupedListeners = {};
-    for (let listenerPath in this.listeners) {
+    for (let [listenerPath, listenersCollection] of this.listeners) {
       listeners[listenerPath] = { single: [], bulk: [] };
-      const listenersCollection = this.listeners[listenerPath];
       const currentCuttedPath = this.cutPath(listenerPath, updatePath);
       if (this.match(currentCuttedPath, updatePath)) {
         const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
@@ -621,8 +620,7 @@ export default class DeepState {
       listeners[notifyPath] = { bulk: [], single: [] };
       for (const wildcardPath in wildcardScan) {
         const fullPath = updatePath + this.options.delimeter + wildcardPath;
-        for (const listenerPath in this.listeners) {
-          const listenersCollection = this.listeners[listenerPath];
+        for (const [listenerPath, listenersCollection] of this.listeners) {
           const params = listenersCollection.paramsInfo
             ? this.getParams(listenersCollection.paramsInfo, fullPath)
             : undefined;
