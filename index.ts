@@ -1,6 +1,5 @@
 import WildcardObject, { wildcardApi } from './wildcard-object-scan';
 import Path from './ObjectPath';
-import { stringify } from 'querystring';
 
 export interface PathInfo {
   listener: string;
