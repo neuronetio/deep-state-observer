@@ -356,16 +356,7 @@
         };
     };
     DeepState.prototype.getCleanListenersCollection = function getCleanListenersCollection(values = {}) {
-        return Object.assign({
-            listeners: {},
-            isRecursive: false,
-            isWildcard: false,
-            hasParams: false,
-            match: undefined,
-            paramsInfo: undefined,
-            path: undefined,
-            count: 0
-        }, values);
+        return Object.assign({ listeners: new Map(), isRecursive: false, isWildcard: false, hasParams: false, match: undefined, paramsInfo: undefined, path: undefined, count: 0 }, values);
     };
     DeepState.prototype.getCleanListener = function getCleanListener(fn, options = defaultListenerOptions) {
         return {
@@ -388,7 +379,7 @@
         if (this.listeners.has(listenerPath)) {
             let listenersCollection = this.listeners.get(listenerPath);
             this.id++;
-            listenersCollection.listeners[this.id] = listener;
+            listenersCollection.listeners.set(this.id, listener);
             return listenersCollection;
         }
         let collCfg = {
@@ -410,7 +401,7 @@
         }
         let listenersCollection = this.getCleanListenersCollection(Object.assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
         this.id++;
-        listenersCollection.listeners[this.id] = listener;
+        listenersCollection.listeners.set(this.id, listener);
         this.listeners.set(collCfg.path, listenersCollection);
         return listenersCollection;
     };
@@ -481,7 +472,7 @@
         const listeners = this.listeners;
         const listenersCollection = listeners.get(path);
         return function unsub() {
-            delete listenersCollection.listeners[id];
+            listenersCollection.listeners.delete(id);
             listenersCollection.count--;
             if (listenersCollection.count === 0) {
                 listeners.delete(path);
@@ -535,8 +526,7 @@
                     ? () => this.get(this.cutPath(updatePath, listenerPath))
                     : () => newValue;
                 const bulkValue = [{ value, path: updatePath, params }];
-                for (const listenerId in listenersCollection.listeners) {
-                    const listener = listenersCollection.listeners[listenerId];
+                for (const listener of listenersCollection.listeners.values()) {
                     if (listener.options.bulk) {
                         listeners[listenerPath].bulk.push({
                             listener,
@@ -597,8 +587,7 @@
                 for (const currentRestPath in values) {
                     const value = () => values[currentRestPath];
                     const fullPath = [updatePath, currentRestPath].join(this.options.delimeter);
-                    for (const listenerId in listenersCollection.listeners) {
-                        const listener = listenersCollection.listeners[listenerId];
+                    for (const [listenerId, listener] of listenersCollection.listeners) {
                         const eventInfo = {
                             type,
                             listener,
@@ -673,8 +662,7 @@
                     if (this.match(listenerPath, fullPath)) {
                         const value = () => wildcardScan[wildcardPath];
                         const bulkValue = [{ value, path: fullPath, params }];
-                        for (const listenerId in listenersCollection.listeners) {
-                            const listener = listenersCollection.listeners[listenerId];
+                        for (const listener of listenersCollection.listeners.values()) {
                             const eventInfo = {
                                 type,
                                 listener,

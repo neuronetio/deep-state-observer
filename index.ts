@@ -60,10 +60,7 @@ export interface GroupedListeners {
 
 export type Updater = (value: any) => {};
 
-export interface ListenersObject {
-  [key: string]: Listener;
-  [key: number]: Listener;
-}
+export type ListenersObject = Map<string | number, Listener>;
 
 export interface ListenersCollection {
   path: string;
@@ -315,16 +312,14 @@ DeepState.prototype.getCleanListenersCollection = function getCleanListenersColl
   values = {}
 ): ListenersCollection {
   return {
-    ...{
-      listeners: {},
-      isRecursive: false,
-      isWildcard: false,
-      hasParams: false,
-      match: undefined,
-      paramsInfo: undefined,
-      path: undefined,
-      count: 0
-    },
+    listeners: new Map(),
+    isRecursive: false,
+    isWildcard: false,
+    hasParams: false,
+    match: undefined,
+    paramsInfo: undefined,
+    path: undefined,
+    count: 0,
     ...values
   };
 };
@@ -360,7 +355,7 @@ DeepState.prototype.getListenersCollection = function getListenersCollection(
   if (this.listeners.has(listenerPath)) {
     let listenersCollection = this.listeners.get(listenerPath);
     this.id++;
-    listenersCollection.listeners[this.id] = listener;
+    listenersCollection.listeners.set(this.id, listener);
     return listenersCollection;
   }
   let collCfg = {
@@ -389,7 +384,7 @@ DeepState.prototype.getListenersCollection = function getListenersCollection(
     )
   });
   this.id++;
-  listenersCollection.listeners[this.id] = listener;
+  listenersCollection.listeners.set(this.id, listener);
   this.listeners.set(collCfg.path, listenersCollection);
   return listenersCollection;
 };
@@ -477,7 +472,7 @@ DeepState.prototype.unsubscribe = function unsubscribe(
   const listeners = this.listeners;
   const listenersCollection = listeners.get(path);
   return function unsub() {
-    delete listenersCollection.listeners[id];
+    listenersCollection.listeners.delete(id);
     listenersCollection.count--;
     if (listenersCollection.count === 0) {
       listeners.delete(path);
@@ -546,8 +541,7 @@ DeepState.prototype.getSubscribedListeners = function getSubscribedListeners(
           ? () => this.get(this.cutPath(updatePath, listenerPath))
           : () => newValue;
       const bulkValue = [{ value, path: updatePath, params }];
-      for (const listenerId in listenersCollection.listeners) {
-        const listener = listenersCollection.listeners[listenerId];
+      for (const listener of listenersCollection.listeners.values()) {
         if (listener.options.bulk) {
           listeners[listenerPath].bulk.push({
             listener,
@@ -637,8 +631,7 @@ DeepState.prototype.getNestedListeners = function getNestedListeners(
         const fullPath = [updatePath, currentRestPath].join(
           this.options.delimeter
         );
-        for (const listenerId in listenersCollection.listeners) {
-          const listener = listenersCollection.listeners[listenerId];
+        for (const [listenerId, listener] of listenersCollection.listeners) {
           const eventInfo = {
             type,
             listener,
@@ -737,8 +730,7 @@ DeepState.prototype.getNotifyOnlyListeners = function getNotifyOnlyListeners(
         if (this.match(listenerPath, fullPath)) {
           const value = () => wildcardScan[wildcardPath];
           const bulkValue = [{ value, path: fullPath, params }];
-          for (const listenerId in listenersCollection.listeners) {
-            const listener = listenersCollection.listeners[listenerId];
+          for (const listener of listenersCollection.listeners.values()) {
             const eventInfo = {
               type,
               listener,

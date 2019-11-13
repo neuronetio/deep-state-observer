@@ -354,16 +354,7 @@ DeepState.prototype.subscribeAll = function subscribeAll(userPaths, fn, options 
     };
 };
 DeepState.prototype.getCleanListenersCollection = function getCleanListenersCollection(values = {}) {
-    return Object.assign({
-        listeners: {},
-        isRecursive: false,
-        isWildcard: false,
-        hasParams: false,
-        match: undefined,
-        paramsInfo: undefined,
-        path: undefined,
-        count: 0
-    }, values);
+    return Object.assign({ listeners: new Map(), isRecursive: false, isWildcard: false, hasParams: false, match: undefined, paramsInfo: undefined, path: undefined, count: 0 }, values);
 };
 DeepState.prototype.getCleanListener = function getCleanListener(fn, options = defaultListenerOptions) {
     return {
@@ -386,7 +377,7 @@ DeepState.prototype.getListenersCollection = function getListenersCollection(lis
     if (this.listeners.has(listenerPath)) {
         let listenersCollection = this.listeners.get(listenerPath);
         this.id++;
-        listenersCollection.listeners[this.id] = listener;
+        listenersCollection.listeners.set(this.id, listener);
         return listenersCollection;
     }
     let collCfg = {
@@ -408,7 +399,7 @@ DeepState.prototype.getListenersCollection = function getListenersCollection(lis
     }
     let listenersCollection = this.getCleanListenersCollection(Object.assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
     this.id++;
-    listenersCollection.listeners[this.id] = listener;
+    listenersCollection.listeners.set(this.id, listener);
     this.listeners.set(collCfg.path, listenersCollection);
     return listenersCollection;
 };
@@ -479,7 +470,7 @@ DeepState.prototype.unsubscribe = function unsubscribe(path, id) {
     const listeners = this.listeners;
     const listenersCollection = listeners.get(path);
     return function unsub() {
-        delete listenersCollection.listeners[id];
+        listenersCollection.listeners.delete(id);
         listenersCollection.count--;
         if (listenersCollection.count === 0) {
             listeners.delete(path);
@@ -533,8 +524,7 @@ DeepState.prototype.getSubscribedListeners = function getSubscribedListeners(upd
                 ? () => this.get(this.cutPath(updatePath, listenerPath))
                 : () => newValue;
             const bulkValue = [{ value, path: updatePath, params }];
-            for (const listenerId in listenersCollection.listeners) {
-                const listener = listenersCollection.listeners[listenerId];
+            for (const listener of listenersCollection.listeners.values()) {
                 if (listener.options.bulk) {
                     listeners[listenerPath].bulk.push({
                         listener,
@@ -595,8 +585,7 @@ DeepState.prototype.getNestedListeners = function getNestedListeners(updatePath,
             for (const currentRestPath in values) {
                 const value = () => values[currentRestPath];
                 const fullPath = [updatePath, currentRestPath].join(this.options.delimeter);
-                for (const listenerId in listenersCollection.listeners) {
-                    const listener = listenersCollection.listeners[listenerId];
+                for (const [listenerId, listener] of listenersCollection.listeners) {
                     const eventInfo = {
                         type,
                         listener,
@@ -671,8 +660,7 @@ DeepState.prototype.getNotifyOnlyListeners = function getNotifyOnlyListeners(upd
                 if (this.match(listenerPath, fullPath)) {
                     const value = () => wildcardScan[wildcardPath];
                     const bulkValue = [{ value, path: fullPath, params }];
-                    for (const listenerId in listenersCollection.listeners) {
-                        const listener = listenersCollection.listeners[listenerId];
+                    for (const listener of listenersCollection.listeners.values()) {
                         const eventInfo = {
                             type,
                             listener,
