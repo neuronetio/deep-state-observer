@@ -906,4 +906,52 @@ describe("State", () => {
     expect(state.listeners.get("one.two").count).toEqual(1);
     expect(state.listeners.get("one.two;").count).toEqual(1);
   });
+
+  it("should execute listeners only when all values where changed", () => {
+    const state = new State({
+      first: { one: 1 },
+      second: { two: 2 },
+      third: { three: 3 }
+    });
+    const values = [];
+    state.waitForAll(["first", "second", "third"], paths => {
+      const value = {};
+      for (const path in paths) {
+        value[path] = state.get(path);
+      }
+      values.push(value);
+    });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual({
+      first: { one: 1 },
+      second: { two: 2 },
+      third: { three: 3 }
+    });
+    state.update("first.one", 11);
+    expect(values.length).toEqual(1);
+    expect(state.get("")).toEqual({
+      first: { one: 11 },
+      second: { two: 2 },
+      third: { three: 3 }
+    });
+    state.update("second.two", 22);
+    expect(values.length).toEqual(1);
+    expect(state.get("")).toEqual({
+      first: { one: 11 },
+      second: { two: 22 },
+      third: { three: 3 }
+    });
+    state.update("third.three", 33);
+    expect(values.length).toEqual(2);
+    expect(state.get("")).toEqual({
+      first: { one: 11 },
+      second: { two: 22 },
+      third: { three: 33 }
+    });
+    expect(values[1]).toEqual({
+      first: { one: 11 },
+      second: { two: 22 },
+      third: { three: 33 }
+    });
+  });
 });
