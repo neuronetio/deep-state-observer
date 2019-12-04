@@ -76,6 +76,13 @@ export interface ListenersCollection {
 
 export type Listeners = Map<string, ListenersCollection>;
 
+export interface WaitingListener {
+  fn: ListenerFunction;
+  options: ListenerOptions;
+}
+
+export type WaitingListeners = WeakMap<string[], WaitingListener>;
+
 export interface ParamInfo {
   name: string;
   replaced: string;
@@ -114,6 +121,7 @@ const defaultOptions: Options = {
   wildcard: `*`,
   log
 };
+
 const defaultListenerOptions: ListenerOptions = {
   bulk: false,
   debug: false,
@@ -121,6 +129,7 @@ const defaultListenerOptions: ListenerOptions = {
   data: undefined,
   waitForAll: false
 };
+
 const defaultUpdateOptions: UpdateOptions = {
   only: [],
   source: "",
@@ -130,16 +139,17 @@ const defaultUpdateOptions: UpdateOptions = {
 
 class DeepState {
   private listeners: Listeners;
+  private waitingListeners: WaitingListeners;
   private data: object;
   private options: Options;
   private id: number;
   private pathGet: any;
   private pathSet: any;
   private scan: any;
-  private waitingListeners: Listeners;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = new Map();
+    this.waitingListeners = new Map();
     this.data = data;
     this.options = { ...defaultOptions, ...options };
     this.id = 0;
@@ -150,26 +160,25 @@ class DeepState {
       this.options.delimeter,
       this.options.wildcard
     );
-    this.waitingListeners = new Map();
   }
 
-  getListeners(): Listeners {
+  public getListeners(): Listeners {
     return this.listeners;
   }
 
-  destroy() {
+  public destroy() {
     this.data = undefined;
     this.listeners = new Map();
   }
 
-  match(first: string, second: string): boolean {
+  private match(first: string, second: string): boolean {
     if (first === second) return true;
     if (first === this.options.wildcard || second === this.options.wildcard)
       return true;
     return this.scan.match(first, second);
   }
 
-  getIndicesOf(searchStr: string, str: string): number[] {
+  private getIndicesOf(searchStr: string, str: string): number[] {
     const searchStrLen = searchStr.length;
     if (searchStrLen == 0) {
       return [];
@@ -184,7 +193,7 @@ class DeepState {
     return indices;
   }
 
-  getIndicesCount(searchStr: string, str: string): number {
+  private getIndicesCount(searchStr: string, str: string): number {
     const searchStrLen = searchStr.length;
     if (searchStrLen == 0) {
       return 0;
@@ -199,7 +208,7 @@ class DeepState {
     return indices;
   }
 
-  cutPath(longer: string, shorter: string): string {
+  private cutPath(longer: string, shorter: string): string {
     longer = this.cleanNotRecursivePath(longer);
     shorter = this.cleanNotRecursivePath(shorter);
     const shorterPartsLen = this.getIndicesCount(
@@ -210,7 +219,7 @@ class DeepState {
     return longer.substr(0, longerParts[shorterPartsLen]);
   }
 
-  trimPath(path: string): string {
+  private trimPath(path: string): string {
     path = this.cleanNotRecursivePath(path);
     if (path.charAt(0) === this.options.delimeter) {
       return path.substr(1);
@@ -218,29 +227,29 @@ class DeepState {
     return path;
   }
 
-  split(path: string) {
+  private split(path: string) {
     return path === "" ? [] : path.split(this.options.delimeter);
   }
 
-  isWildcard(path: string): boolean {
+  private isWildcard(path: string): boolean {
     return path.includes(this.options.wildcard);
   }
 
-  isNotRecursive(path: string): boolean {
+  private isNotRecursive(path: string): boolean {
     return path.endsWith(this.options.notRecursive);
   }
 
-  cleanNotRecursivePath(path: string): string {
+  private cleanNotRecursivePath(path: string): string {
     return this.isNotRecursive(path)
       ? path.substring(0, path.length - 1)
       : path;
   }
 
-  hasParams(path: string) {
+  private hasParams(path: string) {
     return path.includes(this.options.param);
   }
 
-  getParamsInfo(path: string): ParamsInfo {
+  private getParamsInfo(path: string): ParamsInfo {
     let paramsInfo: ParamsInfo = { replaced: "", original: path, params: {} };
     let partIndex = 0;
     let fullReplaced = [];
@@ -275,7 +284,7 @@ class DeepState {
     return paramsInfo;
   }
 
-  getParams(paramsInfo: ParamsInfo | undefined, path: string): Params {
+  private getParams(paramsInfo: ParamsInfo | undefined, path: string): Params {
     if (!paramsInfo) {
       return undefined;
     }
@@ -288,13 +297,15 @@ class DeepState {
     return result;
   }
 
-  waitForAll(
-    userPath: string[],
+  public waitForAll(
+    userPaths: string[],
     fn: ListenerFunction,
     options: ListenerOptions = defaultListenerOptions
-  ) {}
+  ) {
+    this.waitingListeners.set(userPaths, { fn, options });
+  }
 
-  subscribeAll(
+  public subscribeAll(
     userPaths: string[],
     fn: ListenerFunction,
     options: ListenerOptions = defaultListenerOptions
@@ -314,7 +325,7 @@ class DeepState {
     };
   }
 
-  getCleanListenersCollection(values = {}): ListenersCollection {
+  private getCleanListenersCollection(values = {}): ListenersCollection {
     return {
       listeners: new Map(),
       isRecursive: false,
@@ -328,7 +339,7 @@ class DeepState {
     };
   }
 
-  getCleanListener(
+  private getCleanListener(
     fn: ListenerFunction,
     options: ListenerOptions = defaultListenerOptions
   ): Listener {
@@ -338,7 +349,7 @@ class DeepState {
     };
   }
 
-  getListenerCollectionMatch(
+  private getListenerCollectionMatch(
     listenerPath: string,
     isRecursive: boolean,
     isWildcard: boolean
@@ -352,7 +363,7 @@ class DeepState {
     };
   }
 
-  getListenersCollection(
+  private getListenersCollection(
     listenerPath: string,
     listener: Listener
   ): ListenersCollection {
@@ -393,7 +404,7 @@ class DeepState {
     return listenersCollection;
   }
 
-  subscribe(
+  public subscribe(
     listenerPath: string,
     fn: ListenerFunction,
     options: ListenerOptions = defaultListenerOptions,
@@ -469,7 +480,7 @@ class DeepState {
     return this.unsubscribe(listenerPath, this.id);
   }
 
-  unsubscribe(path: string, id: number) {
+  public unsubscribe(path: string, id: number) {
     const listeners = this.listeners;
     const listenersCollection = listeners.get(path);
     return function unsub() {
@@ -481,7 +492,7 @@ class DeepState {
     };
   }
 
-  same(newValue, oldValue): boolean {
+  private same(newValue, oldValue): boolean {
     return (
       (["number", "string", "undefined", "boolean"].includes(typeof newValue) ||
         newValue === null) &&
@@ -489,7 +500,7 @@ class DeepState {
     );
   }
 
-  notifyListeners(
+  private notifyListeners(
     listeners: GroupedListeners,
     exclude: GroupedListener[] = [],
     returnNotified: boolean = true
@@ -522,7 +533,7 @@ class DeepState {
     return alreadyNotified;
   }
 
-  getSubscribedListeners(
+  private getSubscribedListeners(
     updatePath: string,
     newValue,
     options: UpdateOptions,
@@ -584,7 +595,7 @@ class DeepState {
     return listeners;
   }
 
-  notifySubscribedListeners(
+  private notifySubscribedListeners(
     updatePath: string,
     newValue,
     options: UpdateOptions,
@@ -602,7 +613,7 @@ class DeepState {
     );
   }
 
-  getNestedListeners(
+  private getNestedListeners(
     updatePath: string,
     newValue,
     options: UpdateOptions,
@@ -684,7 +695,7 @@ class DeepState {
     return listeners;
   }
 
-  notifyNestedListeners(
+  private notifyNestedListeners(
     updatePath: string,
     newValue,
     options: UpdateOptions,
@@ -705,7 +716,7 @@ class DeepState {
     );
   }
 
-  getNotifyOnlyListeners(
+  private getNotifyOnlyListeners(
     updatePath: string,
     newValue,
     options: UpdateOptions,
@@ -779,7 +790,7 @@ class DeepState {
     return listeners;
   }
 
-  notifyOnly(
+  private notifyOnly(
     updatePath: string,
     newValue,
     options: UpdateOptions,
@@ -799,11 +810,11 @@ class DeepState {
     );
   }
 
-  canBeNested(newValue): boolean {
+  private canBeNested(newValue): boolean {
     return typeof newValue === "object" && newValue !== null;
   }
 
-  getUpdateValues(oldValue, split, fn) {
+  private getUpdateValues(oldValue, split, fn) {
     if (typeof oldValue === "object" && oldValue !== null) {
       Array.isArray(oldValue)
         ? (oldValue = oldValue.slice())
@@ -816,7 +827,7 @@ class DeepState {
     return { newValue, oldValue };
   }
 
-  wildcardUpdate(
+  private wildcardUpdate(
     updatePath: string,
     fn: Updater,
     options: UpdateOptions = defaultUpdateOptions
@@ -879,7 +890,7 @@ class DeepState {
     }
   }
 
-  update(
+  public update(
     updatePath: string,
     fn: Updater,
     options: UpdateOptions = defaultUpdateOptions
@@ -930,14 +941,14 @@ class DeepState {
     return newValue;
   }
 
-  get(userPath: string | undefined = undefined) {
+  public get(userPath: string | undefined = undefined) {
     if (typeof userPath === "undefined" || userPath === "") {
       return this.data;
     }
     return this.pathGet(this.split(userPath), this.data);
   }
 
-  debugSubscribe(
+  private debugSubscribe(
     listener: Listener,
     listenersCollection: ListenersCollection,
     listenerPath: string
@@ -951,7 +962,7 @@ class DeepState {
     }
   }
 
-  debugListener(time: number, groupedListener: GroupedListener) {
+  private debugListener(time: number, groupedListener: GroupedListener) {
     if (
       groupedListener.eventInfo.options.debug ||
       groupedListener.listener.options.debug
@@ -963,7 +974,7 @@ class DeepState {
     }
   }
 
-  debugTime(groupedListener: GroupedListener): number {
+  private debugTime(groupedListener: GroupedListener): number {
     return groupedListener.listener.options.debug ||
       groupedListener.eventInfo.options.debug
       ? Date.now()
