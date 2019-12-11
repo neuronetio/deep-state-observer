@@ -457,24 +457,30 @@ class DeepState {
     );
     listenersCollection.count++;
     listenerPath = listenersCollection.path;
+    let additionalDestroys = [];
     if (!listenersCollection.isWildcard) {
-      fn(
-        this.pathGet(
-          this.split(this.cleanNotRecursivePath(listenerPath)),
-          this.data
-        ),
-        {
-          type,
-          listener,
-          listenersCollection,
-          path: {
-            listener: listenerPath,
-            update: undefined,
-            resolved: this.cleanNotRecursivePath(listenerPath)
-          },
-          params: this.getParams(listenersCollection.paramsInfo, listenerPath),
-          options
-        }
+      additionalDestroys.push(
+        fn(
+          this.pathGet(
+            this.split(this.cleanNotRecursivePath(listenerPath)),
+            this.data
+          ),
+          {
+            type,
+            listener,
+            listenersCollection,
+            path: {
+              listener: listenerPath,
+              update: undefined,
+              resolved: this.cleanNotRecursivePath(listenerPath)
+            },
+            params: this.getParams(
+              listenersCollection.paramsInfo,
+              listenerPath
+            ),
+            options
+          }
+        )
       );
     } else {
       const paths = this.scan.get(this.cleanNotRecursivePath(listenerPath));
@@ -487,43 +493,50 @@ class DeepState {
             value: paths[path]
           });
         }
-        fn(bulkValue, {
-          type,
-          listener,
-          listenersCollection,
-          path: {
-            listener: listenerPath,
-            update: undefined,
-            resolved: undefined
-          },
-          options,
-          params: undefined
-        });
-      } else {
-        for (const path in paths) {
-          fn(paths[path], {
+        additionalDestroys.push(
+          fn(bulkValue, {
             type,
             listener,
             listenersCollection,
             path: {
               listener: listenerPath,
               update: undefined,
-              resolved: this.cleanNotRecursivePath(path)
+              resolved: undefined
             },
-            params: this.getParams(listenersCollection.paramsInfo, path),
-            options
-          });
+            options,
+            params: undefined
+          })
+        );
+      } else {
+        for (const path in paths) {
+          additionalDestroys.push(
+            fn(paths[path], {
+              type,
+              listener,
+              listenersCollection,
+              path: {
+                listener: listenerPath,
+                update: undefined,
+                resolved: this.cleanNotRecursivePath(path)
+              },
+              params: this.getParams(listenersCollection.paramsInfo, path),
+              options
+            })
+          );
         }
       }
     }
     this.debugSubscribe(listener, listenersCollection, listenerPath);
-    return this.unsubscribe(listenerPath, this.id);
+    return this.unsubscribe(listenerPath, this.id, additionalDestroys);
   }
 
-  private unsubscribe(path: string, id: number) {
+  private unsubscribe(path: string, id: number, additionalDestroys: any[]) {
     const listeners = this.listeners;
     const listenersCollection = listeners.get(path);
     return function unsub() {
+      for (const destr of additionalDestroys) {
+        if (typeof destr === "function") destr();
+      }
       listenersCollection.listeners.delete(id);
       listenersCollection.count--;
       if (listenersCollection.count === 0) {

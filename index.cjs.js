@@ -453,8 +453,9 @@ class DeepState {
         const listenersCollection = this.getListenersCollection(listenerPath, listener);
         listenersCollection.count++;
         listenerPath = listenersCollection.path;
+        let additionalDestroys = [];
         if (!listenersCollection.isWildcard) {
-            fn(this.pathGet(this.split(this.cleanNotRecursivePath(listenerPath)), this.data), {
+            additionalDestroys.push(fn(this.pathGet(this.split(this.cleanNotRecursivePath(listenerPath)), this.data), {
                 type,
                 listener,
                 listenersCollection,
@@ -465,7 +466,7 @@ class DeepState {
                 },
                 params: this.getParams(listenersCollection.paramsInfo, listenerPath),
                 options
-            });
+            }));
         }
         else {
             const paths = this.scan.get(this.cleanNotRecursivePath(listenerPath));
@@ -478,7 +479,7 @@ class DeepState {
                         value: paths[path]
                     });
                 }
-                fn(bulkValue, {
+                additionalDestroys.push(fn(bulkValue, {
                     type,
                     listener,
                     listenersCollection,
@@ -489,11 +490,11 @@ class DeepState {
                     },
                     options,
                     params: undefined
-                });
+                }));
             }
             else {
                 for (const path in paths) {
-                    fn(paths[path], {
+                    additionalDestroys.push(fn(paths[path], {
                         type,
                         listener,
                         listenersCollection,
@@ -504,17 +505,21 @@ class DeepState {
                         },
                         params: this.getParams(listenersCollection.paramsInfo, path),
                         options
-                    });
+                    }));
                 }
             }
         }
         this.debugSubscribe(listener, listenersCollection, listenerPath);
-        return this.unsubscribe(listenerPath, this.id);
+        return this.unsubscribe(listenerPath, this.id, additionalDestroys);
     }
-    unsubscribe(path, id) {
+    unsubscribe(path, id, additionalDestroys) {
         const listeners = this.listeners;
         const listenersCollection = listeners.get(path);
         return function unsub() {
+            for (const destr of additionalDestroys) {
+                if (typeof destr === "function")
+                    destr();
+            }
             listenersCollection.listeners.delete(id);
             listenersCollection.count--;
             if (listenersCollection.count === 0) {
