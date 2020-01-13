@@ -161,7 +161,7 @@ class ObjectPath {
         if (copiedPath === null) {
             copiedPath = path.slice();
         }
-        if (copiedPath.length === 0 || typeof obj === 'undefined') {
+        if (copiedPath.length === 0 || typeof obj === "undefined") {
             return obj;
         }
         const currentPath = copiedPath.shift();
@@ -190,6 +190,9 @@ class ObjectPath {
         if (copiedPath.length === 0) {
             obj[currentPath] = newValue;
             return;
+        }
+        if (!obj) {
+            obj = {};
         }
         if (!obj.hasOwnProperty(currentPath)) {
             obj[currentPath] = {};
