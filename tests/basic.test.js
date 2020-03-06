@@ -14,12 +14,8 @@ describe("State", () => {
     expect(state.match("xy*", "test")).toEqual(false);
     expect(state.match("*xy", "test")).toEqual(false);
 
-    expect(
-      state.match("one.two.three.*.five", "one.two.three.four.five")
-    ).toEqual(true);
-    expect(state.match("one.two.three.*.five", "one.two.three.four")).toEqual(
-      false
-    );
+    expect(state.match("one.two.three.*.five", "one.two.three.four.five")).toEqual(true);
+    expect(state.match("one.two.three.*.five", "one.two.three.four")).toEqual(false);
   });
 
   it("should check existence of methods and data", () => {
@@ -48,13 +44,9 @@ describe("State", () => {
     const data = {
       one: { two: { three: { four: { five: 5 } } } }
     };
-    expect(
-      state.pathGet(["one", "two", "three", "four", "five"], data)
-    ).toEqual(5);
+    expect(state.pathGet(["one", "two", "three", "four", "five"], data)).toEqual(5);
     state.pathSet(["one", "two", "three", "four", "five"], 55, data);
-    expect(
-      state.pathGet(["one", "two", "three", "four", "five"], data)
-    ).toEqual(55);
+    expect(state.pathGet(["one", "two", "three", "four", "five"], data)).toEqual(55);
     expect(data.one.two.three.four.five).toEqual(55);
 
     const data2 = {};
@@ -170,13 +162,7 @@ describe("State", () => {
 
   it("should match wildcards (array)", () => {
     const state = new State({
-      one: [
-        { two: 2 },
-        { two: 22 },
-        { two: 222 },
-        { three: 3 },
-        [{ test: "x" }]
-      ]
+      one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: 3 }, [{ test: "x" }]]
     });
     const paths = [];
     const values = [];
@@ -900,9 +886,7 @@ describe("State", () => {
     expect(events[1].path.listener).toEqual("one.two;");
     expect(events[0].listenersCollection.isRecursive).toEqual(true);
     expect(events[1].listenersCollection.isRecursive).toEqual(false);
-    expect(events[0].listenersCollection).not.toEqual(
-      events[1].listenersCollection
-    );
+    expect(events[0].listenersCollection).not.toEqual(events[1].listenersCollection);
     expect(state.listeners.get("one.two").count).toEqual(1);
     expect(state.listeners.get("one.two;").count).toEqual(1);
   });
@@ -953,5 +937,28 @@ describe("State", () => {
       second: { two: 22 },
       third: { three: 33 }
     });
+  });
+
+  it("should update data object after listeners were notified", () => {
+    const state = new State({
+      one: { two: { three: { four: 4 } } }
+    });
+    const values = [];
+    state.subscribe("one.two.three.four", (val, eventInfo) => {
+      values.push(val);
+      if (val === 44) {
+        expect(state.get("one.two.three.four")).toEqual(4);
+      }
+    });
+    state.subscribe("one.two.three.four", (val, eventInfo) => {
+      values.push(val);
+      if (val === 44) {
+        expect(state.get("one.two.three.four")).toEqual(4);
+      }
+    });
+    expect(values.length).toEqual(2);
+    state.update("one.two", { three: { four: 44 } }, { updateAfter: true });
+    expect(values[2]).toEqual(44);
+    expect(state.get("one.two.three.four")).toEqual(44);
   });
 });
