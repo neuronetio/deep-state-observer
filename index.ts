@@ -34,6 +34,7 @@ export interface ListenerOptions {
   debug: boolean;
   source: string;
   data: any;
+  queue: boolean;
 }
 
 export interface Listener {
@@ -140,7 +141,8 @@ const defaultListenerOptions: ListenerOptions = {
   bulk: false,
   debug: false,
   source: "",
-  data: undefined
+  data: undefined,
+  queue: false
 };
 
 const defaultUpdateOptions: UpdateOptions = {
@@ -161,7 +163,8 @@ class DeepState {
   private pathSet: any;
   private scan: any;
   private jobsRunning = 0;
-  private queueParams = [];
+  private updateQueue = [];
+  private subscribeQueue = [];
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = new Map();
@@ -507,6 +510,21 @@ class DeepState {
     );
   }
 
+  private runQueuedListeners() {
+    if (this.subscribeQueue.length === 0) return;
+    const queue = [...this.subscribeQueue];
+    for (let i = 0, len = queue.length; i < len; i++) {
+      const remove = queue[i]();
+      if (remove) {
+        const index = this.subscribeQueue.indexOf(queue[i]);
+        if (index > -1) {
+          this.subscribeQueue.splice(index, 1);
+        }
+      }
+    }
+    Promise.resolve().then(() => this.runQueuedListeners());
+  }
+
   private notifyListeners(
     listeners: GroupedListeners,
     exclude: GroupedListener[] = [],
@@ -518,7 +536,17 @@ class DeepState {
       for (const singleListener of single) {
         if (exclude.includes(singleListener)) continue;
         const time = this.debugTime(singleListener);
-        singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+        if (singleListener.listener.options.queue && this.jobsRunning) {
+          this.subscribeQueue.push(() => {
+            if (!this.jobsRunning) {
+              singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+              return true;
+            }
+            return false;
+          });
+        } else {
+          singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+        }
         if (returnNotified) alreadyNotified.push(singleListener);
         this.debugListener(time, singleListener);
       }
@@ -529,11 +557,22 @@ class DeepState {
         for (const bulk of bulkListener.value) {
           bulkValue.push({ ...bulk, value: bulk.value() });
         }
-        bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+        if (bulkListener.listener.options.queue && this.jobsRunning) {
+          this.subscribeQueue.push(() => {
+            if (!this.jobsRunning) {
+              bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+              return true;
+            }
+            return false;
+          });
+        } else {
+          bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+        }
         if (returnNotified) alreadyNotified.push(bulkListener);
         this.debugListener(time, bulkListener);
       }
     }
+    Promise.resolve().then(() => this.runQueuedListeners());
     return alreadyNotified;
   }
 
@@ -826,9 +865,9 @@ class DeepState {
     this.jobsRunning--;
   }
 
-  private runQueue() {
-    while (this.queueParams.length) {
-      const params = this.queueParams.shift();
+  private runUpdateQueue() {
+    while (this.updateQueue.length) {
+      const params = this.updateQueue.shift();
       this.update(params.updatePath, params.fn, params.options);
     }
   }
@@ -839,9 +878,9 @@ class DeepState {
       if (jobsRunning > this.options.maxSimultaneousJobs) {
         throw new Error("Maximal simultaneous jobs limit reached.");
       }
-      this.queueParams.push({ updatePath, fn, options });
+      this.updateQueue.push({ updatePath, fn, options });
       return Promise.resolve().then(() => {
-        this.runQueue();
+        this.runUpdateQueue();
       });
     }
     this.jobsRunning++;

@@ -217,7 +217,8 @@ const defaultListenerOptions = {
     bulk: false,
     debug: false,
     source: "",
-    data: undefined
+    data: undefined,
+    queue: false
 };
 const defaultUpdateOptions = {
     only: [],
@@ -229,7 +230,8 @@ const defaultUpdateOptions = {
 class DeepState {
     constructor(data = {}, options = defaultOptions) {
         this.jobsRunning = 0;
-        this.queueParams = [];
+        this.updateQueue = [];
+        this.subscribeQueue = [];
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
@@ -530,6 +532,21 @@ class DeepState {
         return ((["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
             oldValue === newValue);
     }
+    runQueuedListeners() {
+        if (this.subscribeQueue.length === 0)
+            return;
+        const queue = [...this.subscribeQueue];
+        for (let i = 0, len = queue.length; i < len; i++) {
+            const remove = queue[i]();
+            if (remove) {
+                const index = this.subscribeQueue.indexOf(queue[i]);
+                if (index > -1) {
+                    this.subscribeQueue.splice(index, 1);
+                }
+            }
+        }
+        Promise.resolve().then(() => this.runQueuedListeners());
+    }
     notifyListeners(listeners, exclude = [], returnNotified = true) {
         const alreadyNotified = [];
         for (const path in listeners) {
@@ -538,7 +555,18 @@ class DeepState {
                 if (exclude.includes(singleListener))
                     continue;
                 const time = this.debugTime(singleListener);
-                singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                if (singleListener.listener.options.queue && this.jobsRunning) {
+                    this.subscribeQueue.push(() => {
+                        if (!this.jobsRunning) {
+                            singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+                else {
+                    singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                }
                 if (returnNotified)
                     alreadyNotified.push(singleListener);
                 this.debugListener(time, singleListener);
@@ -551,12 +579,24 @@ class DeepState {
                 for (const bulk of bulkListener.value) {
                     bulkValue.push(Object.assign({}, bulk, { value: bulk.value() }));
                 }
-                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                if (bulkListener.listener.options.queue && this.jobsRunning) {
+                    this.subscribeQueue.push(() => {
+                        if (!this.jobsRunning) {
+                            bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+                else {
+                    bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                }
                 if (returnNotified)
                     alreadyNotified.push(bulkListener);
                 this.debugListener(time, bulkListener);
             }
         }
+        Promise.resolve().then(() => this.runQueuedListeners());
         return alreadyNotified;
     }
     getSubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
@@ -798,9 +838,9 @@ class DeepState {
         }
         this.jobsRunning--;
     }
-    runQueue() {
-        while (this.queueParams.length) {
-            const params = this.queueParams.shift();
+    runUpdateQueue() {
+        while (this.updateQueue.length) {
+            const params = this.updateQueue.shift();
             this.update(params.updatePath, params.fn, params.options);
         }
     }
@@ -810,9 +850,9 @@ class DeepState {
             if (jobsRunning > this.options.maxSimultaneousJobs) {
                 throw new Error("Maximal simultaneous jobs limit reached.");
             }
-            this.queueParams.push({ updatePath, fn, options });
+            this.updateQueue.push({ updatePath, fn, options });
             return Promise.resolve().then(() => {
-                this.runQueue();
+                this.runUpdateQueue();
             });
         }
         this.jobsRunning++;
