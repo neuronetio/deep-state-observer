@@ -24,7 +24,7 @@ export interface Options {
   notRecursive: string;
   param: string;
   wildcard: string;
-  wait: boolean;
+  queue: boolean;
   maxSimultaneousJobs: number;
   log: (message: string, info: any) => void;
 }
@@ -119,7 +119,7 @@ export interface UpdateOptions {
   source: string;
   debug: boolean;
   data: any;
-  updateAfter: boolean;
+  queue: boolean;
 }
 
 function log(message: string, info: any) {
@@ -131,7 +131,7 @@ const defaultOptions: Options = {
   notRecursive: `;`,
   param: `:`,
   wildcard: `*`,
-  wait: false,
+  queue: false,
   maxSimultaneousJobs: 1000,
   log
 };
@@ -148,7 +148,7 @@ const defaultUpdateOptions: UpdateOptions = {
   source: "",
   debug: false,
   data: undefined,
-  updateAfter: false
+  queue: false
 };
 
 class DeepState {
@@ -834,7 +834,7 @@ class DeepState {
 
   public update(updatePath: string, fn: Updater, options: UpdateOptions = defaultUpdateOptions) {
     const jobsRunning = this.jobsRunning;
-    if (this.options.wait && jobsRunning) {
+    if ((this.options.queue || options.queue) && jobsRunning) {
       if (jobsRunning > this.options.maxSimultaneousJobs) {
         throw new Error("Maximal simultaneous jobs limit reached.");
       }
@@ -858,14 +858,11 @@ class DeepState {
     if (this.same(newValue, oldValue)) {
       return newValue;
     }
-    if (!options.updateAfter) {
-      this.pathSet(split, newValue, this.data);
-    }
+    this.pathSet(split, newValue, this.data);
     options = { ...defaultUpdateOptions, ...options };
     if (options.only === null) {
       return newValue;
     }
-
     if (options.only.length) {
       this.notifyOnly(updatePath, newValue, options);
       this.executeWaitingListeners(updatePath);
@@ -876,9 +873,6 @@ class DeepState {
       this.notifyNestedListeners(updatePath, newValue, options, "update", alreadyNotified);
     }
     this.executeWaitingListeners(updatePath);
-    if (options.updateAfter) {
-      this.pathSet(split, newValue, this.data);
-    }
     this.jobsRunning--;
     return newValue;
   }

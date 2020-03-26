@@ -939,31 +939,8 @@ describe("State", () => {
     });
   });
 
-  it("should update data object after listeners were notified", () => {
-    const state = new State({
-      one: { two: { three: { four: 4 } } }
-    });
-    const values = [];
-    state.subscribe("one.two.three.four", (val, eventInfo) => {
-      values.push(val);
-      if (val === 44) {
-        expect(state.get("one.two.three.four")).toEqual(4);
-      }
-    });
-    state.subscribe("one.two.three.four", (val, eventInfo) => {
-      values.push(val);
-      if (val === 44) {
-        expect(state.get("one.two.three.four")).toEqual(4);
-      }
-    });
-    expect(values.length).toEqual(2);
-    state.update("one.two", { three: { four: 44 } }, { updateAfter: true });
-    expect(values[2]).toEqual(44);
-    expect(state.get("one.two.three.four")).toEqual(44);
-  });
-
   it("should work with wait option", () => {
-    const state = new State({ test: 1 }, { wait: true });
+    const state = new State({ test: 1 }, { queue: true });
     const values = [];
     state.subscribe("test", value => {
       values.push(value);
@@ -975,13 +952,28 @@ describe("State", () => {
   });
 
   it("should wait until all jobs are finished", () => {
-    const state = new State({ test: 1, other: "x" }, { wait: true });
+    const state = new State({ test: 1, other: "x" }, { queue: true });
     const values = [];
-    let once = false;
     state.subscribe("test", value => {
-      const res = state.update("other", "xx");
+      state.update("other", "xx");
       values.push(value);
-      once = true;
+    });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+    state.update("test", 2);
+    expect(values[1]).toEqual(2);
+    expect(state.get("other")).toEqual("x");
+    setTimeout(() => {
+      expect(state.get("other")).toEqual("xx");
+    }, 100);
+  });
+
+  it("should wait until all jobs are finished with update:queue options", () => {
+    const state = new State({ test: 1, other: "x" });
+    const values = [];
+    state.subscribe("test", value => {
+      state.update("other", "xx", { queue: true });
+      values.push(value);
     });
     expect(values.length).toEqual(1);
     expect(values[0]).toEqual(1);

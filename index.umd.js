@@ -215,7 +215,7 @@
         notRecursive: `;`,
         param: `:`,
         wildcard: `*`,
-        wait: false,
+        queue: false,
         maxSimultaneousJobs: 1000,
         log
     };
@@ -230,7 +230,7 @@
         source: "",
         debug: false,
         data: undefined,
-        updateAfter: false
+        queue: false
     };
     class DeepState {
         constructor(data = {}, options = defaultOptions) {
@@ -811,7 +811,7 @@
         }
         update(updatePath, fn, options = defaultUpdateOptions) {
             const jobsRunning = this.jobsRunning;
-            if (this.options.wait && jobsRunning) {
+            if ((this.options.queue || options.queue) && jobsRunning) {
                 if (jobsRunning > this.options.maxSimultaneousJobs) {
                     throw new Error("Maximal simultaneous jobs limit reached.");
                 }
@@ -835,9 +835,7 @@
             if (this.same(newValue, oldValue)) {
                 return newValue;
             }
-            if (!options.updateAfter) {
-                this.pathSet(split, newValue, this.data);
-            }
+            this.pathSet(split, newValue, this.data);
             options = Object.assign({}, defaultUpdateOptions, options);
             if (options.only === null) {
                 return newValue;
@@ -852,9 +850,6 @@
                 this.notifyNestedListeners(updatePath, newValue, options, "update", alreadyNotified);
             }
             this.executeWaitingListeners(updatePath);
-            if (options.updateAfter) {
-                this.pathSet(split, newValue, this.data);
-            }
             this.jobsRunning--;
             return newValue;
         }
