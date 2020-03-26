@@ -802,6 +802,7 @@
             for (const path of waitingPaths) {
                 this.executeWaitingListeners(path);
             }
+            this.jobsRunning--;
         }
         runQueue() {
             while (this.queueParams.length) {
@@ -833,16 +834,19 @@
                 });
             }
             if (this.same(newValue, oldValue)) {
+                this.jobsRunning--;
                 return newValue;
             }
             this.pathSet(split, newValue, this.data);
             options = Object.assign({}, defaultUpdateOptions, options);
             if (options.only === null) {
+                this.jobsRunning--;
                 return newValue;
             }
             if (options.only.length) {
                 this.notifyOnly(updatePath, newValue, options);
                 this.executeWaitingListeners(updatePath);
+                this.jobsRunning--;
                 return newValue;
             }
             const alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, options);
