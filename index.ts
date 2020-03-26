@@ -24,6 +24,8 @@ export interface Options {
   notRecursive: string;
   param: string;
   wildcard: string;
+  wait: boolean;
+  maxSimultaneousJobs: number;
   log: (message: string, info: any) => void;
 }
 
@@ -129,6 +131,8 @@ const defaultOptions: Options = {
   notRecursive: `;`,
   param: `:`,
   wildcard: `*`,
+  wait: false,
+  maxSimultaneousJobs: 1000,
   log
 };
 
@@ -156,6 +160,8 @@ class DeepState {
   private pathGet: any;
   private pathSet: any;
   private scan: any;
+  private jobsRunning = 0;
+  private queueParams = [];
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = new Map();
@@ -419,6 +425,7 @@ class DeepState {
     options: ListenerOptions = defaultListenerOptions,
     type: string = "subscribe"
   ) {
+    this.jobsRunning++;
     let listener = this.getCleanListener(fn, options);
     const listenersCollection = this.getListenersCollection(listenerPath, listener);
     listenersCollection.count++;
@@ -477,6 +484,7 @@ class DeepState {
       }
     }
     this.debugSubscribe(listener, listenersCollection, listenerPath);
+    this.jobsRunning--;
     return this.unsubscribe(listenerPath, this.id);
   }
 
@@ -817,7 +825,25 @@ class DeepState {
     }
   }
 
+  private runQueue() {
+    while (this.queueParams.length) {
+      const params = this.queueParams.shift();
+      this.update(params.updatePath, params.fn, params.options);
+    }
+  }
+
   public update(updatePath: string, fn: Updater, options: UpdateOptions = defaultUpdateOptions) {
+    const jobsRunning = this.jobsRunning;
+    if (this.options.wait && jobsRunning) {
+      if (jobsRunning > this.options.maxSimultaneousJobs) {
+        throw new Error("Maximal simultaneous jobs limit reached.");
+      }
+      this.queueParams.push({ updatePath, fn, options });
+      return Promise.resolve().then(() => {
+        this.runQueue();
+      });
+    }
+    this.jobsRunning++;
     if (this.isWildcard(updatePath)) {
       return this.wildcardUpdate(updatePath, fn, options);
     }
@@ -839,6 +865,7 @@ class DeepState {
     if (options.only === null) {
       return newValue;
     }
+
     if (options.only.length) {
       this.notifyOnly(updatePath, newValue, options);
       this.executeWaitingListeners(updatePath);
@@ -852,6 +879,7 @@ class DeepState {
     if (options.updateAfter) {
       this.pathSet(split, newValue, this.data);
     }
+    this.jobsRunning--;
     return newValue;
   }
 

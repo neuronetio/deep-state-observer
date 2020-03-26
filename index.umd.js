@@ -215,6 +215,8 @@
         notRecursive: `;`,
         param: `:`,
         wildcard: `*`,
+        wait: false,
+        maxSimultaneousJobs: 1000,
         log
     };
     const defaultListenerOptions = {
@@ -232,6 +234,8 @@
     };
     class DeepState {
         constructor(data = {}, options = defaultOptions) {
+            this.jobsRunning = 0;
+            this.queueParams = [];
             this.listeners = new Map();
             this.waitingListeners = new Map();
             this.data = data;
@@ -453,6 +457,7 @@
             return listenersCollection;
         }
         subscribe(listenerPath, fn, options = defaultListenerOptions, type = "subscribe") {
+            this.jobsRunning++;
             let listener = this.getCleanListener(fn, options);
             const listenersCollection = this.getListenersCollection(listenerPath, listener);
             listenersCollection.count++;
@@ -513,6 +518,7 @@
                 }
             }
             this.debugSubscribe(listener, listenersCollection, listenerPath);
+            this.jobsRunning--;
             return this.unsubscribe(listenerPath, this.id);
         }
         unsubscribe(path, id) {
@@ -797,7 +803,24 @@
                 this.executeWaitingListeners(path);
             }
         }
+        runQueue() {
+            while (this.queueParams.length) {
+                const params = this.queueParams.shift();
+                this.update(params.updatePath, params.fn, params.options);
+            }
+        }
         update(updatePath, fn, options = defaultUpdateOptions) {
+            const jobsRunning = this.jobsRunning;
+            if (this.options.wait && jobsRunning) {
+                if (jobsRunning > this.options.maxSimultaneousJobs) {
+                    throw new Error("Maximal simultaneous jobs limit reached.");
+                }
+                this.queueParams.push({ updatePath, fn, options });
+                return Promise.resolve().then(() => {
+                    this.runQueue();
+                });
+            }
+            this.jobsRunning++;
             if (this.isWildcard(updatePath)) {
                 return this.wildcardUpdate(updatePath, fn, options);
             }
@@ -832,6 +855,7 @@
             if (options.updateAfter) {
                 this.pathSet(split, newValue, this.data);
             }
+            this.jobsRunning--;
             return newValue;
         }
         get(userPath = undefined) {
