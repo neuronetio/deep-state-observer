@@ -16,7 +16,7 @@ export interface ListenerFunctionEventInfo {
   options: ListenerOptions | UpdateOptions | undefined;
 }
 
-export type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => {};
+export type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
 export type Match = (path: string) => boolean;
 
 export interface Options {

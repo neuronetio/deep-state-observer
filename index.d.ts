@@ -11,7 +11,7 @@ export interface ListenerFunctionEventInfo {
     params: Params;
     options: ListenerOptions | UpdateOptions | undefined;
 }
-export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => {};
+export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
 export declare type Match = (path: string) => boolean;
 export interface Options {
     delimeter: string;
