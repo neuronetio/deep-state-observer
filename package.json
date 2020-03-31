@@ -8,6 +8,7 @@
   "browser": "index.js",
   "scripts": {
     "build": "rollup -c",
+    "types": "tsc -d index.ts --downlevelIteration",
     "test": "jasmine --config=./jasmine.json",
     "bench": "node benchmark.js",
     "bench:chrome": "node --inspect-brk benchmark.js"

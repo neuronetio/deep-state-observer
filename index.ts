@@ -58,7 +58,7 @@ export interface GroupedListeners {
   [path: string]: GroupedListenerContainer;
 }
 
-export type Updater = (value: any) => {};
+export type Updater = (value: any) => any | any;
 
 export type ListenersObject = Map<string | number, Listener>;
 
