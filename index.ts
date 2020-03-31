@@ -58,7 +58,7 @@ export interface GroupedListeners {
   [path: string]: GroupedListenerContainer;
 }
 
-export type Updater = (value: any) => any | any;
+export type Updater = (value: any) => any;
 
 export type ListenersObject = Map<string | number, Listener>;
 
@@ -831,7 +831,7 @@ class DeepState {
     return { newValue, oldValue };
   }
 
-  private wildcardUpdate(updatePath: string, fn: Updater, options: UpdateOptions = defaultUpdateOptions) {
+  private wildcardUpdate(updatePath: string, fn: Updater | any, options: UpdateOptions = defaultUpdateOptions) {
     options = { ...defaultUpdateOptions, ...options };
     const scanned = this.scan.get(updatePath);
     const bulk = {};
@@ -872,7 +872,7 @@ class DeepState {
     }
   }
 
-  public update(updatePath: string, fn: Updater, options: UpdateOptions = defaultUpdateOptions) {
+  public update(updatePath: string, fn: Updater | any, options: UpdateOptions = defaultUpdateOptions) {
     const jobsRunning = this.jobsRunning;
     if ((this.options.queue || options.queue) && jobsRunning) {
       if (jobsRunning > this.options.maxSimultaneousJobs) {

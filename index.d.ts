@@ -46,7 +46,7 @@ export interface GroupedListenerContainer {
 export interface GroupedListeners {
     [path: string]: GroupedListenerContainer;
 }
-export declare type Updater = (value: any) => any | any;
+export declare type Updater = (value: any) => any;
 export declare type ListenersObject = Map<string | number, Listener>;
 export interface ListenersCollection {
     path: string;
@@ -146,7 +146,7 @@ declare class DeepState {
     private getUpdateValues;
     private wildcardUpdate;
     private runUpdateQueue;
-    update(updatePath: string, fn: Updater, options?: UpdateOptions): any;
+    update(updatePath: string, fn: Updater | any, options?: UpdateOptions): any;
     get(userPath?: string | undefined): any;
     private debugSubscribe;
     private debugListener;
