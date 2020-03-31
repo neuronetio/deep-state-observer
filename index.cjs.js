@@ -239,7 +239,7 @@ class DeepState {
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
-        this.options = Object.assign({}, defaultOptions, options);
+        this.options = Object.assign(Object.assign({}, defaultOptions), options);
         this.id = 0;
         this.pathGet = ObjectPath.get;
         this.pathSet = ObjectPath.set;
@@ -413,7 +413,7 @@ class DeepState {
     getCleanListener(fn, options = defaultListenerOptions) {
         return {
             fn,
-            options: Object.assign({}, defaultListenerOptions, options)
+            options: Object.assign(Object.assign({}, defaultListenerOptions), options)
         };
     }
     getListenerCollectionMatch(listenerPath, isRecursive, isWildcard) {
@@ -450,7 +450,7 @@ class DeepState {
         if (this.isNotRecursive(collCfg.path)) {
             collCfg.isRecursive = false;
         }
-        let listenersCollection = this.getCleanListenersCollection(Object.assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
+        let listenersCollection = this.getCleanListenersCollection(Object.assign(Object.assign({}, collCfg), { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
         this.id++;
         listenersCollection.listeners.set(this.id, listener);
         this.listeners.set(collCfg.path, listenersCollection);
@@ -581,7 +581,7 @@ class DeepState {
                 const time = this.debugTime(bulkListener);
                 const bulkValue = [];
                 for (const bulk of bulkListener.value) {
-                    bulkValue.push(Object.assign({}, bulk, { value: bulk.value() }));
+                    bulkValue.push(Object.assign(Object.assign({}, bulk), { value: bulk.value() }));
                 }
                 if (bulkListener.listener.options.queue && this.jobsRunning) {
                     this.subscribeQueue.push(() => {
@@ -604,7 +604,7 @@ class DeepState {
         return alreadyNotified;
     }
     getSubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
-        options = Object.assign({}, defaultUpdateOptions, options);
+        options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
         const listeners = {};
         for (let [listenerPath, listenersCollection] of this.listeners) {
             listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
@@ -808,7 +808,7 @@ class DeepState {
         return { newValue, oldValue };
     }
     wildcardUpdate(updatePath, fn, options = defaultUpdateOptions) {
-        options = Object.assign({}, defaultUpdateOptions, options);
+        options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
         const scanned = this.scan.get(updatePath);
         const bulk = {};
         for (const path in scanned) {
@@ -876,7 +876,7 @@ class DeepState {
             return newValue;
         }
         this.pathSet(split, newValue, this.data);
-        options = Object.assign({}, defaultUpdateOptions, options);
+        options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
         if (options.only === null) {
             this.jobsRunning--;
             return newValue;
