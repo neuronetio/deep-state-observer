@@ -23,11 +23,11 @@ export interface Options {
     log: (message: string, info: any) => void;
 }
 export interface ListenerOptions {
-    bulk: boolean;
-    debug: boolean;
-    source: string;
-    data: any;
-    queue: boolean;
+    bulk?: boolean;
+    debug?: boolean;
+    source?: string;
+    data?: any;
+    queue?: boolean;
 }
 export interface Listener {
     fn: ListenerFunction;
