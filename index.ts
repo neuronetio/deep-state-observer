@@ -116,11 +116,11 @@ export interface ParamsInfo {
 }
 
 export interface UpdateOptions {
-  only: string[];
-  source: string;
-  debug: boolean;
-  data: any;
-  queue: boolean;
+  only?: string[];
+  source?: string;
+  debug?: boolean;
+  data?: any;
+  queue?: boolean;
 }
 
 function log(message: string, info: any) {

@@ -91,11 +91,11 @@ export interface ParamsInfo {
     original: string;
 }
 export interface UpdateOptions {
-    only: string[];
-    source: string;
-    debug: boolean;
-    data: any;
-    queue: boolean;
+    only?: string[];
+    source?: string;
+    debug?: boolean;
+    data?: any;
+    queue?: boolean;
 }
 declare class DeepState {
     private listeners;
