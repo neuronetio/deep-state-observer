@@ -803,7 +803,17 @@ class DeepState {
         }
         return { newValue, oldValue };
     }
-    wildcardUpdate(updatePath, fn, options = defaultUpdateOptions) {
+    wildcardNotify(groupedListenersPack, waitingPaths) {
+        let alreadyNotified = [];
+        for (const groupedListeners of groupedListenersPack) {
+            alreadyNotified = [...alreadyNotified, ...this.notifyListeners(groupedListeners, alreadyNotified)];
+        }
+        for (const path of waitingPaths) {
+            this.executeWaitingListeners(path);
+        }
+        this.jobsRunning--;
+    }
+    wildcardUpdate(updatePath, fn, options = defaultUpdateOptions, multi = false) {
         options = Object.assign({}, defaultUpdateOptions, options);
         const scanned = this.scan.get(updatePath);
         const bulk = {};
@@ -829,19 +839,15 @@ class DeepState {
             this.pathSet(this.split(path), newValue, this.data);
             waitingPaths.push(path);
         }
-        let alreadyNotified = [];
-        for (const groupedListeners of groupedListenersPack) {
-            alreadyNotified = [...alreadyNotified, ...this.notifyListeners(groupedListeners, alreadyNotified)];
+        if (multi) {
+            return () => this.wildcardNotify(groupedListenersPack, waitingPaths);
         }
-        for (const path of waitingPaths) {
-            this.executeWaitingListeners(path);
-        }
-        this.jobsRunning--;
+        this.wildcardNotify(groupedListenersPack, waitingPaths);
     }
     runUpdateQueue() {
         while (this.updateQueue.length) {
             const params = this.updateQueue.shift();
-            this.update(params.updatePath, params.fn, params.options);
+            this.update(params.updatePath, params.fn, params.options, params.multi);
         }
     }
     updateNotify(updatePath, newValue, options) {
@@ -852,20 +858,25 @@ class DeepState {
         this.executeWaitingListeners(updatePath);
         this.jobsRunning--;
     }
+    updateNotifyOnly(updatePath, newValue, options) {
+        this.notifyOnly(updatePath, newValue, options);
+        this.executeWaitingListeners(updatePath);
+        this.jobsRunning--;
+    }
     update(updatePath, fn, options = defaultUpdateOptions, multi = false) {
         const jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
             if (jobsRunning > this.options.maxSimultaneousJobs) {
                 throw new Error("Maximal simultaneous jobs limit reached.");
             }
-            this.updateQueue.push({ updatePath, fn, options });
+            this.updateQueue.push({ updatePath, fn, options, multi });
             return Promise.resolve().then(() => {
                 this.runUpdateQueue();
             });
         }
         this.jobsRunning++;
         if (this.isWildcard(updatePath)) {
-            return this.wildcardUpdate(updatePath, fn, options);
+            return this.wildcardUpdate(updatePath, fn, options, multi);
         }
         const split = this.split(updatePath);
         const { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fn);
@@ -883,12 +894,15 @@ class DeepState {
         options = Object.assign({}, defaultUpdateOptions, options);
         if (options.only === null) {
             this.jobsRunning--;
+            if (multi)
+                return () => { };
             return newValue;
         }
         if (options.only.length) {
-            this.notifyOnly(updatePath, newValue, options);
-            this.executeWaitingListeners(updatePath);
-            this.jobsRunning--;
+            if (multi) {
+                return () => this.updateNotifyOnly(updatePath, newValue, options);
+            }
+            this.updateNotifyOnly(updatePath, newValue, options);
             return newValue;
         }
         if (multi) {

@@ -144,9 +144,11 @@ declare class DeepState {
     private notifyOnly;
     private canBeNested;
     private getUpdateValues;
+    private wildcardNotify;
     private wildcardUpdate;
     private runUpdateQueue;
     private updateNotify;
+    private updateNotifyOnly;
     update(updatePath: string, fn: Updater | any, options?: UpdateOptions, multi?: boolean): any;
     multi(): {
         update(updatePath: string, fn: any, options?: UpdateOptions): any;
