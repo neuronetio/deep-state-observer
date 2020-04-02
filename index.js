@@ -844,7 +844,15 @@ class DeepState {
             this.update(params.updatePath, params.fn, params.options);
         }
     }
-    update(updatePath, fn, options = defaultUpdateOptions) {
+    updateNotify(updatePath, newValue, options) {
+        const alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, options);
+        if (this.canBeNested(newValue)) {
+            this.notifyNestedListeners(updatePath, newValue, options, "update", alreadyNotified);
+        }
+        this.executeWaitingListeners(updatePath);
+        this.jobsRunning--;
+    }
+    update(updatePath, fn, options = defaultUpdateOptions, multi = false) {
         const jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
             if (jobsRunning > this.options.maxSimultaneousJobs) {
@@ -883,13 +891,28 @@ class DeepState {
             this.jobsRunning--;
             return newValue;
         }
-        const alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, options);
-        if (this.canBeNested(newValue)) {
-            this.notifyNestedListeners(updatePath, newValue, options, "update", alreadyNotified);
+        if (multi) {
+            return () => this.updateNotify(updatePath, newValue, options);
         }
-        this.executeWaitingListeners(updatePath);
-        this.jobsRunning--;
+        this.updateNotify(updatePath, newValue, options);
         return newValue;
+    }
+    multi() {
+        const self = this;
+        const notifiers = [];
+        const multiObject = {
+            update(updatePath, fn, options = defaultUpdateOptions) {
+                notifiers.push(self.update(updatePath, fn, options, true));
+                return this;
+            },
+            done() {
+                for (let i = 0, len = notifiers.length; i < len; i++) {
+                    notifiers[i]();
+                }
+                notifiers.length = 0;
+            }
+        };
+        return multiObject;
     }
     get(userPath = undefined) {
         if (typeof userPath === "undefined" || userPath === "") {

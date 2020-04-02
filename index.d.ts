@@ -146,7 +146,12 @@ declare class DeepState {
     private getUpdateValues;
     private wildcardUpdate;
     private runUpdateQueue;
-    update(updatePath: string, fn: Updater | any, options?: UpdateOptions): any;
+    private updateNotify;
+    update(updatePath: string, fn: Updater | any, options?: UpdateOptions, multi?: boolean): any;
+    multi(): {
+        update(updatePath: string, fn: any, options?: UpdateOptions): any;
+        done(): void;
+    };
     get(userPath?: string | undefined): any;
     private debugSubscribe;
     private debugListener;
