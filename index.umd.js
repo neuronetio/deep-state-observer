@@ -877,9 +877,13 @@
                     throw new Error("Maximal simultaneous jobs limit reached.");
                 }
                 this.updateQueue.push({ updatePath, fn, options, multi });
-                return Promise.resolve().then(() => {
+                const result = Promise.resolve().then(() => {
                     this.runUpdateQueue();
                 });
+                if (multi) {
+                    return () => result;
+                }
+                return result;
             }
             this.jobsRunning++;
             if (this.isWildcard(updatePath)) {
