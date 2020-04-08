@@ -853,6 +853,7 @@
         runUpdateQueue() {
             while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
                 const params = this.updateQueue.shift();
+                params.options.queue = false; // prevent infinite loop
                 this.update(params.updatePath, params.fn, params.options, params.multi);
             }
         }
