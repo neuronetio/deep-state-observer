@@ -211,21 +211,21 @@ const defaultOptions = {
     wildcard: `*`,
     queue: false,
     maxSimultaneousJobs: 1000,
-    log
+    log,
 };
 const defaultListenerOptions = {
     bulk: false,
     debug: false,
     source: "",
     data: undefined,
-    queue: false
+    queue: false,
 };
 const defaultUpdateOptions = {
     only: [],
     source: "",
     debug: false,
     data: undefined,
-    queue: false
+    queue: false,
 };
 class DeepState {
     constructor(data = {}, options = defaultOptions) {
@@ -316,7 +316,7 @@ class DeepState {
             paramsInfo.params[partIndex] = {
                 original: part,
                 replaced: "",
-                name: ""
+                name: "",
             };
             const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimeter}\\${this.options.param}]+)`, "g");
             let param = reg.exec(part);
@@ -409,7 +409,7 @@ class DeepState {
     getCleanListener(fn, options = defaultListenerOptions) {
         return {
             fn,
-            options: Object.assign({}, defaultListenerOptions, options)
+            options: Object.assign({}, defaultListenerOptions, options),
         };
     }
     getListenerCollectionMatch(listenerPath, isRecursive, isWildcard) {
@@ -435,7 +435,7 @@ class DeepState {
             hasParams: false,
             paramsInfo: undefined,
             originalPath: listenerPath,
-            path: listenerPath
+            path: listenerPath,
         };
         if (this.hasParams(collCfg.path)) {
             collCfg.paramsInfo = this.getParamsInfo(collCfg.path);
@@ -466,10 +466,10 @@ class DeepState {
                 path: {
                     listener: listenerPath,
                     update: undefined,
-                    resolved: this.cleanNotRecursivePath(listenerPath)
+                    resolved: this.cleanNotRecursivePath(listenerPath),
                 },
                 params: this.getParams(listenersCollection.paramsInfo, listenerPath),
-                options
+                options,
             });
         }
         else {
@@ -480,7 +480,7 @@ class DeepState {
                     bulkValue.push({
                         path,
                         params: this.getParams(listenersCollection.paramsInfo, path),
-                        value: paths[path]
+                        value: paths[path],
                     });
                 }
                 fn(bulkValue, {
@@ -490,10 +490,10 @@ class DeepState {
                     path: {
                         listener: listenerPath,
                         update: undefined,
-                        resolved: undefined
+                        resolved: undefined,
                     },
                     options,
-                    params: undefined
+                    params: undefined,
                 });
             }
             else {
@@ -505,10 +505,10 @@ class DeepState {
                         path: {
                             listener: listenerPath,
                             update: undefined,
-                            resolved: this.cleanNotRecursivePath(path)
+                            resolved: this.cleanNotRecursivePath(path),
                         },
                         params: this.getParams(listenersCollection.paramsInfo, path),
-                        options
+                        options,
                     });
                 }
             }
@@ -623,12 +623,12 @@ class DeepState {
                                 path: {
                                     listener: listenerPath,
                                     update: originalPath ? originalPath : updatePath,
-                                    resolved: undefined
+                                    resolved: undefined,
                                 },
                                 params,
-                                options
+                                options,
                             },
-                            value: bulkValue
+                            value: bulkValue,
                         });
                     }
                     else {
@@ -641,12 +641,12 @@ class DeepState {
                                 path: {
                                     listener: listenerPath,
                                     update: originalPath ? originalPath : updatePath,
-                                    resolved: this.cleanNotRecursivePath(updatePath)
+                                    resolved: this.cleanNotRecursivePath(updatePath),
                                 },
                                 params,
-                                options
+                                options,
                             },
-                            value
+                            value,
                         });
                     }
                 }
@@ -681,10 +681,10 @@ class DeepState {
                             path: {
                                 listener: listenerPath,
                                 update: originalPath ? originalPath : updatePath,
-                                resolved: this.cleanNotRecursivePath(fullPath)
+                                resolved: this.cleanNotRecursivePath(fullPath),
                             },
                             params,
-                            options
+                            options,
                         };
                         if (listener.options.bulk) {
                             bulk.push({ value, path: fullPath, params });
@@ -695,7 +695,7 @@ class DeepState {
                                 listener,
                                 listenersCollection,
                                 eventInfo,
-                                value
+                                value,
                             });
                         }
                     }
@@ -709,16 +709,16 @@ class DeepState {
                         path: {
                             listener: listenerPath,
                             update: updatePath,
-                            resolved: undefined
+                            resolved: undefined,
                         },
                         options,
-                        params
+                        params,
                     };
                     listeners[listenerPath].bulk.push({
                         listener,
                         listenersCollection,
                         eventInfo,
-                        value: bulk
+                        value: bulk,
                     });
                 }
             }
@@ -756,18 +756,18 @@ class DeepState {
                                 path: {
                                     listener: listenerPath,
                                     update: originalPath ? originalPath : updatePath,
-                                    resolved: this.cleanNotRecursivePath(fullPath)
+                                    resolved: this.cleanNotRecursivePath(fullPath),
                                 },
                                 params,
-                                options
+                                options,
                             };
                             if (listener.options.bulk) {
-                                if (!listeners[notifyPath].bulk.some(bulkListener => bulkListener.listener === listener)) {
+                                if (!listeners[notifyPath].bulk.some((bulkListener) => bulkListener.listener === listener)) {
                                     listeners[notifyPath].bulk.push({
                                         listener,
                                         listenersCollection,
                                         eventInfo,
-                                        value: bulkValue
+                                        value: bulkValue,
                                     });
                                 }
                             }
@@ -776,7 +776,7 @@ class DeepState {
                                     listener,
                                     listenersCollection,
                                     eventInfo,
-                                    value
+                                    value,
                                 });
                             }
                         }
@@ -845,7 +845,7 @@ class DeepState {
         this.wildcardNotify(groupedListenersPack, waitingPaths);
     }
     runUpdateQueue() {
-        while (this.updateQueue.length) {
+        while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
             const params = this.updateQueue.shift();
             this.update(params.updatePath, params.fn, params.options, params.multi);
         }
@@ -883,7 +883,7 @@ class DeepState {
         if (options.debug) {
             this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ""}`, {
                 oldValue,
-                newValue
+                newValue,
             });
         }
         if (this.same(newValue, oldValue)) {
@@ -924,7 +924,7 @@ class DeepState {
                     notifiers[i]();
                 }
                 notifiers.length = 0;
-            }
+            },
         };
         return multiObject;
     }
@@ -939,7 +939,7 @@ class DeepState {
             this.options.log("listener subscribed", {
                 listenerPath,
                 listener,
-                listenersCollection
+                listenersCollection,
             });
         }
     }
@@ -947,7 +947,7 @@ class DeepState {
         if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
             this.options.log("Listener fired", {
                 time: Date.now() - time,
-                info: groupedListener
+                info: groupedListener,
             });
         }
     }
