@@ -543,13 +543,12 @@ class DeepState {
             const queue = [...this.subscribeQueue];
             for (let i = 0, len = queue.length; i < len; i++) {
                 queue[i]();
-                const index = this.subscribeQueue.indexOf(queue[i]);
-                if (index > -1) {
-                    this.subscribeQueue.splice(index, 1);
-                }
             }
+            this.subscribeQueue.length = 0;
         }
-        Promise.resolve().then(() => this.runQueuedListeners());
+        else {
+            Promise.resolve().then(() => this.runQueuedListeners());
+        }
     }
     notifyListeners(listeners, exclude = [], returnNotified = true) {
         const alreadyNotified = [];
