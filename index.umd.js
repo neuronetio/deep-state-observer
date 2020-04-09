@@ -565,6 +565,7 @@
                         this.subscribeQueue.push(() => {
                             if (!this.jobsRunning) {
                                 singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                                --this.jobsRunning;
                                 return true;
                             }
                             return false;
