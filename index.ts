@@ -885,13 +885,11 @@ class DeepState {
       this.notifyNestedListeners(updatePath, newValue, options, "update", alreadyNotified);
     }
     this.executeWaitingListeners(updatePath);
-    this.jobsRunning--;
   }
 
   private updateNotifyOnly(updatePath, newValue, options) {
     this.notifyOnly(updatePath, newValue, options);
     this.executeWaitingListeners(updatePath);
-    this.jobsRunning--;
   }
 
   public update(updatePath: string, fn: Updater | any, options: UpdateOptions = defaultUpdateOptions, multi = false) {
@@ -933,6 +931,7 @@ class DeepState {
       return newValue;
     }
     if (options.only.length) {
+      this.jobsRunning--;
       if (multi) {
         return () => this.updateNotifyOnly(updatePath, newValue, options);
       }
@@ -940,9 +939,11 @@ class DeepState {
       return newValue;
     }
     if (multi) {
+      this.jobsRunning--;
       return () => this.updateNotify(updatePath, newValue, options);
     }
     this.updateNotify(updatePath, newValue, options);
+    this.jobsRunning--;
     return newValue;
   }
 
