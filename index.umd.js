@@ -544,12 +544,10 @@
             if (this.jobsRunning === 0) {
                 const queue = [...this.subscribeQueue];
                 for (let i = 0, len = queue.length; i < len; i++) {
-                    const remove = queue[i]();
-                    if (remove) {
-                        const index = this.subscribeQueue.indexOf(queue[i]);
-                        if (index > -1) {
-                            this.subscribeQueue.splice(index, 1);
-                        }
+                    queue[i]();
+                    const index = this.subscribeQueue.indexOf(queue[i]);
+                    if (index > -1) {
+                        this.subscribeQueue.splice(index, 1);
                     }
                 }
             }
