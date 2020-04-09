@@ -541,13 +541,15 @@
         runQueuedListeners() {
             if (this.subscribeQueue.length === 0)
                 return;
-            const queue = [...this.subscribeQueue];
-            for (let i = 0, len = queue.length; i < len; i++) {
-                const remove = queue[i]();
-                if (remove) {
-                    const index = this.subscribeQueue.indexOf(queue[i]);
-                    if (index > -1) {
-                        this.subscribeQueue.splice(index, 1);
+            if (this.jobsRunning === 0) {
+                const queue = [...this.subscribeQueue];
+                for (let i = 0, len = queue.length; i < len; i++) {
+                    const remove = queue[i]();
+                    if (remove) {
+                        const index = this.subscribeQueue.indexOf(queue[i]);
+                        if (index > -1) {
+                            this.subscribeQueue.splice(index, 1);
+                        }
                     }
                 }
             }
@@ -563,12 +565,7 @@
                     const time = this.debugTime(singleListener);
                     if (singleListener.listener.options.queue && this.jobsRunning) {
                         this.subscribeQueue.push(() => {
-                            if (!this.jobsRunning) {
-                                singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
-                                --this.jobsRunning;
-                                return true;
-                            }
-                            return false;
+                            singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
                         });
                     }
                     else {
