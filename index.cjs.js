@@ -847,7 +847,7 @@ class DeepState {
         while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
             const params = this.updateQueue.shift();
             params.options.queue = false; // prevent infinite loop
-            this.update(params.updatePath, params.fn, params.options, params.multi);
+            this.update(params.updatePath, params.fnOrValue, params.options, params.multi);
         }
     }
     updateNotify(updatePath, newValue, options) {
@@ -861,13 +861,13 @@ class DeepState {
         this.notifyOnly(updatePath, newValue, options);
         this.executeWaitingListeners(updatePath);
     }
-    update(updatePath, fn, options = defaultUpdateOptions, multi = false) {
+    update(updatePath, fnOrValue, options = defaultUpdateOptions, multi = false) {
         const jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
             if (jobsRunning > this.options.maxSimultaneousJobs) {
                 throw new Error("Maximal simultaneous jobs limit reached.");
             }
-            this.updateQueue.push({ updatePath, fn, options, multi });
+            this.updateQueue.push({ updatePath, fnOrValue, options, multi });
             const result = Promise.resolve().then(() => {
                 this.runUpdateQueue();
             });
@@ -876,12 +876,12 @@ class DeepState {
             }
             return result;
         }
-        this.jobsRunning++;
+        ++this.jobsRunning;
         if (this.isWildcard(updatePath)) {
-            return this.wildcardUpdate(updatePath, fn, options, multi);
+            return this.wildcardUpdate(updatePath, fnOrValue, options, multi);
         }
         const split = this.split(updatePath);
-        const { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fn);
+        const { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fnOrValue);
         if (options.debug) {
             this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ""}`, {
                 oldValue,
@@ -889,19 +889,21 @@ class DeepState {
             });
         }
         if (this.same(newValue, oldValue)) {
-            this.jobsRunning--;
+            --this.jobsRunning;
+            if (multi)
+                return () => newValue;
             return newValue;
         }
         this.pathSet(split, newValue, this.data);
         options = Object.assign({}, defaultUpdateOptions, options);
         if (options.only === null) {
-            this.jobsRunning--;
+            --this.jobsRunning;
             if (multi)
                 return () => { };
             return newValue;
         }
         if (options.only.length) {
-            this.jobsRunning--;
+            --this.jobsRunning;
             if (multi) {
                 return () => this.updateNotifyOnly(updatePath, newValue, options);
             }
@@ -909,11 +911,11 @@ class DeepState {
             return newValue;
         }
         if (multi) {
-            this.jobsRunning--;
+            --this.jobsRunning;
             return () => this.updateNotify(updatePath, newValue, options);
         }
         this.updateNotify(updatePath, newValue, options);
-        this.jobsRunning--;
+        --this.jobsRunning;
         return newValue;
     }
     multi() {

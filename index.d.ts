@@ -149,7 +149,7 @@ declare class DeepState {
     private runUpdateQueue;
     private updateNotify;
     private updateNotifyOnly;
-    update(updatePath: string, fn: Updater | any, options?: UpdateOptions, multi?: boolean): any;
+    update(updatePath: string, fnOrValue: Updater | any, options?: UpdateOptions, multi?: boolean): any;
     multi(): {
         update(updatePath: string, fn: any, options?: UpdateOptions): any;
         done(): void;
