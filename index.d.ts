@@ -22,14 +22,12 @@ export interface Options {
     maxSimultaneousJobs: number;
     log: (message: string, info: any) => void;
 }
-export declare type ChangeDetection = (newValue: unknown, oldValue: unknown, path: string) => boolean;
 export interface ListenerOptions {
     bulk?: boolean;
     debug?: boolean;
     source?: string;
     data?: any;
     queue?: boolean;
-    changeDetection?: ChangeDetection;
     ignore?: string[];
 }
 export interface UpdateOptions {
@@ -104,7 +102,6 @@ declare class DeepState {
     private listeners;
     private waitingListeners;
     private data;
-    private oldData;
     private options;
     private id;
     private pathGet;
@@ -148,7 +145,6 @@ declare class DeepState {
     private getNotifyOnlyListeners;
     private notifyOnly;
     private canBeNested;
-    private copy;
     private getUpdateValues;
     private wildcardNotify;
     private wildcardUpdate;

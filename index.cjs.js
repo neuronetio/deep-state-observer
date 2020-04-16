@@ -205,59 +205,6 @@ class ObjectPath {
     }
 }
 
-function isObject(obj) {
-    if (obj === null || typeof obj !== "object")
-        return false;
-    if (obj.constructor) {
-        if (obj.constructor.name !== "Object" && obj.constructor.name !== "Array")
-            return false;
-    }
-    return true;
-}
-function _clone(obj) {
-    if (!isObject(obj))
-        return obj;
-    if (obj.__cloned__)
-        return obj;
-    obj.__cloned__ = true;
-    let temp = {};
-    if (obj.constructor.name === "Array") {
-        temp = new Array(obj.length);
-        for (let i = 0, len = obj.length; i < len; i++) {
-            temp[i] = _clone(obj[i]);
-        }
-    }
-    else {
-        for (let key in obj) {
-            temp[key] = _clone(obj[key]);
-        }
-    }
-    return temp;
-}
-function _clean(obj) {
-    if (!isObject(obj))
-        return obj;
-    if (obj.__cloned__)
-        delete obj.__cloned__;
-    if (obj.constructor.name === "Array") {
-        for (let i = 0, len = obj.length; i < len; i++) {
-            if (isObject(obj[i]) && obj[i].__cloned__)
-                _clean(obj[i]);
-        }
-    }
-    else {
-        for (let key in obj) {
-            if (isObject(obj[key]) && obj[key].__cloned__)
-                _clean(obj[key]);
-        }
-    }
-}
-function clone(obj) {
-    const result = _clone(obj);
-    _clean(obj);
-    _clean(result);
-    return result;
-}
 function log(message, info) {
     console.debug(message, info);
 }
@@ -276,10 +223,6 @@ const defaultListenerOptions = {
     source: "",
     data: undefined,
     queue: false,
-    changeDetection(newValue, oldValue) {
-        return !((["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
-            oldValue === newValue);
-    },
 };
 const defaultUpdateOptions = {
     only: [],
@@ -296,7 +239,6 @@ class DeepState {
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
-        this.oldData = this.copy(data);
         this.options = Object.assign({}, defaultOptions, options);
         this.id = 0;
         this.pathGet = ObjectPath.get;
@@ -665,7 +607,7 @@ class DeepState {
         }
         return false;
     }
-    getSubscribedListeners(updatePath, newValue, oldValue, options, type = "update", originalPath = null) {
+    getSubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
         options = Object.assign({}, defaultUpdateOptions, options);
         const listeners = {};
         for (let [listenerPath, listenersCollection] of this.listeners) {
@@ -677,12 +619,9 @@ class DeepState {
                 const cutPath = this.cutPath(updatePath, listenerPath);
                 const traverse = listenersCollection.isRecursive || listenersCollection.isWildcard;
                 const value = traverse ? () => this.get(cutPath) : () => newValue;
-                const old = traverse ? () => this.pathGet(this.split(cutPath), this.oldData) : () => oldValue;
                 const bulkValue = [{ value, path: updatePath, params }];
                 for (const listener of listenersCollection.listeners.values()) {
                     if (this.shouldIgnore(listener, updatePath))
-                        continue;
-                    if (!listener.options.changeDetection(value(), old(), updatePath))
                         continue;
                     if (listener.options.bulk) {
                         listeners[listenerPath].bulk.push({
@@ -725,10 +664,10 @@ class DeepState {
         }
         return listeners;
     }
-    notifySubscribedListeners(updatePath, newValue, oldValue, options, type = "update", originalPath = null) {
-        return this.notifyListeners(this.getSubscribedListeners(updatePath, newValue, oldValue, options, type, originalPath));
+    notifySubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
+        return this.notifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
     }
-    getNestedListeners(updatePath, newValue, oldValue, options, type = "update", originalPath = null) {
+    getNestedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
         const listeners = {};
         for (let [listenerPath, listenersCollection] of this.listeners) {
             listeners[listenerPath] = { single: [], bulk: [] };
@@ -736,7 +675,6 @@ class DeepState {
             if (this.match(currentCuttedPath, updatePath)) {
                 const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
                 const wildcardNewValues = new WildcardObject(newValue, this.options.delimeter, this.options.wildcard).get(restPath);
-                const wildcardOldValues = new WildcardObject(oldValue, this.options.delimeter, this.options.wildcard).get(restPath);
                 const params = listenersCollection.paramsInfo
                     ? this.getParams(listenersCollection.paramsInfo, updatePath)
                     : undefined;
@@ -744,7 +682,6 @@ class DeepState {
                 const bulkListeners = {};
                 for (const currentRestPath in wildcardNewValues) {
                     const value = () => wildcardNewValues[currentRestPath];
-                    const oldValue = () => wildcardOldValues[currentRestPath];
                     const fullPath = [updatePath, currentRestPath].join(this.options.delimeter);
                     for (const [listenerId, listener] of listenersCollection.listeners) {
                         const eventInfo = {
@@ -759,19 +696,19 @@ class DeepState {
                             params,
                             options,
                         };
-                        if (listener.options.changeDetection(wildcardNewValues[currentRestPath], wildcardOldValues[currentRestPath], updatePath)) {
-                            if (listener.options.bulk) {
-                                bulk.push({ value, oldValue, path: fullPath, params });
-                                bulkListeners[listenerId] = listener;
-                            }
-                            else {
-                                listeners[listenerPath].single.push({
-                                    listener,
-                                    listenersCollection,
-                                    eventInfo,
-                                    value,
-                                });
-                            }
+                        if (this.shouldIgnore(listener, updatePath))
+                            continue;
+                        if (listener.options.bulk) {
+                            bulk.push({ value, path: fullPath, params });
+                            bulkListeners[listenerId] = listener;
+                        }
+                        else {
+                            listeners[listenerPath].single.push({
+                                listener,
+                                listenersCollection,
+                                eventInfo,
+                                value,
+                            });
                         }
                     }
                 }
@@ -800,10 +737,10 @@ class DeepState {
         }
         return listeners;
     }
-    notifyNestedListeners(updatePath, newValue, oldValue, options, type = "update", alreadyNotified, originalPath = null) {
-        return this.notifyListeners(this.getNestedListeners(updatePath, newValue, oldValue, options, type, originalPath), alreadyNotified, false);
+    notifyNestedListeners(updatePath, newValue, options, type = "update", alreadyNotified, originalPath = null) {
+        return this.notifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), alreadyNotified, false);
     }
-    getNotifyOnlyListeners(updatePath, newValue, oldValue, options, type = "update", originalPath = null) {
+    getNotifyOnlyListeners(updatePath, newValue, options, type = "update", originalPath = null) {
         const listeners = {};
         if (typeof options.only !== "object" ||
             !Array.isArray(options.only) ||
@@ -813,7 +750,6 @@ class DeepState {
         }
         for (const notifyPath of options.only) {
             const wildcardScanNewValue = new WildcardObject(newValue, this.options.delimeter, this.options.wildcard).get(notifyPath);
-            const wildcardScanOldValue = new WildcardObject(oldValue, this.options.delimeter, this.options.wildcard).get(notifyPath);
             listeners[notifyPath] = { bulk: [], single: [] };
             for (const wildcardPath in wildcardScanNewValue) {
                 const fullPath = updatePath + this.options.delimeter + wildcardPath;
@@ -823,8 +759,7 @@ class DeepState {
                         : undefined;
                     if (this.match(listenerPath, fullPath)) {
                         const value = () => wildcardScanNewValue[wildcardPath];
-                        const old = () => wildcardScanOldValue[wildcardPath];
-                        const bulkValue = [{ value, oldValue: old, path: fullPath, params }];
+                        const bulkValue = [{ value, path: fullPath, params }];
                         for (const listener of listenersCollection.listeners.values()) {
                             const eventInfo = {
                                 type,
@@ -838,25 +773,25 @@ class DeepState {
                                 params,
                                 options,
                             };
-                            if (listener.options.changeDetection(wildcardScanNewValue[wildcardPath], wildcardScanOldValue[wildcardPath], updatePath)) {
-                                if (listener.options.bulk) {
-                                    if (!listeners[notifyPath].bulk.some((bulkListener) => bulkListener.listener === listener)) {
-                                        listeners[notifyPath].bulk.push({
-                                            listener,
-                                            listenersCollection,
-                                            eventInfo,
-                                            value: bulkValue,
-                                        });
-                                    }
-                                }
-                                else {
-                                    listeners[notifyPath].single.push({
+                            if (this.shouldIgnore(listener, updatePath))
+                                continue;
+                            if (listener.options.bulk) {
+                                if (!listeners[notifyPath].bulk.some((bulkListener) => bulkListener.listener === listener)) {
+                                    listeners[notifyPath].bulk.push({
                                         listener,
                                         listenersCollection,
                                         eventInfo,
-                                        value,
+                                        value: bulkValue,
                                     });
                                 }
+                            }
+                            else {
+                                listeners[notifyPath].single.push({
+                                    listener,
+                                    listenersCollection,
+                                    eventInfo,
+                                    value,
+                                });
                             }
                         }
                     }
@@ -865,32 +800,14 @@ class DeepState {
         }
         return listeners;
     }
-    notifyOnly(updatePath, newValue, oldValue, options, type = "update", originalPath = "") {
-        return (typeof this.notifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, oldValue, options, type, originalPath))[0] !== "undefined");
+    notifyOnly(updatePath, newValue, options, type = "update", originalPath = "") {
+        return (typeof this.notifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath))[0] !==
+            "undefined");
     }
     canBeNested(newValue) {
         return typeof newValue === "object" && newValue !== null;
     }
-    copy(value) {
-        let copied = value;
-        if (typeof value === "object" && value !== null) {
-            if (typeof value.clone === "function") {
-                copied = value.clone();
-            }
-            else if (Array.isArray(value)) {
-                copied = new Array(value.length);
-                for (let i = 0, len = value.length; i < len; i++) {
-                    copied[i] = this.copy(value[i]);
-                }
-            }
-            else {
-                copied = clone(value);
-            }
-        }
-        return copied;
-    }
     getUpdateValues(oldValue, split, fn) {
-        oldValue = this.copy(oldValue);
         let newValue = fn;
         if (typeof fn === "function") {
             newValue = fn(this.pathGet(split, this.data));
@@ -922,30 +839,21 @@ class DeepState {
         const waitingPaths = [];
         for (const path in bulk) {
             const newValue = bulk[path];
-            const oldValue = this.pathGet(this.split(path), this.oldData);
             if (options.only.length) {
-                groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, oldValue, options, "update", updatePath));
+                groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
             }
             else {
-                groupedListenersPack.push(this.getSubscribedListeners(path, newValue, oldValue, options, "update", updatePath));
+                groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, "update", updatePath));
                 this.canBeNested(newValue) &&
-                    groupedListenersPack.push(this.getNestedListeners(path, newValue, oldValue, options, "update", updatePath));
+                    groupedListenersPack.push(this.getNestedListeners(path, newValue, options, "update", updatePath));
             }
             options.debug && this.options.log("Wildcard update", { path, newValue });
             waitingPaths.push(path);
         }
         if (multi) {
-            return () => {
-                this.wildcardNotify(groupedListenersPack, waitingPaths);
-                for (const path in bulk) {
-                    this.pathSet(this.split(path), this.copy(bulk[path]), this.oldData);
-                }
-            };
+            return () => this.wildcardNotify(groupedListenersPack, waitingPaths);
         }
         this.wildcardNotify(groupedListenersPack, waitingPaths);
-        for (const path in bulk) {
-            this.pathSet(this.split(path), this.copy(bulk[path]), this.oldData);
-        }
     }
     runUpdateQueue() {
         while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
@@ -954,15 +862,15 @@ class DeepState {
             this.update(params.updatePath, params.fnOrValue, params.options, params.multi);
         }
     }
-    updateNotify(updatePath, newValue, oldValue, options) {
-        const alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, oldValue, options);
+    updateNotify(updatePath, newValue, options) {
+        const alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, options);
         if (this.canBeNested(newValue)) {
-            this.notifyNestedListeners(updatePath, newValue, oldValue, options, "update", alreadyNotified);
+            this.notifyNestedListeners(updatePath, newValue, options, "update", alreadyNotified);
         }
         this.executeWaitingListeners(updatePath);
     }
-    updateNotifyOnly(updatePath, newValue, oldValue, options) {
-        this.notifyOnly(updatePath, newValue, oldValue, options);
+    updateNotifyOnly(updatePath, newValue, options) {
+        this.notifyOnly(updatePath, newValue, options);
         this.executeWaitingListeners(updatePath);
     }
     update(updatePath, fnOrValue, options = defaultUpdateOptions, multi = false) {
@@ -1002,7 +910,6 @@ class DeepState {
         options = Object.assign({}, defaultUpdateOptions, options);
         if (options.only === null) {
             --this.jobsRunning;
-            this.pathSet(split, this.copy(newValue), this.oldData);
             if (multi)
                 return () => { };
             return newValue;
@@ -1011,23 +918,19 @@ class DeepState {
             --this.jobsRunning;
             if (multi) {
                 return () => {
-                    this.updateNotifyOnly(updatePath, newValue, oldValue, options);
-                    this.pathSet(split, this.copy(newValue), this.oldData);
+                    this.updateNotifyOnly(updatePath, newValue, options);
                 };
             }
-            this.updateNotifyOnly(updatePath, newValue, oldValue, options);
-            this.pathSet(split, this.copy(newValue), this.oldData);
+            this.updateNotifyOnly(updatePath, newValue, options);
             return newValue;
         }
         if (multi) {
             --this.jobsRunning;
             return () => {
-                this.updateNotify(updatePath, newValue, oldValue, options);
-                this.pathSet(split, this.copy(newValue), this.oldData);
+                this.updateNotify(updatePath, newValue, options);
             };
         }
-        this.updateNotify(updatePath, newValue, oldValue, options);
-        this.pathSet(split, this.copy(newValue), this.oldData);
+        this.updateNotify(updatePath, newValue, options);
         --this.jobsRunning;
         return newValue;
     }

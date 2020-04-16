@@ -1008,63 +1008,6 @@ describe("State", () => {
     expect(values[3]).toEqual(22);
   });
 
-  it("should run changeDetection properly", () => {
-    const state = new State({ one: { two: { three: { four: 4 } } } });
-    const values = [];
-    let checks = [];
-    state.subscribe(
-      "one.two.three",
-      (val) => {
-        values.push(val);
-      },
-      {
-        changeDetection(newValue, oldValue, updatePath) {
-          checks.push([{ ...newValue }, { ...oldValue }]);
-          if (newValue.four === 7) return true;
-          if (newValue.four === 8) return true;
-          return false;
-        },
-      }
-    );
-    expect(values.length).toEqual(1);
-    expect(checks.length).toEqual(0);
-
-    state.update("one.two.three.four", 5);
-    expect(checks.length).toEqual(1);
-    expect(checks[0][0].four).toEqual(5);
-    expect(checks[0][1].four).toEqual(4);
-    expect(values.length).toEqual(1);
-    expect(state.get("one.two.three.four")).toEqual(5);
-
-    state.update("one.two.*.four", 6);
-    expect(checks.length).toEqual(2);
-    expect(checks[1][0].four).toEqual(6);
-    expect(checks[1][1].four).toEqual(5);
-    expect(values.length).toEqual(1);
-    expect(state.get("one.two.three.four")).toEqual(6);
-
-    state.update("one.two.three", { four: 7 });
-    expect(checks.length).toEqual(3);
-    expect(checks[2][0].four).toEqual(7);
-    expect(checks[2][1].four).toEqual(6);
-    expect(values.length).toEqual(2);
-    expect(state.get("one.two.three.four")).toEqual(7);
-
-    state.update("one.two.*.four", 8);
-    expect(checks.length).toEqual(4);
-    expect(checks[3][0].four).toEqual(8);
-    expect(checks[3][1].four).toEqual(7);
-    expect(values.length).toEqual(3);
-    expect(state.get("one.two.three.four")).toEqual(8);
-
-    state.update("one.two.three.four", 9);
-    expect(checks.length).toEqual(5);
-    expect(checks[4][0].four).toEqual(9);
-    expect(checks[4][1].four).toEqual(8);
-    expect(values.length).toEqual(3);
-    expect(state.get("one.two.three.four")).toEqual(9);
-  });
-
   it("should ignore ignored changes", () => {
     const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
     const values = [];
