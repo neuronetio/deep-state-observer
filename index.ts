@@ -136,17 +136,12 @@ if (typeof object_create !== "function") {
 }
 
 function clone(obj: object, parsed = []) {
-  if (obj === null || typeof obj !== "object" || "isActiveClone" in obj) return obj;
+  if (obj === null || typeof obj !== "object" || parsed.includes(obj)) return obj;
   let temp = object_create(obj.constructor.prototype);
   for (var key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      const index = parsed.indexOf(obj[key]);
-      if (index !== -1) {
-        temp[key] = parsed[index];
-      } else {
-        parsed.push(obj[key]);
-        temp[key] = clone(obj[key], parsed);
-      }
+      temp[key] = clone(obj[key], parsed);
+      parsed.push(obj[key]);
     }
   }
   return temp;
