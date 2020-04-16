@@ -207,26 +207,27 @@
         }
     }
 
-    function clone(obj, parsed = []) {
-        if (obj === null || typeof obj !== "object" || parsed.includes(obj))
+    function clone(obj) {
+        if (obj === null || typeof obj !== "object" || "__cloned__" in obj)
             return obj;
         if (obj.constructor) {
             if (obj.constructor.name !== "Object" && obj.constructor.name !== "Array")
                 return obj;
         }
-        parsed.push(obj);
+        obj.__cloned__ = true;
         let temp = {};
         if (obj.constructor.name === "Array") {
             temp = new Array(obj.length);
             for (let i = 0, len = obj.length; i < len; i++) {
-                temp[i] = clone(obj[i], parsed);
+                temp[i] = clone(obj[i]);
             }
         }
         else {
             for (let key in obj) {
-                temp[key] = clone(obj[key], parsed);
+                temp[key] = clone(obj[key]);
             }
         }
+        delete obj.__cloned__;
         return temp;
     }
     function log(message, info) {
