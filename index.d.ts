@@ -99,6 +99,14 @@ export interface ParamsInfo {
     replaced: string;
     original: string;
 }
+/**
+ * Merge deep - helper function which will merge objects recursively - creating brand new one - like clone
+ *
+ * @param {object} target
+ * @params {[object]} sources
+ * @returns {object}
+ */
+export declare function mergeDeep(target: any, ...sources: any[]): any;
 declare class DeepState {
     private listeners;
     private waitingListeners;
