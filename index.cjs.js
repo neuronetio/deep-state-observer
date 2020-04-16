@@ -208,22 +208,21 @@ class ObjectPath {
 function clone(obj, parsed = []) {
     if (obj === null || typeof obj !== "object" || parsed.includes(obj))
         return obj;
-    if (obj.constructor && obj.constructor.name !== "Object" && !Array.isArray(obj))
-        return obj;
+    if (obj.constructor) {
+        if (obj.constructor.name !== "Object" && obj.constructor.name !== "Array")
+            return obj;
+    }
     parsed.push(obj);
     let temp = {};
-    if (Array.isArray(obj)) {
+    if (obj.constructor.name === "Array") {
         temp = new Array(obj.length);
         for (let i = 0, len = obj.length; i < len; i++) {
-            // @ts-ignore
             temp[i] = clone(obj[i], parsed);
         }
     }
     else {
-        for (var key in obj) {
-            if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                temp[key] = clone(obj[key], parsed);
-            }
+        for (let key in obj) {
+            temp[key] = clone(obj[key], parsed);
         }
     }
     return temp;
