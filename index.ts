@@ -126,60 +126,22 @@ export interface ParamsInfo {
   original: string;
 }
 
-/**
- * Is object - helper function to determine if specified variable is an object
- *
- * @param {any} item
- * @returns {boolean}
- */
-function isObject(item) {
-  return item && typeof item === "object" && !Array.isArray(item);
-}
-
-/**
- * Merge deep - helper function which will merge objects recursively - creating brand new one - like clone
- *
- * @param {object} target
- * @params {[object]} sources
- * @returns {object}
- */
-export function mergeDeep(target, ...sources) {
-  const source = sources.shift();
-  if (isObject(target) && isObject(source)) {
-    for (const key in source) {
-      if (isObject(source[key])) {
-        if (typeof source[key].clone === "function") {
-          target[key] = source[key].clone();
-        } else {
-          if (typeof target[key] === "undefined") {
-            target[key] = {};
-          }
-          target[key] = mergeDeep(target[key], source[key]);
-        }
-      } else if (Array.isArray(source[key])) {
-        target[key] = new Array(source[key].length);
-        let index = 0;
-        for (let item of source[key]) {
-          if (isObject(item)) {
-            if (typeof item.clone === "function") {
-              target[key][index] = item.clone();
-            } else {
-              target[key][index] = mergeDeep({}, item);
-            }
-          } else {
-            target[key][index] = item;
-          }
-          index++;
-        }
-      } else {
-        target[key] = source[key];
-      }
+function clone(obj: object) {
+  if (obj === null || typeof obj !== "object" || "isActiveClone" in obj) return obj;
+  let temp;
+  if (obj instanceof Date) {
+    temp = new Date(obj);
+  } else {
+    temp = obj.constructor();
+  }
+  for (var key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      obj["isActiveClone"] = null;
+      temp[key] = clone(obj[key]);
+      delete obj["isActiveClone"];
     }
   }
-  if (!sources.length) {
-    return target;
-  }
-  return mergeDeep(target, ...sources);
+  return temp;
 }
 
 function log(message: string, info: any) {
@@ -924,7 +886,7 @@ class DeepState {
           copied[i] = this.copy(value[i]);
         }
       } else {
-        copied = mergeDeep({}, value);
+        copied = clone(value);
       }
     }
     return copied;
