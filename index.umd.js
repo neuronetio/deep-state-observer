@@ -207,28 +207,58 @@
         }
     }
 
-    function clone(obj) {
-        if (obj === null || typeof obj !== "object" || "__cloned__" in obj)
-            return obj;
+    function isObject(obj) {
+        if (obj === null || typeof obj !== "object")
+            return false;
         if (obj.constructor) {
             if (obj.constructor.name !== "Object" && obj.constructor.name !== "Array")
-                return obj;
+                return false;
         }
+        return true;
+    }
+    function _clone(obj) {
+        if (!isObject(obj))
+            return obj;
+        if (obj.__cloned__)
+            return obj;
         obj.__cloned__ = true;
         let temp = {};
         if (obj.constructor.name === "Array") {
             temp = new Array(obj.length);
             for (let i = 0, len = obj.length; i < len; i++) {
-                temp[i] = clone(obj[i]);
+                temp[i] = _clone(obj[i]);
             }
         }
         else {
             for (let key in obj) {
-                temp[key] = clone(obj[key]);
+                temp[key] = _clone(obj[key]);
             }
         }
-        delete obj.__cloned__;
         return temp;
+    }
+    function _clean(obj) {
+        if (!isObject(obj))
+            return obj;
+        if (obj.__cloned__)
+            delete obj.__cloned__;
+        if (obj.constructor.name === "Array") {
+            for (let i = 0, len = obj.length; i < len; i++) {
+                if (isObject(obj[i]) && obj[i].__cloned__)
+                    _clean(obj[i]);
+            }
+        }
+        else {
+            for (let key in obj) {
+                if (isObject(obj[key]) && obj[key].__cloned__)
+                    _clean(obj[key]);
+            }
+        }
+    }
+    function clone(obj) {
+        const result = _clone(obj);
+        _clean(obj);
+        _clean(result);
+        return result;
     }
     function log(message, info) {
         console.debug(message, info);
