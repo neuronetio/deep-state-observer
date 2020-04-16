@@ -32,7 +32,7 @@ describe("State", () => {
   it("should call State", () => {
     const state = new State({ a: "a", b: "b", c: { d: "d" } });
     let $d;
-    state.subscribe("c.d", d => {
+    state.subscribe("c.d", (d) => {
       $d = d;
     });
     expect($d).toEqual("d");
@@ -42,7 +42,7 @@ describe("State", () => {
   it("should get and set properties", () => {
     const state = new State({});
     const data = {
-      one: { two: { three: { four: { five: 5 } } } }
+      one: { two: { three: { four: { five: 5 } } } },
     };
     expect(state.pathGet(["one", "two", "three", "four", "five"], data)).toEqual(5);
     state.pathSet(["one", "two", "three", "four", "five"], 55, data);
@@ -65,12 +65,12 @@ describe("State", () => {
   it("should update and watch", () => {
     const state = new State({
       test: {
-        test2: 123
-      }
+        test2: 123,
+      },
     });
     let test2 = 0;
     let event = 0;
-    state.subscribe("test.test2", value => {
+    state.subscribe("test.test2", (value) => {
       test2 = value;
       if (event === 0) {
         expect(value).toEqual(123);
@@ -80,7 +80,7 @@ describe("State", () => {
       event++;
     });
     expect(test2).toEqual(123);
-    state.update("test.test2", oldValue => {
+    state.update("test.test2", (oldValue) => {
       return 100;
     });
     expect(test2).toEqual(100);
@@ -89,7 +89,7 @@ describe("State", () => {
 
   it("should notify nested subscribers about change", () => {
     const state = new State({
-      one: { two: { three: { four: "go!" } } }
+      one: { two: { three: { four: "go!" } } },
     });
     const paths = [];
     const values = [];
@@ -130,8 +130,8 @@ describe("State", () => {
     const state = new State({
       one: {
         two: { three: { four: { five: 5 } } },
-        "2": { three: { four: { five: 5, six: 6 } } }
-      }
+        "2": { three: { four: { five: 5, six: 6 } } },
+      },
     });
     const paths = [];
     const values = [];
@@ -162,7 +162,7 @@ describe("State", () => {
 
   it("should match wildcards (array)", () => {
     const state = new State({
-      one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: 3 }, [{ test: "x" }]]
+      one: [{ two: 2 }, { two: 22 }, { two: 222 }, { three: 3 }, [{ test: "x" }]],
     });
     const paths = [];
     const values = [];
@@ -236,7 +236,7 @@ describe("State", () => {
 
   it("should watch recursively within path (subscribeAll)", () => {
     const state = new State({
-      one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 }
+      one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 },
     });
     const paths = [];
     const values = [];
@@ -258,7 +258,7 @@ describe("State", () => {
 
   it("should watch recursively within path and return final value if it is not an object/array", () => {
     const state = new State({
-      one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 }
+      one: { two: { three: { four: [{ x: 1 }, { y: 2 }, { z: 3 }] } }, 2: 2 },
     });
     const paths = [];
     const values = [];
@@ -284,9 +284,9 @@ describe("State", () => {
         two: {
           1: { x: 1 },
           2: { x: 2 },
-          3: { x: 3 }
-        }
-      }
+          3: { x: 3 },
+        },
+      },
     });
     const paths = [];
     const values = [];
@@ -300,7 +300,7 @@ describe("State", () => {
     expect(values[0]).toEqual({
       1: { x: 1 },
       "2": { x: 2 },
-      3: { x: 3 }
+      3: { x: 3 },
     });
 
     state.update("one.two.2.x", 22);
@@ -310,13 +310,13 @@ describe("State", () => {
     expect(values[1]).toEqual({
       1: { x: 1 },
       "2": { x: 22 },
-      3: { x: 3 }
+      3: { x: 3 },
     });
   });
 
   it("should match simple params", () => {
     const state = new State({
-      users: { 1: { name: "john", age: 35 }, 2: { name: "alice", age: 30 } }
+      users: { 1: { name: "john", age: 35 }, 2: { name: "alice", age: 30 } },
     });
     const paths = [];
     const values = [];
@@ -340,7 +340,7 @@ describe("State", () => {
 
   it("should match simple params and return bulk value", () => {
     const state = new State({
-      users: { 1: { name: "john", age: 35 }, 2: { name: "alice", age: 30 } }
+      users: { 1: { name: "john", age: 35 }, 2: { name: "alice", age: 30 } },
     });
     const paths = [];
     const values = [];
@@ -348,7 +348,7 @@ describe("State", () => {
     state.subscribe(
       "users.:id.name",
       (bulk, eventInfo) => {
-        bulk.forEach(item => {
+        bulk.forEach((item) => {
           paths.push(item.path);
           values.push(item.value);
           params.push(item.params);
@@ -375,19 +375,19 @@ describe("State", () => {
           rows: {
             1: { id: "id-1" },
             2: { id: "id-2" },
-            3: { id: "id-3" }
-          }
-        }
+            3: { id: "id-3" },
+          },
+        },
       },
       internal: {
         list: {
           rows: {
             1: { id: "id-1" },
             2: { id: "id-2" },
-            3: { id: "id-3" }
-          }
-        }
-      }
+            3: { id: "id-3" },
+          },
+        },
+      },
     });
     const paths = [];
     const values = [];
@@ -400,12 +400,12 @@ describe("State", () => {
 
   it("should bulk wildcarded subscribeAll", () => {
     const state = new State({
-      something: [{ x: 1 }, { x: 1 }, { x: 1 }, { x: 1 }]
+      something: [{ x: 1 }, { x: 1 }, { x: 1 }, { x: 1 }],
     });
     let count = 0;
     state.subscribeAll(
       ["something", "something.*.x"],
-      bulk => {
+      (bulk) => {
         count++;
       },
       { bulk: true }
@@ -417,7 +417,7 @@ describe("State", () => {
 
   it("should update values from wildcard path", () => {
     const state = new State({
-      one: { two: { three: { four: { five: 5 } } } }
+      one: { two: { three: { four: { five: 5 } } } },
     });
     const paths = [];
     const values = [];
@@ -448,7 +448,7 @@ describe("State", () => {
 
   it("should not listen to recursive changes", () => {
     const state = new State({
-      one: { two: { three: { four: { five: 5 } } } }
+      one: { two: { three: { four: { five: 5 } } } },
     });
     const paths = [];
     const values = [];
@@ -478,7 +478,7 @@ describe("State", () => {
 
   it("should update values from wildcard path (children)", () => {
     const state = new State({
-      one: { two: { three: { four: { five: 5 } } } }
+      one: { two: { three: { four: { five: 5 } } } },
     });
     const paths = [];
     const values = [];
@@ -507,7 +507,7 @@ describe("State", () => {
 
   it("should update values from wildcard path (recursive)", () => {
     const state = new State({
-      one: { two: { three: { four: { five: 5 } } } }
+      one: { two: { three: { four: { five: 5 } } } },
     });
     const paths = [];
     const values = [];
@@ -536,7 +536,7 @@ describe("State", () => {
 
   it("should update values from wildcard path (recursive & wildcard)", () => {
     const state = new State({
-      one: { two: { three: { four: { five: 5 } } } }
+      one: { two: { three: { four: { five: 5 } } } },
     });
     const paths = [];
     const values = [];
@@ -565,7 +565,7 @@ describe("State", () => {
 
   it("should notify only specified strict listeners", () => {
     const state = new State({
-      one: { two: { three: 3 } }
+      one: { two: { three: 3 } },
     });
     const values = [];
     const paths = [];
@@ -587,7 +587,7 @@ describe("State", () => {
 
   it("should notify only specified strict listeners #2", () => {
     const state = new State({
-      one: { two: { three: { four: { five: 5 } } } }
+      one: { two: { three: { four: { five: 5 } } } },
     });
     const values = [];
     const paths = [];
@@ -616,7 +616,7 @@ describe("State", () => {
 
   it("should notify only specified strict listeners (nested)", () => {
     const state = new State({
-      one: { two: { three: { four: 4 } } }
+      one: { two: { three: { four: 4 } } },
     });
     const values = [];
     const paths = [];
@@ -638,7 +638,7 @@ describe("State", () => {
 
   it("should notify only specified strict listeners (nested & wildcard)", () => {
     const state = new State({
-      one: { two: { three: { four: 4 } } }
+      one: { two: { three: { four: 4 } } },
     });
     const values = [];
     const paths = [];
@@ -660,7 +660,7 @@ describe("State", () => {
 
   it("should notify only specified strict listeners (nested & wildcard 2)", () => {
     const state = new State({
-      one: { two: { three: { four: 4 } } }
+      one: { two: { three: { four: 4 } } },
     });
     const values = [];
     const paths = [];
@@ -682,7 +682,7 @@ describe("State", () => {
 
   it("should notify only specified strict listeners (nested & wildcard & bulk)", () => {
     const base = {
-      one: { two: { three: { four: 4 } } }
+      one: { two: { three: { four: 4 } } },
     };
     for (let i = 1; i < 10; i++) {
       base.one.two["three" + i] = { four: 4 };
@@ -696,7 +696,7 @@ describe("State", () => {
     });
     state.subscribe(
       "one.two.*.four",
-      bulk => {
+      (bulk) => {
         values.push("bulk");
         paths.push("bulk");
       },
@@ -705,7 +705,7 @@ describe("State", () => {
     expect(values.length).toEqual(2);
     state.update(
       "one.two",
-      current => {
+      (current) => {
         const two = state.get("one.two");
         for (const three in two) {
           two[three] = { four: 44 };
@@ -723,7 +723,7 @@ describe("State", () => {
 
   it("should notify only specified strict listeners (nested & wildcard)", () => {
     const state = new State({
-      one: { two: { three: { four: 4 } } }
+      one: { two: { three: { four: 4 } } },
     });
     const values = [];
     const paths = [];
@@ -746,10 +746,10 @@ describe("State", () => {
   it("should destroy listeners", () => {
     const state = new State({ test: "x" });
     const values = [];
-    const first = state.subscribe("test", test => {
+    const first = state.subscribe("test", (test) => {
       values.push(test);
     });
-    const second = state.subscribe("test", test => {
+    const second = state.subscribe("test", (test) => {
       values.push(test + "2");
     });
     expect(values.length).toEqual(2);
@@ -773,7 +773,7 @@ describe("State", () => {
 
   it("should add valid event info path object", () => {
     const state = new State({
-      one: { two: { three: { four: 4 } } }
+      one: { two: { three: { four: 4 } } },
     });
     const values = [];
     const events = [];
@@ -833,7 +833,7 @@ describe("State", () => {
 
   it("should add valid event info type", () => {
     const state = new State({
-      one: { two: { three: { four: 4 } } }
+      one: { two: { three: { four: 4 } } },
     });
     const values = [];
     const events = [];
@@ -863,7 +863,7 @@ describe("State", () => {
 
   it("should add two listeners with the same path but with different recursive option", () => {
     const state = new State({
-      one: { two: { three: { four: 4 } } }
+      one: { two: { three: { four: 4 } } },
     });
     const values = [];
     const events = [];
@@ -871,14 +871,14 @@ describe("State", () => {
       values.push(val);
       events.push({
         ...eventInfo,
-        ...{ listenersCollection: eventInfo.listenersCollection }
+        ...{ listenersCollection: eventInfo.listenersCollection },
       });
     });
     state.subscribe("one.two;", (val, eventInfo) => {
       values.push(val);
       events.push({
         ...eventInfo,
-        ...{ listenersCollection: eventInfo.listenersCollection }
+        ...{ listenersCollection: eventInfo.listenersCollection },
       });
     });
     expect(values.length).toEqual(2);
@@ -895,10 +895,10 @@ describe("State", () => {
     const state = new State({
       first: { one: 1 },
       second: { two: 2 },
-      third: { three: 3 }
+      third: { three: 3 },
     });
     const values = [];
-    state.waitForAll(["first", "second", "third"], paths => {
+    state.waitForAll(["first", "second", "third"], (paths) => {
       const value = {};
       for (const path in paths) {
         value[path] = state.get(path);
@@ -909,40 +909,40 @@ describe("State", () => {
     expect(values[0]).toEqual({
       first: { one: 1 },
       second: { two: 2 },
-      third: { three: 3 }
+      third: { three: 3 },
     });
     state.update("first.one", 11);
     expect(values.length).toEqual(1);
     expect(state.get("")).toEqual({
       first: { one: 11 },
       second: { two: 2 },
-      third: { three: 3 }
+      third: { three: 3 },
     });
     state.update("second.two", 22);
     expect(values.length).toEqual(1);
     expect(state.get("")).toEqual({
       first: { one: 11 },
       second: { two: 22 },
-      third: { three: 3 }
+      third: { three: 3 },
     });
     state.update("third.three", 33);
     expect(values.length).toEqual(2);
     expect(state.get("")).toEqual({
       first: { one: 11 },
       second: { two: 22 },
-      third: { three: 33 }
+      third: { three: 33 },
     });
     expect(values[1]).toEqual({
       first: { one: 11 },
       second: { two: 22 },
-      third: { three: 33 }
+      third: { three: 33 },
     });
   });
 
   it("should work with wait option", () => {
     const state = new State({ test: 1 }, { queue: true });
     const values = [];
-    state.subscribe("test", value => {
+    state.subscribe("test", (value) => {
       values.push(value);
     });
     expect(values.length).toEqual(1);
@@ -954,7 +954,7 @@ describe("State", () => {
   it("should wait until all jobs are finished", () => {
     const state = new State({ test: 1, other: "x" }, { queue: true });
     const values = [];
-    state.subscribe("test", value => {
+    state.subscribe("test", (value) => {
       state.update("other", "xx");
       values.push(value);
     });
@@ -971,7 +971,7 @@ describe("State", () => {
   it("should wait until all jobs are finished with update:queue options", () => {
     const state = new State({ test: 1, other: "x" });
     const values = [];
-    state.subscribe("test", value => {
+    state.subscribe("test", (value) => {
       state.update("other", "xx", { queue: true });
       values.push(value);
     });
@@ -988,10 +988,10 @@ describe("State", () => {
   it("should fire couple of udates without notify and at the end of all should notify all", () => {
     const state = new State({ test1: 1, test2: 2 });
     const values = [];
-    state.subscribe("test1", value => {
+    state.subscribe("test1", (value) => {
       values.push(value);
     });
-    state.subscribe("test2", value => {
+    state.subscribe("test2", (value) => {
       values.push(value);
     });
     expect(values.length).toEqual(2);
@@ -1006,5 +1006,62 @@ describe("State", () => {
       .done();
     expect(values.length).toEqual(4);
     expect(values[3]).toEqual(22);
+  });
+
+  it("should run changeDetection properly", () => {
+    const state = new State({ one: { two: { three: { four: 4 } } } });
+    const values = [];
+    let checks = [];
+    state.subscribe(
+      "one.two.three",
+      (val) => {
+        values.push(val);
+      },
+      {
+        changeDetection(newValue, oldValue, updatePath) {
+          checks.push([{ ...newValue }, { ...oldValue }]);
+          if (newValue.four === 7) return true;
+          if (newValue.four === 8) return true;
+          return false;
+        },
+      }
+    );
+    expect(values.length).toEqual(1);
+    expect(checks.length).toEqual(0);
+
+    state.update("one.two.three.four", 5);
+    expect(checks.length).toEqual(1);
+    expect(checks[0][0].four).toEqual(5);
+    expect(checks[0][1].four).toEqual(4);
+    expect(values.length).toEqual(1);
+    expect(state.get("one.two.three.four")).toEqual(5);
+
+    state.update("one.two.*.four", 6);
+    expect(checks.length).toEqual(2);
+    expect(checks[1][0].four).toEqual(6);
+    expect(checks[1][1].four).toEqual(5);
+    expect(values.length).toEqual(1);
+    expect(state.get("one.two.three.four")).toEqual(6);
+
+    state.update("one.two.three", { four: 7 });
+    expect(checks.length).toEqual(3);
+    expect(checks[2][0].four).toEqual(7);
+    expect(checks[2][1].four).toEqual(6);
+    expect(values.length).toEqual(2);
+    expect(state.get("one.two.three.four")).toEqual(7);
+
+    state.update("one.two.*.four", 8);
+    expect(checks.length).toEqual(4);
+    expect(checks[3][0].four).toEqual(8);
+    expect(checks[3][1].four).toEqual(7);
+    expect(values.length).toEqual(3);
+    expect(state.get("one.two.three.four")).toEqual(8);
+
+    state.update("one.two.three.four", 9);
+    expect(checks.length).toEqual(5);
+    expect(checks[4][0].four).toEqual(9);
+    expect(checks[4][1].four).toEqual(8);
+    expect(values.length).toEqual(3);
+    expect(state.get("one.two.three.four")).toEqual(9);
   });
 });

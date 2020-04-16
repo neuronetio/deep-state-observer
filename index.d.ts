@@ -22,10 +22,19 @@ export interface Options {
     maxSimultaneousJobs: number;
     log: (message: string, info: any) => void;
 }
+export declare type ChangeDetection = (newValue: unknown, oldValue: unknown, path: string) => boolean;
 export interface ListenerOptions {
     bulk?: boolean;
     debug?: boolean;
     source?: string;
+    data?: any;
+    queue?: boolean;
+    changeDetection?: ChangeDetection;
+}
+export interface UpdateOptions {
+    only?: string[];
+    source?: string;
+    debug?: boolean;
     data?: any;
     queue?: boolean;
 }
@@ -90,17 +99,11 @@ export interface ParamsInfo {
     replaced: string;
     original: string;
 }
-export interface UpdateOptions {
-    only?: string[];
-    source?: string;
-    debug?: boolean;
-    data?: any;
-    queue?: boolean;
-}
 declare class DeepState {
     private listeners;
     private waitingListeners;
     private data;
+    private oldData;
     private options;
     private id;
     private pathGet;
@@ -133,7 +136,6 @@ declare class DeepState {
     private getListenersCollection;
     subscribe(listenerPath: string, fn: ListenerFunction, options?: ListenerOptions, type?: string): () => void;
     private unsubscribe;
-    private same;
     private runQueuedListeners;
     private notifyListeners;
     private getSubscribedListeners;
@@ -143,6 +145,7 @@ declare class DeepState {
     private getNotifyOnlyListeners;
     private notifyOnly;
     private canBeNested;
+    private copy;
     private getUpdateValues;
     private wildcardNotify;
     private wildcardUpdate;
