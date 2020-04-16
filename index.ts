@@ -138,10 +138,10 @@ if (typeof object_create !== "function") {
 function clone(obj: object, parsed = []) {
   if (obj === null || typeof obj !== "object" || parsed.includes(obj)) return obj;
   let temp = object_create(obj.constructor.prototype);
+  parsed.push(obj);
   for (var key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       temp[key] = clone(obj[key], parsed);
-      parsed.push(obj[key]);
     }
   }
   return temp;
