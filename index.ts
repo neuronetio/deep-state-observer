@@ -126,22 +126,22 @@ export interface ParamsInfo {
   original: string;
 }
 
-var object_create = Object.create;
-if (typeof object_create !== "function") {
-  object_create = function (o) {
-    function F() {}
-    F.prototype = o;
-    return new F();
-  };
-}
-
 function clone(obj: object, parsed = []) {
   if (obj === null || typeof obj !== "object" || parsed.includes(obj)) return obj;
-  let temp = object_create(obj.constructor.prototype);
+  if (obj.constructor && obj.constructor.name !== "Object" && !Array.isArray(obj)) return obj;
   parsed.push(obj);
-  for (var key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      temp[key] = clone(obj[key], parsed);
+  let temp = {};
+  if (Array.isArray(obj)) {
+    temp = new Array(obj.length);
+    for (let i = 0, len = obj.length; i < len; i++) {
+      // @ts-ignore
+      temp[i] = clone(obj[i]);
+    }
+  } else {
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        temp[key] = clone(obj[key], parsed);
+      }
     }
   }
   return temp;
