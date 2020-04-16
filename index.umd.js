@@ -218,7 +218,7 @@
             temp = new Array(obj.length);
             for (let i = 0, len = obj.length; i < len; i++) {
                 // @ts-ignore
-                temp[i] = clone(obj[i]);
+                temp[i] = clone(obj[i], parsed);
             }
         }
         else {
