@@ -30,6 +30,7 @@ export interface ListenerOptions {
     data?: any;
     queue?: boolean;
     changeDetection?: ChangeDetection;
+    ignore?: string[];
 }
 export interface UpdateOptions {
     only?: string[];
@@ -139,6 +140,7 @@ declare class DeepState {
     private unsubscribe;
     private runQueuedListeners;
     private notifyListeners;
+    private shouldIgnore;
     private getSubscribedListeners;
     private notifySubscribedListeners;
     private getNestedListeners;

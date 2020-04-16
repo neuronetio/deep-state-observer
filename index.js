@@ -652,6 +652,15 @@ class DeepState {
         Promise.resolve().then(() => this.runQueuedListeners());
         return alreadyNotified;
     }
+    shouldIgnore(listener, updatePath) {
+        if (!listener.options.ignore)
+            return false;
+        for (const ignorePath of listener.options.ignore) {
+            if (updatePath.startsWith(ignorePath))
+                return true;
+        }
+        return false;
+    }
     getSubscribedListeners(updatePath, newValue, oldValue, options, type = "update", originalPath = null) {
         options = Object.assign({}, defaultUpdateOptions, options);
         const listeners = {};
@@ -667,43 +676,45 @@ class DeepState {
                 const old = traverse ? () => this.pathGet(this.split(cutPath), this.oldData) : () => oldValue;
                 const bulkValue = [{ value, path: updatePath, params }];
                 for (const listener of listenersCollection.listeners.values()) {
-                    if (listener.options.changeDetection(value(), old(), updatePath)) {
-                        if (listener.options.bulk) {
-                            listeners[listenerPath].bulk.push({
+                    if (this.shouldIgnore(listener, updatePath))
+                        continue;
+                    if (!listener.options.changeDetection(value(), old(), updatePath))
+                        continue;
+                    if (listener.options.bulk) {
+                        listeners[listenerPath].bulk.push({
+                            listener,
+                            listenersCollection,
+                            eventInfo: {
+                                type,
                                 listener,
-                                listenersCollection,
-                                eventInfo: {
-                                    type,
-                                    listener,
-                                    path: {
-                                        listener: listenerPath,
-                                        update: originalPath ? originalPath : updatePath,
-                                        resolved: undefined,
-                                    },
-                                    params,
-                                    options,
+                                path: {
+                                    listener: listenerPath,
+                                    update: originalPath ? originalPath : updatePath,
+                                    resolved: undefined,
                                 },
-                                value: bulkValue,
-                            });
-                        }
-                        else {
-                            listeners[listenerPath].single.push({
+                                params,
+                                options,
+                            },
+                            value: bulkValue,
+                        });
+                    }
+                    else {
+                        listeners[listenerPath].single.push({
+                            listener,
+                            listenersCollection,
+                            eventInfo: {
+                                type,
                                 listener,
-                                listenersCollection,
-                                eventInfo: {
-                                    type,
-                                    listener,
-                                    path: {
-                                        listener: listenerPath,
-                                        update: originalPath ? originalPath : updatePath,
-                                        resolved: this.cleanNotRecursivePath(updatePath),
-                                    },
-                                    params,
-                                    options,
+                                path: {
+                                    listener: listenerPath,
+                                    update: originalPath ? originalPath : updatePath,
+                                    resolved: this.cleanNotRecursivePath(updatePath),
                                 },
-                                value,
-                            });
-                        }
+                                params,
+                                options,
+                            },
+                            value,
+                        });
                     }
                 }
             }

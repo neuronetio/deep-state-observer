@@ -38,6 +38,7 @@ export interface ListenerOptions {
   data?: any;
   queue?: boolean;
   changeDetection?: ChangeDetection;
+  ignore?: string[];
 }
 
 export interface UpdateOptions {
@@ -628,6 +629,14 @@ class DeepState {
     return alreadyNotified;
   }
 
+  private shouldIgnore(listener: Listener, updatePath: string): boolean {
+    if (!listener.options.ignore) return false;
+    for (const ignorePath of listener.options.ignore) {
+      if (updatePath.startsWith(ignorePath)) return true;
+    }
+    return false;
+  }
+
   private getSubscribedListeners(
     updatePath: string,
     newValue,
@@ -650,42 +659,42 @@ class DeepState {
         const old = traverse ? () => this.pathGet(this.split(cutPath), this.oldData) : () => oldValue;
         const bulkValue = [{ value, path: updatePath, params }];
         for (const listener of listenersCollection.listeners.values()) {
-          if (listener.options.changeDetection(value(), old(), updatePath)) {
-            if (listener.options.bulk) {
-              listeners[listenerPath].bulk.push({
+          if (this.shouldIgnore(listener, updatePath)) continue;
+          if (!listener.options.changeDetection(value(), old(), updatePath)) continue;
+          if (listener.options.bulk) {
+            listeners[listenerPath].bulk.push({
+              listener,
+              listenersCollection,
+              eventInfo: {
+                type,
                 listener,
-                listenersCollection,
-                eventInfo: {
-                  type,
-                  listener,
-                  path: {
-                    listener: listenerPath,
-                    update: originalPath ? originalPath : updatePath,
-                    resolved: undefined,
-                  },
-                  params,
-                  options,
+                path: {
+                  listener: listenerPath,
+                  update: originalPath ? originalPath : updatePath,
+                  resolved: undefined,
                 },
-                value: bulkValue,
-              });
-            } else {
-              listeners[listenerPath].single.push({
+                params,
+                options,
+              },
+              value: bulkValue,
+            });
+          } else {
+            listeners[listenerPath].single.push({
+              listener,
+              listenersCollection,
+              eventInfo: {
+                type,
                 listener,
-                listenersCollection,
-                eventInfo: {
-                  type,
-                  listener,
-                  path: {
-                    listener: listenerPath,
-                    update: originalPath ? originalPath : updatePath,
-                    resolved: this.cleanNotRecursivePath(updatePath),
-                  },
-                  params,
-                  options,
+                path: {
+                  listener: listenerPath,
+                  update: originalPath ? originalPath : updatePath,
+                  resolved: this.cleanNotRecursivePath(updatePath),
                 },
-                value,
-              });
-            }
+                params,
+                options,
+              },
+              value,
+            });
           }
         }
       }
