@@ -1039,4 +1039,36 @@ describe("State", () => {
     expect(values.length).toEqual(2);
     expect(values[1]).toEqual(1);
   });
+
+  it("should ignore wildcard ignored changes", () => {
+    const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
+    const values = [];
+
+    state.subscribe(
+      "one.two.three",
+      (val) => {
+        values.push(val);
+      },
+      { ignore: ["one.two.*.four"] }
+    );
+
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual({ four: { five: 0 } });
+
+    state.update("one.two.three.four.five", 1);
+    expect(values.length).toEqual(1);
+
+    state.update("one.two.three.*.five", 1);
+    expect(values.length).toEqual(1);
+
+    state.update("one.two.three.four", 1);
+    expect(values.length).toEqual(1);
+
+    state.update("one.two.*.four", 2);
+    expect(values.length).toEqual(1);
+
+    state.update("one.two.three", 1);
+    expect(values.length).toEqual(2);
+    expect(values[1]).toEqual(1);
+  });
 });

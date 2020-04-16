@@ -604,6 +604,9 @@ class DeepState {
         for (const ignorePath of listener.options.ignore) {
             if (updatePath.startsWith(ignorePath))
                 return true;
+            const cuttedUpdatePath = this.cutPath(updatePath, ignorePath);
+            if (this.match(ignorePath, cuttedUpdatePath))
+                return true;
         }
         return false;
     }
