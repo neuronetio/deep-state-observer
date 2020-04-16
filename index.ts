@@ -126,14 +126,18 @@ export interface ParamsInfo {
   original: string;
 }
 
+var object_create = Object.create;
+if (typeof object_create !== "function") {
+  object_create = function (o) {
+    function F() {}
+    F.prototype = o;
+    return new F();
+  };
+}
+
 function clone(obj: object) {
   if (obj === null || typeof obj !== "object" || "isActiveClone" in obj) return obj;
-  let temp;
-  if (obj instanceof Date) {
-    temp = new Date(obj);
-  } else {
-    temp = obj.constructor();
-  }
+  let temp = object_create(obj.constructor.prototype);
   for (var key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
       obj["isActiveClone"] = null;
