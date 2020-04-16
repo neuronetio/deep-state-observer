@@ -235,6 +235,13 @@ class DeepState {
     this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
   }
 
+  private same(newValue, oldValue): boolean {
+    return (
+      (["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
+      oldValue === newValue
+    );
+  }
+
   public getListeners(): Listeners {
     return this.listeners;
   }
@@ -1039,11 +1046,12 @@ class DeepState {
         newValue,
       });
     }
-    // if (this.same(newValue, oldValue)) {
-    //   --this.jobsRunning;
-    //   if (multi) return () => newValue;
-    //   return newValue;
-    // }
+
+    if (this.same(newValue, oldValue)) {
+      --this.jobsRunning;
+      if (multi) return () => newValue;
+      return newValue;
+    }
 
     this.pathSet(split, newValue, this.data);
     options = { ...defaultUpdateOptions, ...options };

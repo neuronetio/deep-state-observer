@@ -113,6 +113,7 @@ declare class DeepState {
     private updateQueue;
     private subscribeQueue;
     constructor(data?: {}, options?: Options);
+    private same;
     getListeners(): Listeners;
     destroy(): void;
     private match;

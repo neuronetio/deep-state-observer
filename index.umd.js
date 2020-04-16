@@ -305,6 +305,10 @@
             this.pathSet = ObjectPath.set;
             this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
         }
+        same(newValue, oldValue) {
+            return ((["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
+                oldValue === newValue);
+        }
         getListeners() {
             return this.listeners;
         }
@@ -979,11 +983,12 @@
                     newValue,
                 });
             }
-            // if (this.same(newValue, oldValue)) {
-            //   --this.jobsRunning;
-            //   if (multi) return () => newValue;
-            //   return newValue;
-            // }
+            if (this.same(newValue, oldValue)) {
+                --this.jobsRunning;
+                if (multi)
+                    return () => newValue;
+                return newValue;
+            }
             this.pathSet(split, newValue, this.data);
             options = Object.assign({}, defaultUpdateOptions, options);
             if (options.only === null) {
