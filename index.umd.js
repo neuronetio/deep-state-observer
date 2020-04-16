@@ -215,15 +215,20 @@
             return new F();
         };
     }
-    function clone(obj) {
+    function clone(obj, parsed = []) {
         if (obj === null || typeof obj !== "object" || "isActiveClone" in obj)
             return obj;
         let temp = object_create(obj.constructor.prototype);
         for (var key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                obj["isActiveClone"] = null;
-                temp[key] = clone(obj[key]);
-                delete obj["isActiveClone"];
+                const index = parsed.indexOf(obj[key]);
+                if (index !== -1) {
+                    temp[key] = parsed[index];
+                }
+                else {
+                    parsed.push(obj[key]);
+                    temp[key] = clone(obj[key], parsed);
+                }
             }
         }
         return temp;
