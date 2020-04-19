@@ -1,5 +1,6 @@
 import WildcardObject from "./wildcard-object-scan";
 import Path from "./ObjectPath";
+import init, { is_match } from "./wildcard_matcher.js";
 
 export interface PathInfo {
   listener: string;
@@ -24,6 +25,7 @@ export interface Options {
   notRecursive: string;
   param: string;
   wildcard: string;
+  experimentalMatch: boolean;
   queue: boolean;
   maxSimultaneousJobs: number;
   log: (message: string, info: any) => void;
@@ -124,53 +126,6 @@ export interface ParamsInfo {
   original: string;
 }
 
-function isObject(obj) {
-  if (obj === null || typeof obj !== "object") return false;
-  if (obj.constructor) {
-    if (obj.constructor.name !== "Object" && obj.constructor.name !== "Array") return false;
-  }
-  return true;
-}
-
-function _clone(obj) {
-  if (!isObject(obj)) return obj;
-  if (obj.__cloned__) return obj;
-  obj.__cloned__ = true;
-  let temp = {};
-  if (obj.constructor.name === "Array") {
-    temp = new Array(obj.length);
-    for (let i = 0, len = obj.length; i < len; i++) {
-      temp[i] = _clone(obj[i]);
-    }
-  } else {
-    for (let key in obj) {
-      temp[key] = _clone(obj[key]);
-    }
-  }
-  return temp;
-}
-
-function _clean(obj) {
-  if (!isObject(obj)) return obj;
-  if (obj.__cloned__) delete obj.__cloned__;
-  if (obj.constructor.name === "Array") {
-    for (let i = 0, len = obj.length; i < len; i++) {
-      if (isObject(obj[i]) && obj[i].__cloned__) _clean(obj[i]);
-    }
-  } else {
-    for (let key in obj) {
-      if (isObject(obj[key]) && obj[key].__cloned__) _clean(obj[key]);
-    }
-  }
-}
-
-function clone(obj) {
-  const result = _clone(obj);
-  _clean(obj);
-  _clean(result);
-  return result;
-}
-
 function log(message: string, info: any) {
   console.debug(message, info);
 }
@@ -180,6 +135,7 @@ const defaultOptions: Options = {
   notRecursive: `;`,
   param: `:`,
   wildcard: `*`,
+  experimentalMatch: false,
   queue: false,
   maxSimultaneousJobs: 1000,
   log,
@@ -214,6 +170,7 @@ class DeepState {
   private updateQueue = [];
   private subscribeQueue = [];
   private listenersIgnoreCache: WeakMap<Listener, { truthy: string[]; falsy: string[] }> = new WeakMap();
+  private is_match: any;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = new Map();
@@ -224,6 +181,12 @@ class DeepState {
     this.pathGet = Path.get;
     this.pathSet = Path.set;
     this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
+  }
+
+  public async initExperimentalMatcher(pathToWasm: string = undefined) {
+    await init(pathToWasm);
+    this.is_match = is_match;
+    this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard, this.is_match);
   }
 
   private same(newValue, oldValue): boolean {
@@ -243,6 +206,7 @@ class DeepState {
   }
 
   private match(first: string, second: string): boolean {
+    if (this.is_match) return this.is_match(first, second);
     if (first === second) return true;
     if (first === this.options.wildcard || second === this.options.wildcard) return true;
     return this.scan.match(first, second);

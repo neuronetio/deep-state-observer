@@ -18,6 +18,7 @@ export interface Options {
     notRecursive: string;
     param: string;
     wildcard: string;
+    experimentalMatch: boolean;
     queue: boolean;
     maxSimultaneousJobs: number;
     log: (message: string, info: any) => void;
@@ -111,7 +112,9 @@ declare class DeepState {
     private updateQueue;
     private subscribeQueue;
     private listenersIgnoreCache;
+    private is_match;
     constructor(data?: {}, options?: Options);
+    initExperimentalMatcher(pathToWasm?: string): Promise<void>;
     private same;
     getListeners(): Listeners;
     destroy(): void;

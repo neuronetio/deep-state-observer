@@ -1,4 +1,4 @@
-import Matcher from './stringMatcher';
+import Matcher from "./stringMatcher";
 export interface wildcardApi {
   get: (wildcard: string) => {};
   match: (first: string, second: string) => boolean;
@@ -9,15 +9,22 @@ export interface wildcardResult {
   [key: string]: any;
 }
 
-function WildcardObject(obj: object, delimeter: string, wildcard: string) {
+function WildcardObject(
+  obj: object,
+  delimeter: string,
+  wildcard: string,
+  is_match: (first: string, second: string) => boolean = undefined
+) {
   this.obj = obj;
   this.delimeter = delimeter;
   this.wildcard = wildcard;
+  this.is_match = is_match;
 }
 
 WildcardObject.prototype.simpleMatch = function simpleMatch(first: string, second: string): boolean {
   if (first === second) return true;
   if (first === this.wildcard) return true;
+  if (this.is_match) return this.is_match(first, second);
   const index = first.indexOf(this.wildcard);
   if (index > -1) {
     const end = first.substr(index + 1);
@@ -33,6 +40,7 @@ WildcardObject.prototype.simpleMatch = function simpleMatch(first: string, secon
 };
 
 WildcardObject.prototype.match = function match(first: string, second: string) {
+  if (this.is_match) return this.is_match(first, second);
   return (
     first === second ||
     first === this.wildcard ||
@@ -59,7 +67,7 @@ WildcardObject.prototype.handleArray = function handleArray(
   let index = 0;
   for (const item of currentArr) {
     const key = index.toString();
-    const currentPath = path === '' ? key : path + this.delimeter + index;
+    const currentPath = path === "" ? key : path + this.delimeter + index;
     if (
       currentWildcardPath === this.wildcard ||
       currentWildcardPath === key ||
@@ -88,7 +96,7 @@ WildcardObject.prototype.handleObject = function handleObject(
   const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
   for (let key in currentObj) {
     key = key.toString();
-    const currentPath = path === '' ? key : path + this.delimeter + key;
+    const currentPath = path === "" ? key : path + this.delimeter + key;
     if (
       currentWildcardPath === this.wildcard ||
       currentWildcardPath === key ||
@@ -116,7 +124,7 @@ WildcardObject.prototype.goFurther = function goFurther(
 };
 
 WildcardObject.prototype.get = function get(wildcard: string): any {
-  return this.goFurther(wildcard, this.obj, 0, '');
+  return this.goFurther(wildcard, this.obj, 0, "");
 };
 
 export default WildcardObject;

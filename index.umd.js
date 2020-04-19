@@ -4,6 +4,31 @@
     (global = global || self, factory(global['svelte-deep-store'] = {}));
 }(this, (function (exports) { 'use strict';
 
+    /*! *****************************************************************************
+    Copyright (c) Microsoft Corporation. All rights reserved.
+    Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+    this file except in compliance with the License. You may obtain a copy of the
+    License at http://www.apache.org/licenses/LICENSE-2.0
+
+    THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
+    WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+    MERCHANTABLITY OR NON-INFRINGEMENT.
+
+    See the Apache Version 2.0 License for specific language governing permissions
+    and limitations under the License.
+    ***************************************************************************** */
+
+    function __awaiter(thisArg, _arguments, P, generator) {
+        function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+        return new (P || (P = Promise))(function (resolve, reject) {
+            function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+            function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+            function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+            step((generator = generator.apply(thisArg, _arguments || [])).next());
+        });
+    }
+
     // forked from https://github.com/joonhocho/superwild
     function Matcher(pattern, wchar = '*') {
         this.wchar = wchar;
@@ -80,16 +105,19 @@
         return true;
     };
 
-    function WildcardObject(obj, delimeter, wildcard) {
+    function WildcardObject(obj, delimeter, wildcard, is_match = undefined) {
         this.obj = obj;
         this.delimeter = delimeter;
         this.wildcard = wildcard;
+        this.is_match = is_match;
     }
     WildcardObject.prototype.simpleMatch = function simpleMatch(first, second) {
         if (first === second)
             return true;
         if (first === this.wildcard)
             return true;
+        if (this.is_match)
+            return this.is_match(first, second);
         const index = first.indexOf(this.wildcard);
         if (index > -1) {
             const end = first.substr(index + 1);
@@ -104,6 +132,8 @@
         return false;
     };
     WildcardObject.prototype.match = function match(first, second) {
+        if (this.is_match)
+            return this.is_match(first, second);
         return (first === second ||
             first === this.wildcard ||
             second === this.wildcard ||
@@ -121,7 +151,7 @@
         let index = 0;
         for (const item of currentArr) {
             const key = index.toString();
-            const currentPath = path === '' ? key : path + this.delimeter + index;
+            const currentPath = path === "" ? key : path + this.delimeter + index;
             if (currentWildcardPath === this.wildcard ||
                 currentWildcardPath === key ||
                 this.simpleMatch(currentWildcardPath, key)) {
@@ -141,7 +171,7 @@
         const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
         for (let key in currentObj) {
             key = key.toString();
-            const currentPath = path === '' ? key : path + this.delimeter + key;
+            const currentPath = path === "" ? key : path + this.delimeter + key;
             if (currentWildcardPath === this.wildcard ||
                 currentWildcardPath === key ||
                 this.simpleMatch(currentWildcardPath, key)) {
@@ -159,7 +189,7 @@
         return this.handleObject(wildcard, currentObj, partIndex, currentPath, result);
     };
     WildcardObject.prototype.get = function get(wildcard) {
-        return this.goFurther(wildcard, this.obj, 0, '');
+        return this.goFurther(wildcard, this.obj, 0, "");
     };
 
     class ObjectPath {
@@ -207,6 +237,136 @@
         }
     }
 
+    let wasm;
+
+    let WASM_VECTOR_LEN = 0;
+
+    let cachegetUint8Memory0 = null;
+    function getUint8Memory0() {
+        if (cachegetUint8Memory0 === null || cachegetUint8Memory0.buffer !== wasm.memory.buffer) {
+            cachegetUint8Memory0 = new Uint8Array(wasm.memory.buffer);
+        }
+        return cachegetUint8Memory0;
+    }
+
+    let cachedTextEncoder = new TextEncoder('utf-8');
+
+    const encodeString = (typeof cachedTextEncoder.encodeInto === 'function'
+        ? function (arg, view) {
+        return cachedTextEncoder.encodeInto(arg, view);
+    }
+        : function (arg, view) {
+        const buf = cachedTextEncoder.encode(arg);
+        view.set(buf);
+        return {
+            read: arg.length,
+            written: buf.length
+        };
+    });
+
+    function passStringToWasm0(arg, malloc, realloc) {
+
+        if (realloc === undefined) {
+            const buf = cachedTextEncoder.encode(arg);
+            const ptr = malloc(buf.length);
+            getUint8Memory0().subarray(ptr, ptr + buf.length).set(buf);
+            WASM_VECTOR_LEN = buf.length;
+            return ptr;
+        }
+
+        let len = arg.length;
+        let ptr = malloc(len);
+
+        const mem = getUint8Memory0();
+
+        let offset = 0;
+
+        for (; offset < len; offset++) {
+            const code = arg.charCodeAt(offset);
+            if (code > 0x7F) break;
+            mem[ptr + offset] = code;
+        }
+
+        if (offset !== len) {
+            if (offset !== 0) {
+                arg = arg.slice(offset);
+            }
+            ptr = realloc(ptr, len, len = offset + arg.length * 3);
+            const view = getUint8Memory0().subarray(ptr + offset, ptr + len);
+            const ret = encodeString(arg, view);
+
+            offset += ret.written;
+        }
+
+        WASM_VECTOR_LEN = offset;
+        return ptr;
+    }
+    /**
+    * @param {string} pattern
+    * @param {string} input
+    * @returns {boolean}
+    */
+    function is_match(pattern, input) {
+        var ptr0 = passStringToWasm0(pattern, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len0 = WASM_VECTOR_LEN;
+        var ptr1 = passStringToWasm0(input, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        var len1 = WASM_VECTOR_LEN;
+        var ret = wasm.is_match(ptr0, len0, ptr1, len1);
+        return ret !== 0;
+    }
+
+    async function load(module, imports) {
+        if (typeof Response === 'function' && module instanceof Response) {
+
+            if (typeof WebAssembly.instantiateStreaming === 'function') {
+                try {
+                    return await WebAssembly.instantiateStreaming(module, imports);
+
+                } catch (e) {
+                    if (module.headers.get('Content-Type') != 'application/wasm') {
+                        console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", e);
+
+                    } else {
+                        throw e;
+                    }
+                }
+            }
+
+            const bytes = await module.arrayBuffer();
+            return await WebAssembly.instantiate(bytes, imports);
+
+        } else {
+
+            const instance = await WebAssembly.instantiate(module, imports);
+
+            if (instance instanceof WebAssembly.Instance) {
+                return { instance, module };
+
+            } else {
+                return instance;
+            }
+        }
+    }
+
+    async function init(input) {
+        if (typeof input === 'undefined') {
+            input = (typeof document === 'undefined' ? new (require('u' + 'rl').URL)('file:' + __filename).href : (document.currentScript && document.currentScript.src || new URL('index.umd.js', document.baseURI).href)).replace(/\.js$/, '_bg.wasm');
+        }
+        const imports = {};
+
+
+        if (typeof input === 'string' || (typeof Request === 'function' && input instanceof Request) || (typeof URL === 'function' && input instanceof URL)) {
+            input = fetch(input);
+        }
+
+        const { instance, module } = await load(await input, imports);
+
+        wasm = instance.exports;
+        init.__wbindgen_wasm_module = module;
+
+        return wasm;
+    }
+
     function log(message, info) {
         console.debug(message, info);
     }
@@ -215,6 +375,7 @@
         notRecursive: `;`,
         param: `:`,
         wildcard: `*`,
+        experimentalMatch: false,
         queue: false,
         maxSimultaneousJobs: 1000,
         log,
@@ -248,6 +409,13 @@
             this.pathSet = ObjectPath.set;
             this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
         }
+        initExperimentalMatcher(pathToWasm = undefined) {
+            return __awaiter(this, void 0, void 0, function* () {
+                yield init(pathToWasm);
+                this.is_match = is_match;
+                this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard, this.is_match);
+            });
+        }
         same(newValue, oldValue) {
             return ((["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
                 oldValue === newValue);
@@ -260,6 +428,8 @@
             this.listeners = new Map();
         }
         match(first, second) {
+            if (this.is_match)
+                return this.is_match(first, second);
             if (first === second)
                 return true;
             if (first === this.options.wildcard || second === this.options.wildcard)
