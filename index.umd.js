@@ -1027,7 +1027,10 @@
                 waitingPaths.push(path);
             }
             if (multi) {
-                return () => this.wildcardNotify(groupedListenersPack, waitingPaths);
+                const self = this;
+                return function () {
+                    return self.wildcardNotify(groupedListenersPack, waitingPaths);
+                };
             }
             this.wildcardNotify(groupedListenersPack, waitingPaths);
         }
@@ -1060,7 +1063,9 @@
                     this.runUpdateQueue();
                 });
                 if (multi) {
-                    return () => result;
+                    return function () {
+                        return result;
+                    };
                 }
                 return result;
             }
@@ -1079,7 +1084,9 @@
             if (this.same(newValue, oldValue)) {
                 --this.jobsRunning;
                 if (multi)
-                    return () => newValue;
+                    return function () {
+                        return newValue;
+                    };
                 return newValue;
             }
             this.pathSet(split, newValue, this.data);
@@ -1087,14 +1094,15 @@
             if (options.only === null) {
                 --this.jobsRunning;
                 if (multi)
-                    return () => { };
+                    return function () { };
                 return newValue;
             }
             if (options.only.length) {
                 --this.jobsRunning;
                 if (multi) {
-                    return () => {
-                        this.updateNotifyOnly(updatePath, newValue, options);
+                    const self = this;
+                    return function () {
+                        return self.updateNotifyOnly(updatePath, newValue, options);
                     };
                 }
                 this.updateNotifyOnly(updatePath, newValue, options);
@@ -1102,8 +1110,9 @@
             }
             if (multi) {
                 --this.jobsRunning;
-                return () => {
-                    this.updateNotify(updatePath, newValue, options);
+                const self = this;
+                return function () {
+                    return self.updateNotify(updatePath, newValue, options);
                 };
             }
             this.updateNotify(updatePath, newValue, options);

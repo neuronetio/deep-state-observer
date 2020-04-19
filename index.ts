@@ -905,7 +905,10 @@ class DeepState {
       waitingPaths.push(path);
     }
     if (multi) {
-      return () => this.wildcardNotify(groupedListenersPack, waitingPaths);
+      const self = this;
+      return function () {
+        return self.wildcardNotify(groupedListenersPack, waitingPaths);
+      };
     }
     this.wildcardNotify(groupedListenersPack, waitingPaths);
   }
@@ -947,7 +950,9 @@ class DeepState {
         this.runUpdateQueue();
       });
       if (multi) {
-        return () => result;
+        return function () {
+          return result;
+        };
       }
       return result;
     }
@@ -966,7 +971,10 @@ class DeepState {
 
     if (this.same(newValue, oldValue)) {
       --this.jobsRunning;
-      if (multi) return () => newValue;
+      if (multi)
+        return function () {
+          return newValue;
+        };
       return newValue;
     }
 
@@ -974,14 +982,15 @@ class DeepState {
     options = { ...defaultUpdateOptions, ...options };
     if (options.only === null) {
       --this.jobsRunning;
-      if (multi) return () => {};
+      if (multi) return function () {};
       return newValue;
     }
     if (options.only.length) {
       --this.jobsRunning;
       if (multi) {
-        return () => {
-          this.updateNotifyOnly(updatePath, newValue, options);
+        const self = this;
+        return function () {
+          return self.updateNotifyOnly(updatePath, newValue, options);
         };
       }
       this.updateNotifyOnly(updatePath, newValue, options);
@@ -989,8 +998,9 @@ class DeepState {
     }
     if (multi) {
       --this.jobsRunning;
-      return () => {
-        this.updateNotify(updatePath, newValue, options);
+      const self = this;
+      return function () {
+        return self.updateNotify(updatePath, newValue, options);
       };
     }
     this.updateNotify(updatePath, newValue, options);
