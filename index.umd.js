@@ -209,32 +209,6 @@
             }
             return currObj;
         }
-        static _set(path, newValue, obj, copiedPath = null, currentIndex = 0) {
-            if (copiedPath === null) {
-                copiedPath = path.slice();
-            }
-            if (currentIndex === copiedPath.length - 1) {
-                for (const key in obj) {
-                    delete obj[key];
-                }
-                for (const key in newValue) {
-                    obj[key] = newValue[key];
-                }
-                return;
-            }
-            const currentPath = copiedPath[currentIndex];
-            if (currentIndex === copiedPath.length - 1) {
-                obj[currentPath] = newValue;
-                return;
-            }
-            if (!obj) {
-                obj = {};
-            }
-            if (!obj.hasOwnProperty(currentPath)) {
-                obj[currentPath] = {};
-            }
-            ObjectPath._set(path, newValue, obj[currentPath], copiedPath, ++currentIndex);
-        }
         static set(path, value, obj) {
             if (path.length === 0) {
                 for (const key in value) {
@@ -1016,7 +990,10 @@
         wildcardNotify(groupedListenersPack, waitingPaths) {
             let alreadyNotified = [];
             for (const groupedListeners of groupedListenersPack) {
-                alreadyNotified = [...alreadyNotified, ...this.notifyListeners(groupedListeners, alreadyNotified)];
+                const notified = this.notifyListeners(groupedListeners, alreadyNotified);
+                for (const notifiedId of notified) {
+                    alreadyNotified.push(notifiedId);
+                }
             }
             for (const path of waitingPaths) {
                 this.executeWaitingListeners(path);

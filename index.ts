@@ -863,7 +863,10 @@ class DeepState {
   private wildcardNotify(groupedListenersPack, waitingPaths) {
     let alreadyNotified = [];
     for (const groupedListeners of groupedListenersPack) {
-      alreadyNotified = [...alreadyNotified, ...this.notifyListeners(groupedListeners, alreadyNotified)];
+      const notified = this.notifyListeners(groupedListeners, alreadyNotified);
+      for (const notifiedId of notified) {
+        alreadyNotified.push(notifiedId);
+      }
     }
     for (const path of waitingPaths) {
       this.executeWaitingListeners(path);
