@@ -586,24 +586,19 @@ class DeepState {
 
   private shouldIgnore(listener: Listener, updatePath: string): boolean {
     if (!listener.options.ignore) return false;
-    const ignored = this.listenersIgnoreCache.get(listener);
-    if (ignored.truthy.includes(updatePath)) return true;
-    if (ignored.falsy.includes(updatePath)) return false;
     for (const ignorePath of listener.options.ignore) {
       if (updatePath.startsWith(ignorePath)) {
-        ignored.truthy.push(updatePath);
-        this.listenersIgnoreCache.set(listener, ignored);
         return true;
       }
-      const cuttedUpdatePath = this.cutPath(updatePath, ignorePath);
-      if (this.match(ignorePath, cuttedUpdatePath)) {
-        ignored.truthy.push(updatePath);
-        this.listenersIgnoreCache.set(listener, ignored);
+      if (this.is_match && this.is_match(ignorePath, updatePath)) {
         return true;
+      } else {
+        const cuttedUpdatePath = this.cutPath(updatePath, ignorePath);
+        if (this.match(ignorePath, cuttedUpdatePath)) {
+          return true;
+        }
       }
     }
-    ignored.falsy.push(updatePath);
-    this.listenersIgnoreCache.set(listener, ignored);
     return false;
   }
 
