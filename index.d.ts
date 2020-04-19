@@ -111,6 +111,7 @@ declare class DeepState {
     private updateQueue;
     private subscribeQueue;
     private cutPathCache;
+    private listenersIgnoreCache;
     constructor(data?: {}, options?: Options);
     private same;
     getListeners(): Listeners;

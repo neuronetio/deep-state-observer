@@ -233,6 +233,7 @@ class DeepState {
         this.updateQueue = [];
         this.subscribeQueue = [];
         this.cutPathCache = {};
+        this.listenersIgnoreCache = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
@@ -463,6 +464,7 @@ class DeepState {
     subscribe(listenerPath, fn, options = defaultListenerOptions, type = "subscribe") {
         this.jobsRunning++;
         let listener = this.getCleanListener(fn, options);
+        this.listenersIgnoreCache.set(listener, { truthy: [], falsy: [] });
         const listenersCollection = this.getListenersCollection(listenerPath, listener);
         listenersCollection.count++;
         listenerPath = listenersCollection.path;
@@ -601,13 +603,26 @@ class DeepState {
     shouldIgnore(listener, updatePath) {
         if (!listener.options.ignore)
             return false;
+        const ignored = this.listenersIgnoreCache.get(listener);
+        if (ignored.truthy.includes(updatePath))
+            return true;
+        if (ignored.falsy.includes(updatePath))
+            return false;
         for (const ignorePath of listener.options.ignore) {
-            if (updatePath.startsWith(ignorePath))
+            if (updatePath.startsWith(ignorePath)) {
+                ignored.truthy.push(updatePath);
+                this.listenersIgnoreCache.set(listener, ignored);
                 return true;
+            }
             const cuttedUpdatePath = this.cutPath(updatePath, ignorePath);
-            if (this.match(ignorePath, cuttedUpdatePath))
+            if (this.match(ignorePath, cuttedUpdatePath)) {
+                ignored.truthy.push(updatePath);
+                this.listenersIgnoreCache.set(listener, ignored);
                 return true;
+            }
         }
+        ignored.falsy.push(updatePath);
+        this.listenersIgnoreCache.set(listener, ignored);
         return false;
     }
     getSubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {

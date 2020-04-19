@@ -214,6 +214,7 @@ class DeepState {
   private updateQueue = [];
   private subscribeQueue = [];
   private cutPathCache = {};
+  private listenersIgnoreCache: WeakMap<Listener, { truthy: string[]; falsy: string[] }> = new WeakMap();
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = new Map();
@@ -488,6 +489,7 @@ class DeepState {
   ) {
     this.jobsRunning++;
     let listener = this.getCleanListener(fn, options);
+    this.listenersIgnoreCache.set(listener, { truthy: [], falsy: [] });
     const listenersCollection = this.getListenersCollection(listenerPath, listener);
     listenersCollection.count++;
     listenerPath = listenersCollection.path;
@@ -623,11 +625,24 @@ class DeepState {
 
   private shouldIgnore(listener: Listener, updatePath: string): boolean {
     if (!listener.options.ignore) return false;
+    const ignored = this.listenersIgnoreCache.get(listener);
+    if (ignored.truthy.includes(updatePath)) return true;
+    if (ignored.falsy.includes(updatePath)) return false;
     for (const ignorePath of listener.options.ignore) {
-      if (updatePath.startsWith(ignorePath)) return true;
+      if (updatePath.startsWith(ignorePath)) {
+        ignored.truthy.push(updatePath);
+        this.listenersIgnoreCache.set(listener, ignored);
+        return true;
+      }
       const cuttedUpdatePath = this.cutPath(updatePath, ignorePath);
-      if (this.match(ignorePath, cuttedUpdatePath)) return true;
+      if (this.match(ignorePath, cuttedUpdatePath)) {
+        ignored.truthy.push(updatePath);
+        this.listenersIgnoreCache.set(listener, ignored);
+        return true;
+      }
     }
+    ignored.falsy.push(updatePath);
+    this.listenersIgnoreCache.set(listener, ignored);
     return false;
   }
 
