@@ -110,7 +110,6 @@ declare class DeepState {
     private jobsRunning;
     private updateQueue;
     private subscribeQueue;
-    private cutPathCache;
     private listenersIgnoreCache;
     constructor(data?: {}, options?: Options);
     private same;

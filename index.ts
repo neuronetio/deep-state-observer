@@ -213,7 +213,6 @@ class DeepState {
   private jobsRunning = 0;
   private updateQueue = [];
   private subscribeQueue = [];
-  private cutPathCache = {};
   private listenersIgnoreCache: WeakMap<Listener, { truthy: string[]; falsy: string[] }> = new WeakMap();
 
   constructor(data = {}, options: Options = defaultOptions) {
@@ -280,13 +279,11 @@ class DeepState {
   }
 
   private cutPath(longer: string, shorter: string): string {
-    const cacheKey = `${longer}-$$-${shorter}`;
-    if (this.cutPathCache[cacheKey]) return this.cutPathCache[cacheKey];
     longer = this.cleanNotRecursivePath(longer);
     shorter = this.cleanNotRecursivePath(shorter);
     const shorterPartsLen = this.getIndicesCount(this.options.delimeter, shorter);
     const longerParts = this.getIndicesOf(this.options.delimeter, longer);
-    return (this.cutPathCache[cacheKey] = longer.substr(0, longerParts[shorterPartsLen]));
+    return longer.substr(0, longerParts[shorterPartsLen]);
   }
 
   private trimPath(path: string): string {
