@@ -191,27 +191,27 @@ WildcardObject.prototype.get = function get(wildcard) {
 };
 
 class ObjectPath {
-    static get(path, obj, copiedPath = null) {
-        if (copiedPath === null) {
-            copiedPath = path.slice();
+    static get(path, obj, create = false) {
+        let currObj = obj;
+        for (const currentPath of path) {
+            if (currObj.hasOwnProperty(currentPath)) {
+                currObj = currObj[currentPath];
+            }
+            else if (create) {
+                currObj[currentPath] = {};
+                currObj = currObj[currentPath];
+            }
+            else {
+                return undefined;
+            }
         }
-        if (copiedPath.length === 0 || typeof obj === "undefined") {
-            return obj;
-        }
-        const currentPath = copiedPath.shift();
-        if (!obj.hasOwnProperty(currentPath)) {
-            return undefined;
-        }
-        if (copiedPath.length === 0) {
-            return obj[currentPath];
-        }
-        return ObjectPath.get(path, obj[currentPath], copiedPath);
+        return currObj;
     }
-    static set(path, newValue, obj, copiedPath = null) {
+    static _set(path, newValue, obj, copiedPath = null, currentIndex = 0) {
         if (copiedPath === null) {
             copiedPath = path.slice();
         }
-        if (copiedPath.length === 0) {
+        if (currentIndex === copiedPath.length - 1) {
             for (const key in obj) {
                 delete obj[key];
             }
@@ -220,8 +220,8 @@ class ObjectPath {
             }
             return;
         }
-        const currentPath = copiedPath.shift();
-        if (copiedPath.length === 0) {
+        const currentPath = copiedPath[currentIndex];
+        if (currentIndex === copiedPath.length - 1) {
             obj[currentPath] = newValue;
             return;
         }
@@ -231,7 +231,22 @@ class ObjectPath {
         if (!obj.hasOwnProperty(currentPath)) {
             obj[currentPath] = {};
         }
-        ObjectPath.set(path, newValue, obj[currentPath], copiedPath);
+        ObjectPath._set(path, newValue, obj[currentPath], copiedPath, ++currentIndex);
+    }
+    static set(path, value, obj) {
+        if (path.length === 0) {
+            for (const key in value) {
+                obj[key] = value[key];
+            }
+            return;
+        }
+        const prePath = path.slice();
+        const lastPath = prePath.pop();
+        const get = ObjectPath.get(prePath, obj, true);
+        if (typeof get === "object") {
+            get[lastPath] = value;
+        }
+        return value;
     }
 }
 
