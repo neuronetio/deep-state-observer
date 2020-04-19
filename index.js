@@ -232,6 +232,7 @@ class DeepState {
         this.jobsRunning = 0;
         this.updateQueue = [];
         this.subscribeQueue = [];
+        this.cutPathCache = {};
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
@@ -284,11 +285,14 @@ class DeepState {
         return indices;
     }
     cutPath(longer, shorter) {
+        const cacheKey = `${longer}-$$-${shorter}`;
+        if (this.cutPathCache[cacheKey])
+            return this.cutPathCache[cacheKey];
         longer = this.cleanNotRecursivePath(longer);
         shorter = this.cleanNotRecursivePath(shorter);
         const shorterPartsLen = this.getIndicesCount(this.options.delimeter, shorter);
         const longerParts = this.getIndicesOf(this.options.delimeter, longer);
-        return longer.substr(0, longerParts[shorterPartsLen]);
+        return (this.cutPathCache[cacheKey] = longer.substr(0, longerParts[shorterPartsLen]));
     }
     trimPath(path) {
         path = this.cleanNotRecursivePath(path);
