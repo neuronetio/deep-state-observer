@@ -183,7 +183,7 @@ class DeepState {
     this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
   }
 
-  public async initExperimentalMatcher(pathToWasm: string = undefined) {
+  public async initExperimentalMatcher(pathToWasm: string) {
     await init(pathToWasm);
     this.is_match = is_match;
     this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard, this.is_match);

@@ -114,7 +114,7 @@ declare class DeepState {
     private listenersIgnoreCache;
     private is_match;
     constructor(data?: {}, options?: Options);
-    initExperimentalMatcher(pathToWasm?: string): Promise<void>;
+    initExperimentalMatcher(pathToWasm: string): Promise<void>;
     private same;
     getListeners(): Listeners;
     destroy(): void;
