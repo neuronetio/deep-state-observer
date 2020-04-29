@@ -46,6 +46,7 @@ export interface UpdateOptions {
   debug?: boolean;
   data?: any;
   queue?: boolean;
+  force?: boolean;
 }
 
 export interface Listener {
@@ -155,6 +156,7 @@ const defaultUpdateOptions: UpdateOptions = {
   debug: false,
   data: undefined,
   queue: false,
+  force: false,
 };
 
 class DeepState {
@@ -886,9 +888,11 @@ class DeepState {
     const bulk = {};
     for (const path in scanned) {
       const split = this.split(path);
-      const { newValue } = this.getUpdateValues(scanned[path], split, fn);
-      this.pathSet(split, newValue, this.data);
-      bulk[path] = newValue;
+      const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn);
+      if (!this.same(newValue, oldValue) || options.force) {
+        this.pathSet(split, newValue, this.data);
+        bulk[path] = newValue;
+      }
     }
     const groupedListenersPack = [];
     const waitingPaths = [];
@@ -937,7 +941,7 @@ class DeepState {
   public update(
     updatePath: string,
     fnOrValue: Updater | any,
-    options: UpdateOptions = defaultUpdateOptions,
+    options: UpdateOptions = { ...defaultUpdateOptions },
     multi = false
   ) {
     const jobsRunning = this.jobsRunning;
@@ -969,7 +973,7 @@ class DeepState {
       });
     }
 
-    if (this.same(newValue, oldValue)) {
+    if (this.same(newValue, oldValue) && !options.force) {
       --this.jobsRunning;
       if (multi)
         return function () {

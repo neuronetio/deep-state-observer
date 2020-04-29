@@ -1105,4 +1105,49 @@ describe("State", () => {
     expect(values.length).toEqual(2);
     expect(values[1]).toEqual(1);
   });
+
+  it("should force update and notify listeners even if value is the same", () => {
+    const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
+    const values1 = [],
+      values2 = [];
+    state.subscribe("one.two.three.four.five", (val) => {
+      values1.push(val);
+    });
+    state.subscribe("one.*.three.four.five", (val) => {
+      values2.push(val);
+    });
+
+    expect(values1.length).toEqual(1);
+    expect(values2.length).toEqual(1);
+
+    state.update("one.*.three.four.five", 6);
+    expect(values1.length).toEqual(2);
+    expect(values2.length).toEqual(2);
+    expect(values1[1]).toEqual(6);
+    expect(values2[1]).toEqual(6);
+
+    state.update("one.*.three.four.five", 6);
+    expect(values1.length).toEqual(2);
+    expect(values2.length).toEqual(2);
+    expect(values1[1]).toEqual(6);
+    expect(values2[1]).toEqual(6);
+
+    state.update("one.*.three.four.five", 6, { force: true });
+    expect(values1.length).toEqual(3);
+    expect(values2.length).toEqual(3);
+    expect(values1[2]).toEqual(6);
+    expect(values2[2]).toEqual(6);
+
+    state.update("one.two.three.four.five", 6);
+    expect(values1.length).toEqual(3);
+    expect(values2.length).toEqual(3);
+    expect(values1[2]).toEqual(6);
+    expect(values2[2]).toEqual(6);
+
+    state.update("one.two.three.four.five", 6, { force: true });
+    expect(values1.length).toEqual(4);
+    expect(values2.length).toEqual(4);
+    expect(values1[3]).toEqual(6);
+    expect(values2[3]).toEqual(6);
+  });
 });

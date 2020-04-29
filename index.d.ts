@@ -37,6 +37,7 @@ export interface UpdateOptions {
     debug?: boolean;
     data?: any;
     queue?: boolean;
+    force?: boolean;
 }
 export interface Listener {
     fn: ListenerFunction;

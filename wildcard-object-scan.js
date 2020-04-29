@@ -11,16 +11,20 @@ var __values = (this && this.__values) || function (o) {
 };
 exports.__esModule = true;
 var stringMatcher_1 = require("./stringMatcher");
-function WildcardObject(obj, delimeter, wildcard) {
+function WildcardObject(obj, delimeter, wildcard, is_match) {
+    if (is_match === void 0) { is_match = undefined; }
     this.obj = obj;
     this.delimeter = delimeter;
     this.wildcard = wildcard;
+    this.is_match = is_match;
 }
 WildcardObject.prototype.simpleMatch = function simpleMatch(first, second) {
     if (first === second)
         return true;
     if (first === this.wildcard)
         return true;
+    if (this.is_match)
+        return this.is_match(first, second);
     var index = first.indexOf(this.wildcard);
     if (index > -1) {
         var end = first.substr(index + 1);
@@ -35,6 +39,8 @@ WildcardObject.prototype.simpleMatch = function simpleMatch(first, second) {
     return false;
 };
 WildcardObject.prototype.match = function match(first, second) {
+    if (this.is_match)
+        return this.is_match(first, second);
     return (first === second ||
         first === this.wildcard ||
         second === this.wildcard ||
@@ -56,7 +62,7 @@ WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr
         for (var currentArr_1 = __values(currentArr), currentArr_1_1 = currentArr_1.next(); !currentArr_1_1.done; currentArr_1_1 = currentArr_1.next()) {
             var item = currentArr_1_1.value;
             var key = index.toString();
-            var currentPath = path === '' ? key : path + this.delimeter + index;
+            var currentPath = path === "" ? key : path + this.delimeter + index;
             if (currentWildcardPath === this.wildcard ||
                 currentWildcardPath === key ||
                 this.simpleMatch(currentWildcardPath, key)) {
@@ -85,7 +91,7 @@ WildcardObject.prototype.handleObject = function handleObject(wildcard, currentO
     var currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
     for (var key in currentObj) {
         key = key.toString();
-        var currentPath = path === '' ? key : path + this.delimeter + key;
+        var currentPath = path === "" ? key : path + this.delimeter + key;
         if (currentWildcardPath === this.wildcard ||
             currentWildcardPath === key ||
             this.simpleMatch(currentWildcardPath, key)) {
@@ -104,6 +110,6 @@ WildcardObject.prototype.goFurther = function goFurther(wildcard, currentObj, pa
     return this.handleObject(wildcard, currentObj, partIndex, currentPath, result);
 };
 WildcardObject.prototype.get = function get(wildcard) {
-    return this.goFurther(wildcard, this.obj, 0, '');
+    return this.goFurther(wildcard, this.obj, 0, "");
 };
 exports["default"] = WildcardObject;

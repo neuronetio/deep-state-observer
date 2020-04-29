@@ -375,6 +375,7 @@ const defaultUpdateOptions = {
     debug: false,
     data: undefined,
     queue: false,
+    force: false,
 };
 class DeepState {
     constructor(data = {}, options = defaultOptions) {
@@ -1000,9 +1001,11 @@ class DeepState {
         const bulk = {};
         for (const path in scanned) {
             const split = this.split(path);
-            const { newValue } = this.getUpdateValues(scanned[path], split, fn);
-            this.pathSet(split, newValue, this.data);
-            bulk[path] = newValue;
+            const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn);
+            if (!this.same(newValue, oldValue) || options.force) {
+                this.pathSet(split, newValue, this.data);
+                bulk[path] = newValue;
+            }
         }
         const groupedListenersPack = [];
         const waitingPaths = [];
@@ -1045,7 +1048,7 @@ class DeepState {
         this.notifyOnly(updatePath, newValue, options);
         this.executeWaitingListeners(updatePath);
     }
-    update(updatePath, fnOrValue, options = defaultUpdateOptions, multi = false) {
+    update(updatePath, fnOrValue, options = Object.assign({}, defaultUpdateOptions), multi = false) {
         const jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
             if (jobsRunning > this.options.maxSimultaneousJobs) {
@@ -1074,7 +1077,7 @@ class DeepState {
                 newValue,
             });
         }
-        if (this.same(newValue, oldValue)) {
+        if (this.same(newValue, oldValue) && !options.force) {
             --this.jobsRunning;
             if (multi)
                 return function () {

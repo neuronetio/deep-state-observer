@@ -1,51 +1,60 @@
 "use strict";
+var __values = (this && this.__values) || function (o) {
+    var m = typeof Symbol === "function" && o[Symbol.iterator], i = 0;
+    if (m) return m.call(o);
+    return {
+        next: function () {
+            if (o && i >= o.length) o = void 0;
+            return { value: o && o[i++], done: !o };
+        }
+    };
+};
 exports.__esModule = true;
 var ObjectPath = /** @class */ (function () {
     function ObjectPath() {
     }
-    ObjectPath.get = function (path, obj, copiedPath) {
-        if (copiedPath === void 0) { copiedPath = null; }
-        if (copiedPath === null) {
-            copiedPath = path.slice();
+    ObjectPath.get = function (path, obj, create) {
+        var e_1, _a;
+        if (create === void 0) { create = false; }
+        var currObj = obj;
+        try {
+            for (var path_1 = __values(path), path_1_1 = path_1.next(); !path_1_1.done; path_1_1 = path_1.next()) {
+                var currentPath = path_1_1.value;
+                if (currObj.hasOwnProperty(currentPath)) {
+                    currObj = currObj[currentPath];
+                }
+                else if (create) {
+                    currObj[currentPath] = {};
+                    currObj = currObj[currentPath];
+                }
+                else {
+                    return undefined;
+                }
+            }
         }
-        if (copiedPath.length === 0 || typeof obj === "undefined") {
-            return obj;
+        catch (e_1_1) { e_1 = { error: e_1_1 }; }
+        finally {
+            try {
+                if (path_1_1 && !path_1_1.done && (_a = path_1["return"])) _a.call(path_1);
+            }
+            finally { if (e_1) throw e_1.error; }
         }
-        var currentPath = copiedPath.shift();
-        if (!obj.hasOwnProperty(currentPath)) {
-            return undefined;
-        }
-        if (copiedPath.length === 0) {
-            return obj[currentPath];
-        }
-        return ObjectPath.get(path, obj[currentPath], copiedPath);
+        return currObj;
     };
-    ObjectPath.set = function (path, newValue, obj, copiedPath) {
-        if (copiedPath === void 0) { copiedPath = null; }
-        if (copiedPath === null) {
-            copiedPath = path.slice();
-        }
-        if (copiedPath.length === 0) {
-            for (var key in obj) {
-                delete obj[key];
-            }
-            for (var key in newValue) {
-                obj[key] = newValue[key];
+    ObjectPath.set = function (path, value, obj) {
+        if (path.length === 0) {
+            for (var key in value) {
+                obj[key] = value[key];
             }
             return;
         }
-        var currentPath = copiedPath.shift();
-        if (copiedPath.length === 0) {
-            obj[currentPath] = newValue;
-            return;
+        var prePath = path.slice();
+        var lastPath = prePath.pop();
+        var get = ObjectPath.get(prePath, obj, true);
+        if (typeof get === "object") {
+            get[lastPath] = value;
         }
-        if (!obj) {
-            obj = {};
-        }
-        if (!obj.hasOwnProperty(currentPath)) {
-            obj[currentPath] = {};
-        }
-        ObjectPath.set(path, newValue, obj[currentPath], copiedPath);
+        return value;
     };
     return ObjectPath;
 }());
