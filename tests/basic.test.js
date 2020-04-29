@@ -1075,7 +1075,7 @@ describe("State", () => {
 
   it("should work with experimental matcher", async () => {
     const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
-    await state.initExperimentalMatcher(fs.readFileSync(path.resolve("./wildcard_matcher_bg.wasm")));
+    await state.loadWasmMatcher(fs.readFileSync(path.resolve("./wildcard_matcher_bg.wasm")));
     const values = [];
 
     state.subscribe(

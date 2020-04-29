@@ -392,9 +392,9 @@ class DeepState {
         this.pathSet = ObjectPath.set;
         this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
     }
-    initExperimentalMatcher(pathToWasm) {
+    loadWasmMatcher(pathToWasmFile) {
         return __awaiter(this, void 0, void 0, function* () {
-            yield init(pathToWasm);
+            yield init(pathToWasmFile);
             this.is_match = is_match;
             this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard, this.is_match);
         });
