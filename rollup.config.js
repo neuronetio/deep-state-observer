@@ -3,43 +3,46 @@ import commonjs from "@rollup/plugin-commonjs";
 import typescript from "rollup-plugin-typescript2";
 export default [
   {
-    input: 'index.ts',
+    input: "index.ts",
     output: {
-      file: 'index.js',
-      format: 'esm'
+      file: "index.esm.js",
+      format: "esm",
     },
     plugins: [
       typescript(),
       resolve({
-        browser: true
+        browser: true,
       }),
-      commonjs()
-    ]
+      commonjs({ extensions: [".js", ".ts"] }),
+    ],
   },
   {
-    input: 'index.js',
+    input: "index.ts",
     output: {
-      file: 'index.cjs.js',
-      format: 'cjs'
+      file: "index.cjs.js",
+      format: "cjs",
     },
     plugins: [
+      typescript(),
       resolve({
-        browser: true
+        browser: true,
       }),
-      commonjs()
-    ]
+      commonjs({ extensions: [".js", ".ts"] }),
+    ],
   },
   {
-    input: 'index.js',
+    input: "index.ts",
     output: {
-      name: 'svelte-deep-store',
-      file: 'index.umd.js',
-      format: 'umd'
+      name: "DeepStateObserver",
+      file: "index.umd.js",
+      format: "umd",
     },
     plugins: [
+      typescript(),
       resolve({
-        browser: true
-      })
-    ]
-  }
+        browser: true,
+      }),
+      commonjs({ extensions: [".js", ".ts"] }),
+    ],
+  },
 ];
