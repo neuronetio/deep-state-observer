@@ -114,6 +114,7 @@ declare class DeepState {
     private subscribeQueue;
     private listenersIgnoreCache;
     private is_match;
+    private destroyed;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
