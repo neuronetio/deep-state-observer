@@ -192,6 +192,8 @@ WildcardObject.prototype.get = function get(wildcard) {
 
 class ObjectPath {
     static get(path, obj, create = false) {
+        if (!obj)
+            return;
         let currObj = obj;
         for (const currentPath of path) {
             if (currObj.hasOwnProperty(currentPath)) {
@@ -202,12 +204,14 @@ class ObjectPath {
                 currObj = currObj[currentPath];
             }
             else {
-                return undefined;
+                return;
             }
         }
         return currObj;
     }
     static set(path, value, obj) {
+        if (!obj)
+            return;
         if (path.length === 0) {
             for (const key in value) {
                 obj[key] = value[key];
@@ -217,7 +221,7 @@ class ObjectPath {
         const prePath = path.slice();
         const lastPath = prePath.pop();
         const get = ObjectPath.get(prePath, obj, true);
-        if (typeof get === "object") {
+        if (typeof get === 'object') {
             get[lastPath] = value;
         }
         return value;

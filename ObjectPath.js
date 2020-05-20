@@ -16,6 +16,8 @@ var ObjectPath = /** @class */ (function () {
     ObjectPath.get = function (path, obj, create) {
         var e_1, _a;
         if (create === void 0) { create = false; }
+        if (!obj)
+            return;
         var currObj = obj;
         try {
             for (var path_1 = __values(path), path_1_1 = path_1.next(); !path_1_1.done; path_1_1 = path_1.next()) {
@@ -28,7 +30,7 @@ var ObjectPath = /** @class */ (function () {
                     currObj = currObj[currentPath];
                 }
                 else {
-                    return undefined;
+                    return;
                 }
             }
         }
@@ -42,6 +44,8 @@ var ObjectPath = /** @class */ (function () {
         return currObj;
     };
     ObjectPath.set = function (path, value, obj) {
+        if (!obj)
+            return;
         if (path.length === 0) {
             for (var key in value) {
                 obj[key] = value[key];
@@ -51,7 +55,7 @@ var ObjectPath = /** @class */ (function () {
         var prePath = path.slice();
         var lastPath = prePath.pop();
         var get = ObjectPath.get(prePath, obj, true);
-        if (typeof get === "object") {
+        if (typeof get === 'object') {
             get[lastPath] = value;
         }
         return value;
