@@ -21,6 +21,7 @@ export interface Options {
     experimentalMatch: boolean;
     queue: boolean;
     maxSimultaneousJobs: number;
+    maxQueueRuns: number;
     log: (message: string, info: any) => void;
 }
 export interface ListenerOptions {
@@ -115,6 +116,7 @@ declare class DeepState {
     private listenersIgnoreCache;
     private is_match;
     private destroyed;
+    private queueRun;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;

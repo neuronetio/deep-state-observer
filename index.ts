@@ -31,6 +31,7 @@ export interface Options {
   experimentalMatch: boolean;
   queue: boolean;
   maxSimultaneousJobs: number;
+  maxQueueRuns: number;
   log: (message: string, info: any) => void;
 }
 
@@ -142,7 +143,8 @@ const defaultOptions: Options = {
   experimentalMatch: false,
   queue: false,
   maxSimultaneousJobs: 1000,
-  log,
+  maxQueueRuns: 1000,
+  log
 };
 
 const defaultListenerOptions: ListenerOptions = {
@@ -150,7 +152,7 @@ const defaultListenerOptions: ListenerOptions = {
   debug: false,
   source: '',
   data: undefined,
-  queue: false,
+  queue: false
 };
 
 const defaultUpdateOptions: UpdateOptions = {
@@ -159,7 +161,7 @@ const defaultUpdateOptions: UpdateOptions = {
   debug: false,
   data: undefined,
   queue: false,
-  force: false,
+  force: false
 };
 
 class DeepState {
@@ -180,6 +182,7 @@ class DeepState {
   > = new WeakMap();
   private is_match: any;
   private destroyed = false;
+  private queueRun = 0;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = new Map();
@@ -315,7 +318,7 @@ class DeepState {
       paramsInfo.params[partIndex] = {
         original: part,
         replaced: '',
-        name: '',
+        name: ''
       };
       const reg = new RegExp(
         `\\${this.options.param}([^\\${this.options.delimeter}\\${this.options.param}]+)`,
@@ -425,7 +428,7 @@ class DeepState {
       paramsInfo: undefined,
       path: undefined,
       count: 0,
-      ...values,
+      ...values
     };
   }
 
@@ -435,7 +438,7 @@ class DeepState {
   ): Listener {
     return {
       fn,
-      options: { ...defaultListenerOptions, ...options },
+      options: { ...defaultListenerOptions, ...options }
     };
   }
 
@@ -468,7 +471,7 @@ class DeepState {
       hasParams: false,
       paramsInfo: undefined,
       originalPath: listenerPath,
-      path: listenerPath,
+      path: listenerPath
     };
     if (this.hasParams(collCfg.path)) {
       collCfg.paramsInfo = this.getParamsInfo(collCfg.path);
@@ -485,7 +488,7 @@ class DeepState {
         collCfg.path,
         collCfg.isRecursive,
         collCfg.isWildcard
-      ),
+      )
     });
     this.id++;
     listenersCollection.listeners.set(this.id, listener);
@@ -522,10 +525,10 @@ class DeepState {
           path: {
             listener: listenerPath,
             update: undefined,
-            resolved: this.cleanNotRecursivePath(listenerPath),
+            resolved: this.cleanNotRecursivePath(listenerPath)
           },
           params: this.getParams(listenersCollection.paramsInfo, listenerPath),
-          options,
+          options
         }
       );
     } else {
@@ -536,7 +539,7 @@ class DeepState {
           bulkValue.push({
             path,
             params: this.getParams(listenersCollection.paramsInfo, path),
-            value: paths[path],
+            value: paths[path]
           });
         }
         fn(bulkValue, {
@@ -546,10 +549,10 @@ class DeepState {
           path: {
             listener: listenerPath,
             update: undefined,
-            resolved: undefined,
+            resolved: undefined
           },
           options,
-          params: undefined,
+          params: undefined
         });
       } else {
         for (const path in paths) {
@@ -560,10 +563,10 @@ class DeepState {
             path: {
               listener: listenerPath,
               update: undefined,
-              resolved: this.cleanNotRecursivePath(path),
+              resolved: this.cleanNotRecursivePath(path)
             },
             params: this.getParams(listenersCollection.paramsInfo, path),
-            options,
+            options
           });
         }
       }
@@ -595,6 +598,10 @@ class DeepState {
       }
       this.subscribeQueue.length = 0;
     } else {
+      this.queueRun++;
+      if (this.queueRun === this.options.maxQueueRuns) {
+        throw new Error('Maximal number of queue runs exhausted.');
+      }
       Promise.resolve().then(() => this.runQueuedListeners());
     }
   }
@@ -702,12 +709,12 @@ class DeepState {
                 path: {
                   listener: listenerPath,
                   update: originalPath ? originalPath : updatePath,
-                  resolved: undefined,
+                  resolved: undefined
                 },
                 params,
-                options,
+                options
               },
-              value: bulkValue,
+              value: bulkValue
             });
           } else {
             listeners[listenerPath].single.push({
@@ -719,12 +726,12 @@ class DeepState {
                 path: {
                   listener: listenerPath,
                   update: originalPath ? originalPath : updatePath,
-                  resolved: this.cleanNotRecursivePath(updatePath),
+                  resolved: this.cleanNotRecursivePath(updatePath)
                 },
                 params,
-                options,
+                options
               },
-              value,
+              value
             });
           }
         }
@@ -789,10 +796,10 @@ class DeepState {
               path: {
                 listener: listenerPath,
                 update: originalPath ? originalPath : updatePath,
-                resolved: this.cleanNotRecursivePath(fullPath),
+                resolved: this.cleanNotRecursivePath(fullPath)
               },
               params,
-              options,
+              options
             };
             if (this.shouldIgnore(listener, updatePath)) continue;
             if (listener.options.bulk) {
@@ -803,7 +810,7 @@ class DeepState {
                 listener,
                 listenersCollection,
                 eventInfo,
-                value,
+                value
               });
             }
           }
@@ -817,16 +824,16 @@ class DeepState {
             path: {
               listener: listenerPath,
               update: updatePath,
-              resolved: undefined,
+              resolved: undefined
             },
             options,
-            params,
+            params
           };
           listeners[listenerPath].bulk.push({
             listener,
             listenersCollection,
             eventInfo,
-            value: bulk,
+            value: bulk
           });
         }
       }
@@ -895,23 +902,23 @@ class DeepState {
                 path: {
                   listener: listenerPath,
                   update: originalPath ? originalPath : updatePath,
-                  resolved: this.cleanNotRecursivePath(fullPath),
+                  resolved: this.cleanNotRecursivePath(fullPath)
                 },
                 params,
-                options,
+                options
               };
               if (this.shouldIgnore(listener, updatePath)) continue;
               if (listener.options.bulk) {
                 if (
                   !listeners[notifyPath].bulk.some(
-                    (bulkListener) => bulkListener.listener === listener
+                    bulkListener => bulkListener.listener === listener
                   )
                 ) {
                   listeners[notifyPath].bulk.push({
                     listener,
                     listenersCollection,
                     eventInfo,
-                    value: bulkValue,
+                    value: bulkValue
                   });
                 }
               } else {
@@ -919,7 +926,7 @@ class DeepState {
                   listener,
                   listenersCollection,
                   eventInfo,
-                  value,
+                  value
                 });
               }
             }
@@ -1038,7 +1045,7 @@ class DeepState {
     }
     if (multi) {
       const self = this;
-      return function () {
+      return function() {
         return self.wildcardNotify(groupedListenersPack, waitingPaths);
       };
     }
@@ -1106,7 +1113,7 @@ class DeepState {
         this.runUpdateQueue();
       });
       if (multi) {
-        return function () {
+        return function() {
           return result;
         };
       }
@@ -1129,7 +1136,7 @@ class DeepState {
         }`,
         {
           oldValue,
-          newValue,
+          newValue
         }
       );
     }
@@ -1137,7 +1144,7 @@ class DeepState {
     if (this.same(newValue, oldValue) && !options.force) {
       --this.jobsRunning;
       if (multi)
-        return function () {
+        return function() {
           return newValue;
         };
       return newValue;
@@ -1147,14 +1154,14 @@ class DeepState {
     options = { ...defaultUpdateOptions, ...options };
     if (options.only === null) {
       --this.jobsRunning;
-      if (multi) return function () {};
+      if (multi) return function() {};
       return newValue;
     }
     if (options.only.length) {
       --this.jobsRunning;
       if (multi) {
         const self = this;
-        return function () {
+        return function() {
           return self.updateNotifyOnly(updatePath, newValue, options);
         };
       }
@@ -1164,7 +1171,7 @@ class DeepState {
     if (multi) {
       --this.jobsRunning;
       const self = this;
-      return function () {
+      return function() {
         return self.updateNotify(updatePath, newValue, options);
       };
     }
@@ -1191,7 +1198,7 @@ class DeepState {
           notifiers[i]();
         }
         notifiers.length = 0;
-      },
+      }
     };
     return multiObject;
   }
@@ -1213,7 +1220,7 @@ class DeepState {
       this.options.log('listener subscribed', {
         listenerPath,
         listener,
-        listenersCollection,
+        listenersCollection
       });
     }
   }
@@ -1225,7 +1232,7 @@ class DeepState {
     ) {
       this.options.log('Listener fired', {
         time: Date.now() - time,
-        info: groupedListener,
+        info: groupedListener
       });
     }
   }
