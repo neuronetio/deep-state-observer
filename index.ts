@@ -182,7 +182,7 @@ class DeepState {
   > = new WeakMap();
   private is_match: any;
   private destroyed = false;
-  private queueRun = 0;
+  private queueRuns = 0;
 
   constructor(data = {}, options: Options = defaultOptions) {
     this.listeners = new Map();
@@ -592,17 +592,19 @@ class DeepState {
     if (this.destroyed) return;
     if (this.subscribeQueue.length === 0) return;
     if (this.jobsRunning === 0) {
+      this.queueRuns = 0;
       const queue = [...this.subscribeQueue];
       for (let i = 0, len = queue.length; i < len; i++) {
         queue[i]();
       }
       this.subscribeQueue.length = 0;
     } else {
-      this.queueRun++;
-      if (this.queueRun === this.options.maxQueueRuns) {
+      this.queueRuns++;
+      if (this.queueRuns >= this.options.maxQueueRuns) {
         throw new Error('Maximal number of queue runs exhausted.');
+      } else {
+        Promise.resolve().then(() => this.runQueuedListeners());
       }
-      Promise.resolve().then(() => this.runQueuedListeners());
     }
   }
 

@@ -385,7 +385,7 @@ class DeepState {
         this.subscribeQueue = [];
         this.listenersIgnoreCache = new WeakMap();
         this.destroyed = false;
-        this.queueRun = 0;
+        this.queueRuns = 0;
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
@@ -715,6 +715,7 @@ class DeepState {
         if (this.subscribeQueue.length === 0)
             return;
         if (this.jobsRunning === 0) {
+            this.queueRuns = 0;
             const queue = [...this.subscribeQueue];
             for (let i = 0, len = queue.length; i < len; i++) {
                 queue[i]();
@@ -722,11 +723,13 @@ class DeepState {
             this.subscribeQueue.length = 0;
         }
         else {
-            this.queueRun++;
-            if (this.queueRun === this.options.maxQueueRuns) {
+            this.queueRuns++;
+            if (this.queueRuns >= this.options.maxQueueRuns) {
                 throw new Error('Maximal number of queue runs exhausted.');
             }
-            Promise.resolve().then(() => this.runQueuedListeners());
+            else {
+                Promise.resolve().then(() => this.runQueuedListeners());
+            }
         }
     }
     notifyListeners(listeners, exclude = [], returnNotified = true) {

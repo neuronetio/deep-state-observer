@@ -116,7 +116,7 @@ declare class DeepState {
     private listenersIgnoreCache;
     private is_match;
     private destroyed;
-    private queueRun;
+    private queueRuns;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
