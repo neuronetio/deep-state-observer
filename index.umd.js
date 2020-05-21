@@ -731,10 +731,15 @@
             else {
                 this.queueRuns++;
                 if (this.queueRuns >= this.options.maxQueueRuns) {
+                    this.queueRuns = 0;
                     throw new Error('Maximal number of queue runs exhausted.');
                 }
                 else {
-                    Promise.resolve().then(() => this.runQueuedListeners());
+                    Promise.resolve()
+                        .then(() => this.runQueuedListeners())
+                        .catch(e => {
+                        throw e;
+                    });
                 }
             }
         }
