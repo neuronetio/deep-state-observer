@@ -165,6 +165,9 @@ declare class DeepState {
         done(): void;
     };
     get(userPath?: string | undefined): any;
+    private lastExecs;
+    private resolved;
+    last(callback: () => void): void;
     private debugSubscribe;
     private debugListener;
     private debugTime;

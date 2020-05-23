@@ -390,6 +390,8 @@ class DeepState {
         this.listenersIgnoreCache = new WeakMap();
         this.destroyed = false;
         this.queueRuns = 0;
+        this.lastExecs = new WeakMap();
+        this.resolved = Promise.resolve();
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
@@ -1179,6 +1181,20 @@ class DeepState {
             return this.data;
         }
         return this.pathGet(this.split(userPath), this.data);
+    }
+    last(callback) {
+        let last = this.lastExecs.get(callback);
+        if (!last) {
+            last = { calls: 0 };
+            this.lastExecs.set(callback, last);
+        }
+        const current = ++last.calls;
+        this.resolved.then(() => {
+            if (current === last.calls) {
+                this.lastExecs.set(callback, { calls: 0 });
+                callback();
+            }
+        });
     }
     debugSubscribe(listener, listenersCollection, listenerPath) {
         if (listener.options.debug) {

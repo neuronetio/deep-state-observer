@@ -1218,6 +1218,23 @@ class DeepState {
     return this.pathGet(this.split(userPath), this.data);
   }
 
+  private lastExecs: WeakMap<() => void, { calls: number }> = new WeakMap();
+  private resolved = Promise.resolve();
+  public last(callback: () => void) {
+    let last = this.lastExecs.get(callback);
+    if (!last) {
+      last = { calls: 0 };
+      this.lastExecs.set(callback, last);
+    }
+    const current = ++last.calls;
+    this.resolved.then(() => {
+      if (current === last.calls) {
+        this.lastExecs.set(callback, { calls: 0 });
+        callback();
+      }
+    });
+  }
+
   private debugSubscribe(
     listener: Listener,
     listenersCollection: ListenersCollection,
