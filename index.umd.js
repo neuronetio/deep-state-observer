@@ -358,17 +358,20 @@
     function log(message, info) {
         console.debug(message, info);
     }
-    const defaultOptions = {
-        delimeter: `.`,
-        notRecursive: `;`,
-        param: `:`,
-        wildcard: `*`,
-        experimentalMatch: false,
-        queue: false,
-        maxSimultaneousJobs: 1000,
-        maxQueueRuns: 1000,
-        log
-    };
+    function getDefaultOptions() {
+        return {
+            delimeter: `.`,
+            notRecursive: `;`,
+            param: `:`,
+            wildcard: `*`,
+            experimentalMatch: false,
+            queue: false,
+            maxSimultaneousJobs: 1000,
+            maxQueueRuns: 1000,
+            log,
+            Promise
+        };
+    }
     const defaultListenerOptions = {
         bulk: false,
         debug: false,
@@ -385,7 +388,7 @@
         force: false
     };
     class DeepState {
-        constructor(data = {}, options = defaultOptions) {
+        constructor(data = {}, options = {}) {
             this.jobsRunning = 0;
             this.updateQueue = [];
             this.subscribeQueue = [];
@@ -393,14 +396,19 @@
             this.destroyed = false;
             this.queueRuns = 0;
             this.lastExecs = new WeakMap();
-            this.resolved = Promise.resolve();
             this.listeners = new Map();
             this.waitingListeners = new Map();
             this.data = data;
-            this.options = Object.assign({}, defaultOptions, options);
+            this.options = Object.assign({}, getDefaultOptions(), options);
             this.id = 0;
             this.pathGet = ObjectPath.get;
             this.pathSet = ObjectPath.set;
+            if (options.Promise) {
+                this.resolved = options.Promise.resolve();
+            }
+            else {
+                this.resolved = Promise.resolve();
+            }
             this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
             this.destroyed = false;
         }

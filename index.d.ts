@@ -14,15 +14,16 @@ export interface ListenerFunctionEventInfo {
 export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
 export declare type Match = (path: string) => boolean;
 export interface Options {
-    delimeter: string;
-    notRecursive: string;
-    param: string;
-    wildcard: string;
-    experimentalMatch: boolean;
-    queue: boolean;
-    maxSimultaneousJobs: number;
-    maxQueueRuns: number;
-    log: (message: string, info: any) => void;
+    delimeter?: string;
+    notRecursive?: string;
+    param?: string;
+    wildcard?: string;
+    experimentalMatch?: boolean;
+    queue?: boolean;
+    maxSimultaneousJobs?: number;
+    maxQueueRuns?: number;
+    log?: (message: string, info: any) => void;
+    Promise?: Promise<unknown> | any;
 }
 export interface ListenerOptions {
     bulk?: boolean;
@@ -117,6 +118,7 @@ declare class DeepState {
     private is_match;
     private destroyed;
     private queueRuns;
+    private resolved;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
@@ -166,7 +168,6 @@ declare class DeepState {
     };
     get(userPath?: string | undefined): any;
     private lastExecs;
-    private resolved;
     last(callback: () => void): void;
     private debugSubscribe;
     private debugListener;

@@ -24,15 +24,16 @@ export type ListenerFunction = (
 export type Match = (path: string) => boolean;
 
 export interface Options {
-  delimeter: string;
-  notRecursive: string;
-  param: string;
-  wildcard: string;
-  experimentalMatch: boolean;
-  queue: boolean;
-  maxSimultaneousJobs: number;
-  maxQueueRuns: number;
-  log: (message: string, info: any) => void;
+  delimeter?: string;
+  notRecursive?: string;
+  param?: string;
+  wildcard?: string;
+  experimentalMatch?: boolean;
+  queue?: boolean;
+  maxSimultaneousJobs?: number;
+  maxQueueRuns?: number;
+  log?: (message: string, info: any) => void;
+  Promise?: Promise<unknown> | any;
 }
 
 export interface ListenerOptions {
@@ -135,17 +136,20 @@ function log(message: string, info: any) {
   console.debug(message, info);
 }
 
-const defaultOptions: Options = {
-  delimeter: `.`,
-  notRecursive: `;`,
-  param: `:`,
-  wildcard: `*`,
-  experimentalMatch: false,
-  queue: false,
-  maxSimultaneousJobs: 1000,
-  maxQueueRuns: 1000,
-  log
-};
+function getDefaultOptions(): Options {
+  return {
+    delimeter: `.`,
+    notRecursive: `;`,
+    param: `:`,
+    wildcard: `*`,
+    experimentalMatch: false,
+    queue: false,
+    maxSimultaneousJobs: 1000,
+    maxQueueRuns: 1000,
+    log,
+    Promise
+  };
+}
 
 const defaultListenerOptions: ListenerOptions = {
   bulk: false,
@@ -183,15 +187,21 @@ class DeepState {
   private is_match: any;
   private destroyed = false;
   private queueRuns = 0;
+  private resolved: Promise<unknown> | any;
 
-  constructor(data = {}, options: Options = defaultOptions) {
+  constructor(data = {}, options: Options = {}) {
     this.listeners = new Map();
     this.waitingListeners = new Map();
     this.data = data;
-    this.options = { ...defaultOptions, ...options };
+    this.options = { ...getDefaultOptions(), ...options };
     this.id = 0;
     this.pathGet = Path.get;
     this.pathSet = Path.set;
+    if (options.Promise) {
+      this.resolved = options.Promise.resolve();
+    } else {
+      this.resolved = Promise.resolve();
+    }
     this.scan = new WildcardObject(
       this.data,
       this.options.delimeter,
@@ -1219,7 +1229,6 @@ class DeepState {
   }
 
   private lastExecs: WeakMap<() => void, { calls: number }> = new WeakMap();
-  private resolved = Promise.resolve();
   public last(callback: () => void) {
     let last = this.lastExecs.get(callback);
     if (!last) {

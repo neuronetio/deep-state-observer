@@ -82,17 +82,20 @@ var wildcard_matcher_js_1 = require("./wildcard_matcher.js");
 function log(message, info) {
     console.debug(message, info);
 }
-var defaultOptions = {
-    delimeter: ".",
-    notRecursive: ";",
-    param: ":",
-    wildcard: "*",
-    experimentalMatch: false,
-    queue: false,
-    maxSimultaneousJobs: 1000,
-    maxQueueRuns: 1000,
-    log: log
-};
+function getDefaultOptions() {
+    return {
+        delimeter: ".",
+        notRecursive: ";",
+        param: ":",
+        wildcard: "*",
+        experimentalMatch: false,
+        queue: false,
+        maxSimultaneousJobs: 1000,
+        maxQueueRuns: 1000,
+        log: log,
+        Promise: Promise
+    };
+}
 var defaultListenerOptions = {
     bulk: false,
     debug: false,
@@ -111,7 +114,7 @@ var defaultUpdateOptions = {
 var DeepState = /** @class */ (function () {
     function DeepState(data, options) {
         if (data === void 0) { data = {}; }
-        if (options === void 0) { options = defaultOptions; }
+        if (options === void 0) { options = {}; }
         this.jobsRunning = 0;
         this.updateQueue = [];
         this.subscribeQueue = [];
@@ -119,14 +122,19 @@ var DeepState = /** @class */ (function () {
         this.destroyed = false;
         this.queueRuns = 0;
         this.lastExecs = new WeakMap();
-        this.resolved = Promise.resolve();
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
-        this.options = __assign({}, defaultOptions, options);
+        this.options = __assign({}, getDefaultOptions(), options);
         this.id = 0;
         this.pathGet = ObjectPath_1["default"].get;
         this.pathSet = ObjectPath_1["default"].set;
+        if (options.Promise) {
+            this.resolved = options.Promise.resolve();
+        }
+        else {
+            this.resolved = Promise.resolve();
+        }
         this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimeter, this.options.wildcard);
         this.destroyed = false;
     }
