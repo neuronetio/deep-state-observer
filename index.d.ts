@@ -119,6 +119,7 @@ declare class DeepState {
     private destroyed;
     private queueRuns;
     private resolved;
+    private muted;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
@@ -169,6 +170,9 @@ declare class DeepState {
     get(userPath?: string | undefined): any;
     private lastExecs;
     last(callback: () => void): void;
+    isMuted(path: string): boolean;
+    mute(path: string): void;
+    unmute(path: string): void;
     private debugSubscribe;
     private debugListener;
     private debugTime;

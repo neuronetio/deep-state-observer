@@ -369,7 +369,7 @@
             maxSimultaneousJobs: 1000,
             maxQueueRuns: 1000,
             log,
-            Promise
+            Promise,
         };
     }
     const defaultListenerOptions = {
@@ -377,7 +377,7 @@
         debug: false,
         source: '',
         data: undefined,
-        queue: false
+        queue: false,
     };
     const defaultUpdateOptions = {
         only: [],
@@ -385,7 +385,7 @@
         debug: false,
         data: undefined,
         queue: false,
-        force: false
+        force: false,
     };
     class DeepState {
         constructor(data = {}, options = {}) {
@@ -409,6 +409,7 @@
             else {
                 this.resolved = Promise.resolve();
             }
+            this.muted = new Set();
             this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
             this.destroyed = false;
         }
@@ -506,7 +507,7 @@
                 paramsInfo.params[partIndex] = {
                     original: part,
                     replaced: '',
-                    name: ''
+                    name: '',
                 };
                 const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimeter}\\${this.options.param}]+)`, 'g');
                 let param = reg.exec(part);
@@ -603,7 +604,7 @@
         getCleanListener(fn, options = defaultListenerOptions) {
             return {
                 fn,
-                options: Object.assign({}, defaultListenerOptions, options)
+                options: Object.assign({}, defaultListenerOptions, options),
             };
         }
         getListenerCollectionMatch(listenerPath, isRecursive, isWildcard) {
@@ -629,7 +630,7 @@
                 hasParams: false,
                 paramsInfo: undefined,
                 originalPath: listenerPath,
-                path: listenerPath
+                path: listenerPath,
             };
             if (this.hasParams(collCfg.path)) {
                 collCfg.paramsInfo = this.getParamsInfo(collCfg.path);
@@ -655,30 +656,33 @@
             const listenersCollection = this.getListenersCollection(listenerPath, listener);
             listenersCollection.count++;
             listenerPath = listenersCollection.path;
+            const cleanPath = this.cleanNotRecursivePath(listenerPath);
             if (!listenersCollection.isWildcard) {
-                fn(this.pathGet(this.split(this.cleanNotRecursivePath(listenerPath)), this.data), {
-                    type,
-                    listener,
-                    listenersCollection,
-                    path: {
-                        listener: listenerPath,
-                        update: undefined,
-                        resolved: this.cleanNotRecursivePath(listenerPath)
-                    },
-                    params: this.getParams(listenersCollection.paramsInfo, listenerPath),
-                    options
-                });
+                if (!this.isMuted(cleanPath))
+                    fn(this.pathGet(this.split(cleanPath), this.data), {
+                        type,
+                        listener,
+                        listenersCollection,
+                        path: {
+                            listener: listenerPath,
+                            update: undefined,
+                            resolved: this.cleanNotRecursivePath(listenerPath),
+                        },
+                        params: this.getParams(listenersCollection.paramsInfo, listenerPath),
+                        options,
+                    });
             }
             else {
-                const paths = this.scan.get(this.cleanNotRecursivePath(listenerPath));
+                const paths = this.scan.get(cleanPath);
                 if (options.bulk) {
                     const bulkValue = [];
                     for (const path in paths) {
-                        bulkValue.push({
-                            path,
-                            params: this.getParams(listenersCollection.paramsInfo, path),
-                            value: paths[path]
-                        });
+                        if (!this.isMuted(path))
+                            bulkValue.push({
+                                path,
+                                params: this.getParams(listenersCollection.paramsInfo, path),
+                                value: paths[path],
+                            });
                     }
                     fn(bulkValue, {
                         type,
@@ -687,26 +691,27 @@
                         path: {
                             listener: listenerPath,
                             update: undefined,
-                            resolved: undefined
+                            resolved: undefined,
                         },
                         options,
-                        params: undefined
+                        params: undefined,
                     });
                 }
                 else {
                     for (const path in paths) {
-                        fn(paths[path], {
-                            type,
-                            listener,
-                            listenersCollection,
-                            path: {
-                                listener: listenerPath,
-                                update: undefined,
-                                resolved: this.cleanNotRecursivePath(path)
-                            },
-                            params: this.getParams(listenersCollection.paramsInfo, path),
-                            options
-                        });
+                        if (!this.isMuted(path))
+                            fn(paths[path], {
+                                type,
+                                listener,
+                                listenersCollection,
+                                path: {
+                                    listener: listenerPath,
+                                    update: undefined,
+                                    resolved: this.cleanNotRecursivePath(path),
+                                },
+                                params: this.getParams(listenersCollection.paramsInfo, path),
+                                options,
+                            });
                     }
                 }
             }
@@ -747,7 +752,7 @@
                 else {
                     Promise.resolve()
                         .then(() => this.runQueuedListeners())
-                        .catch(e => {
+                        .catch((e) => {
                         throw e;
                     });
                 }
@@ -756,6 +761,8 @@
         notifyListeners(listeners, exclude = [], returnNotified = true) {
             const alreadyNotified = [];
             for (const path in listeners) {
+                if (this.isMuted(path))
+                    continue;
                 let { single, bulk } = listeners[path];
                 for (const singleListener of single) {
                     if (exclude.includes(singleListener))
@@ -846,12 +853,12 @@
                                     path: {
                                         listener: listenerPath,
                                         update: originalPath ? originalPath : updatePath,
-                                        resolved: undefined
+                                        resolved: undefined,
                                     },
                                     params,
-                                    options
+                                    options,
                                 },
-                                value: bulkValue
+                                value: bulkValue,
                             });
                         }
                         else {
@@ -864,12 +871,12 @@
                                     path: {
                                         listener: listenerPath,
                                         update: originalPath ? originalPath : updatePath,
-                                        resolved: this.cleanNotRecursivePath(updatePath)
+                                        resolved: this.cleanNotRecursivePath(updatePath),
                                     },
                                     params,
-                                    options
+                                    options,
                                 },
-                                value
+                                value,
                             });
                         }
                     }
@@ -904,10 +911,10 @@
                                 path: {
                                     listener: listenerPath,
                                     update: originalPath ? originalPath : updatePath,
-                                    resolved: this.cleanNotRecursivePath(fullPath)
+                                    resolved: this.cleanNotRecursivePath(fullPath),
                                 },
                                 params,
-                                options
+                                options,
                             };
                             if (this.shouldIgnore(listener, updatePath))
                                 continue;
@@ -920,7 +927,7 @@
                                     listener,
                                     listenersCollection,
                                     eventInfo,
-                                    value
+                                    value,
                                 });
                             }
                         }
@@ -934,16 +941,16 @@
                             path: {
                                 listener: listenerPath,
                                 update: updatePath,
-                                resolved: undefined
+                                resolved: undefined,
                             },
                             options,
-                            params
+                            params,
                         };
                         listeners[listenerPath].bulk.push({
                             listener,
                             listenersCollection,
                             eventInfo,
-                            value: bulk
+                            value: bulk,
                         });
                     }
                 }
@@ -981,20 +988,20 @@
                                     path: {
                                         listener: listenerPath,
                                         update: originalPath ? originalPath : updatePath,
-                                        resolved: this.cleanNotRecursivePath(fullPath)
+                                        resolved: this.cleanNotRecursivePath(fullPath),
                                     },
                                     params,
-                                    options
+                                    options,
                                 };
                                 if (this.shouldIgnore(listener, updatePath))
                                     continue;
                                 if (listener.options.bulk) {
-                                    if (!listeners[notifyPath].bulk.some(bulkListener => bulkListener.listener === listener)) {
+                                    if (!listeners[notifyPath].bulk.some((bulkListener) => bulkListener.listener === listener)) {
                                         listeners[notifyPath].bulk.push({
                                             listener,
                                             listenersCollection,
                                             eventInfo,
-                                            value: bulkValue
+                                            value: bulkValue,
                                         });
                                     }
                                 }
@@ -1003,7 +1010,7 @@
                                         listener,
                                         listenersCollection,
                                         eventInfo,
-                                        value
+                                        value,
                                     });
                                 }
                             }
@@ -1124,7 +1131,7 @@
             if (options.debug) {
                 this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ''}`, {
                     oldValue,
-                    newValue
+                    newValue,
                 });
             }
             if (this.same(newValue, oldValue) && !options.force) {
@@ -1180,7 +1187,7 @@
                         notifiers[i]();
                     }
                     notifiers.length = 0;
-                }
+                },
             };
             return multiObject;
         }
@@ -1206,12 +1213,27 @@
                 }
             });
         }
+        isMuted(path) {
+            for (const mutedPath of this.muted) {
+                if (this.match(path, mutedPath))
+                    return true;
+                if (this.match(mutedPath, path))
+                    return true;
+            }
+            return false;
+        }
+        mute(path) {
+            this.muted.add(path);
+        }
+        unmute(path) {
+            this.muted.delete(path);
+        }
         debugSubscribe(listener, listenersCollection, listenerPath) {
             if (listener.options.debug) {
                 this.options.log('listener subscribed', {
                     listenerPath,
                     listener,
-                    listenersCollection
+                    listenersCollection,
                 });
             }
         }
@@ -1220,7 +1242,7 @@
                 groupedListener.listener.options.debug) {
                 this.options.log('Listener fired', {
                     time: Date.now() - time,
-                    info: groupedListener
+                    info: groupedListener,
                 });
             }
         }
