@@ -93,7 +93,7 @@ import State from 'deep-state-observer'; // const { State } = require('deep-stat
 // first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
 const state = new State({
   some: { thing: { test: 0 } },
-  someOther: { nested: { node: 'ok' } }
+  someOther: { nested: { node: 'ok' } },
 });
 
 // store some unsubscribe methods
@@ -127,8 +127,8 @@ const state = new State({
   byId: {
     1: { val: 1 },
     2: { val: 2 },
-    3: { val: 3 }
-  }
+    3: { val: 3 },
+  },
 });
 
 // store some unsubscribe methods
@@ -191,8 +191,8 @@ const state = new State({
   byId: {
     1: { val: 1 },
     2: { val: 2 },
-    3: { val: 3 }
-  }
+    3: { val: 3 },
+  },
 });
 
 // store some unsubscribe methods
@@ -261,7 +261,10 @@ onDestroy(() => {
 import { onDestroy } from 'svelte';
 import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
 
-const state = new State({ some: 'value', someOther: { nested: { node: 'ok' } } });
+const state = new State({
+  some: 'value',
+  someOther: { nested: { node: 'ok' } },
+});
 
 // store some unsubscribe methods
 let subscribers = [];
@@ -297,7 +300,7 @@ onDestroy(() => {
 
 ```javascript
 const state = new State({
-  one: { two: { three: { four: 4 } } }
+  one: { two: { three: { four: 4 } } },
 });
 state.subscribe('one.two', (val, eventInfo) => {
   // trigerred only once - immediately
@@ -312,12 +315,86 @@ state.subscribe('one.two.three.four', (val, eventInfo) => {
 state.update('one.two', { three: { four: 44 } }, { only: ['*.four'] });
 ```
 
+## mute / unmute changes
+
+It will work with wildcards as update values, as muted paths or both.
+
+```javascript
+const state = new State({ x: { z: 'z', i: { o: 'o' } }, y: 'y' });
+const values = [];
+state.subscribe('x.i.o', (val) => {
+  values.push(val);
+});
+// values.length === 1
+state.mute('x.*.o');
+state.update('x.i.o', 'oo');
+// values.length === 1 (x.i.o listener was not fired)
+state.unmute('x.*.o');
+state.update('x.i.o', 'ooo');
+// values.length === 2 (x.i.o listener was fired)
+```
+
+## ignore
+
+You can watch for object changes but also at the same time ignore specified nodes.
+Ignore option will work with wildcards.
+
+```javascript
+const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
+const values = [];
+
+state.subscribe(
+  'one.two.three',
+  (val) => {
+    values.push(val);
+  },
+  { ignore: ['one.two.three.four'] }
+);
+// values.length === 1 & values[0] === { four: { five: 0 } }
+state.update('one.two.three.four.five', 1);
+// values.length === 1 because all nodes after four was ignored
+state.update('one.two.three.*.five', 1);
+// values.length === 1 because all nodes after four was ignored
+state.update('one.two.three.four', 1);
+// values.length === 1 because all nodes after four was ignored
+state.update('one.two.*.four', 2);
+// values.length === 1 because all nodes after four was ignored
+state.update('one.two.three', 1);
+// values.length === 1 & values[1] === 1
+```
+
+## queue
+
+You can wait with update untill all other tasks are finished.
+
+```javascript
+const state = new State({ test: 1, other: 'x' });
+const values = [];
+state.subscribe('test', (value) => {
+  state.update('other', 'xx', { queue: true });
+  values.push(value);
+});
+// values.length === 1 & values[0] === 1
+state.update('test', 2);
+// values.length ===2 & values[1] === 2
+// state.get('other') === 'x'
+setTimeout(() => {
+  // state.get('other') === 'xx' because updating 'other' was waiting for 'test' listener to end
+}, 100);
+```
+
 ## Debug
 
 ```javascript
 // you can debug listeners and updates with 'debug' and 'source' options
-state.subscribe('something', () => {}, { debug: true, source: 'your.component.name.or.something' });
-state.update('something', 'someValue', { debug: true, source: 'your.component.name.or.something' });
+state.subscribe('something', () => {}, {
+  debug: true,
+  source: 'your.component.name.or.something',
+});
+state.update('something', 'someValue', {
+  debug: true,
+  source: 'your.component.name.or.something',
+});
 ```
 
 ## Vue example
@@ -330,27 +407,27 @@ const state = new State({ test: 1 });
 const subscribers = [];
 
 export default {
-  provide: { state }
+  provide: { state },
 };
 
 // child component
 export default {
-  template:`<div>test is equal to: {{test}}</div>`,
-  inject:['state'],
-  data(){
+  template: `<div>test is equal to: {{test}}</div>`,
+  inject: ['state'],
+  data() {
     return {
-      test: 0
+      test: 0,
     };
   },
-  created(){
+  created() {
     subscribers.push(
-      this.state.subscribe('test', test =>{
+      this.state.subscribe('test', (test) => {
         this.test = test; // assign to local variable
       })
     );
   },
-  beforeDestroy(){
-    subscribers.forEach(unsubscribe=>unsubscribe());
-  }
-}
+  beforeDestroy() {
+    subscribers.forEach((unsubscribe) => unsubscribe());
+  },
+};
 ```
