@@ -359,6 +359,7 @@ function log(message, info) {
 function getDefaultOptions() {
     return {
         delimeter: `.`,
+        useMute: true,
         notRecursive: `;`,
         param: `:`,
         wildcard: `*`,
@@ -1212,6 +1213,8 @@ class DeepState {
         });
     }
     isMuted(path) {
+        if (!this.options.useMute)
+            return false;
         for (const mutedPath of this.muted) {
             if (this.match(path, mutedPath))
                 return true;

@@ -25,6 +25,7 @@ export type Match = (path: string) => boolean;
 
 export interface Options {
   delimeter?: string;
+  useMute?: boolean;
   notRecursive?: string;
   param?: string;
   wildcard?: string;
@@ -139,6 +140,7 @@ function log(message: string, info: any) {
 function getDefaultOptions(): Options {
   return {
     delimeter: `.`,
+    useMute: true,
     notRecursive: `;`,
     param: `:`,
     wildcard: `*`,
@@ -1246,6 +1248,7 @@ class DeepState {
   }
 
   public isMuted(path: string): boolean {
+    if (!this.options.useMute) return false;
     for (const mutedPath of this.muted) {
       if (this.match(path, mutedPath)) return true;
       if (this.match(mutedPath, path)) return true;

@@ -15,6 +15,7 @@ export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionE
 export declare type Match = (path: string) => boolean;
 export interface Options {
     delimeter?: string;
+    useMute?: boolean;
     notRecursive?: string;
     param?: string;
     wildcard?: string;
