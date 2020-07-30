@@ -63,6 +63,7 @@ export declare type Updater = (value: any) => any;
 export declare type ListenersObject = Map<string | number, Listener>;
 export interface ListenersCollection {
     path: string;
+    originalPath: string;
     listeners: ListenersObject;
     isWildcard: boolean;
     isRecursive: boolean;

@@ -481,7 +481,7 @@ class DeepState {
         return path === '' ? [] : path.split(this.options.delimeter);
     }
     isWildcard(path) {
-        return path.includes(this.options.wildcard);
+        return path.includes(this.options.wildcard) || this.hasParams(path);
     }
     isNotRecursive(path) {
         return path.endsWith(this.options.notRecursive);
@@ -594,7 +594,7 @@ class DeepState {
         };
     }
     getCleanListenersCollection(values = {}) {
-        return Object.assign({ listeners: new Map(), isRecursive: false, isWildcard: false, hasParams: false, match: undefined, paramsInfo: undefined, path: undefined, count: 0 }, values);
+        return Object.assign({ listeners: new Map(), isRecursive: false, isWildcard: false, hasParams: false, match: undefined, paramsInfo: undefined, path: undefined, originalPath: undefined, count: 0 }, values);
     }
     getCleanListener(fn, options = defaultListenerOptions) {
         return {
@@ -619,27 +619,23 @@ class DeepState {
             listenersCollection.listeners.set(++this.id, listener);
             return listenersCollection;
         }
+        const hasParams = this.hasParams(listenerPath);
+        let paramsInfo;
+        if (hasParams) {
+            paramsInfo = this.getParamsInfo(listenerPath);
+        }
         let collCfg = {
-            isRecursive: true,
-            isWildcard: false,
-            hasParams: false,
-            paramsInfo: undefined,
+            isRecursive: !this.isNotRecursive(listenerPath),
+            isWildcard: this.isWildcard(listenerPath),
+            hasParams,
+            paramsInfo,
             originalPath: listenerPath,
-            path: listenerPath,
+            path: hasParams ? paramsInfo.replaced : listenerPath,
         };
-        if (this.hasParams(collCfg.path)) {
-            collCfg.paramsInfo = this.getParamsInfo(collCfg.path);
-            collCfg.path = collCfg.paramsInfo.replaced;
-            collCfg.hasParams = true;
-        }
-        collCfg.isWildcard = this.isWildcard(collCfg.path);
-        if (this.isNotRecursive(collCfg.path)) {
-            collCfg.isRecursive = false;
-        }
         let listenersCollection = this.getCleanListenersCollection(Object.assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
         this.id++;
         listenersCollection.listeners.set(this.id, listener);
-        this.listeners.set(collCfg.path, listenersCollection);
+        this.listeners.set(collCfg.originalPath, listenersCollection);
         return listenersCollection;
     }
     subscribe(listenerPath, fn, options = defaultListenerOptions, type = 'subscribe') {
@@ -650,8 +646,7 @@ class DeepState {
         this.listenersIgnoreCache.set(listener, { truthy: [], falsy: [] });
         const listenersCollection = this.getListenersCollection(listenerPath, listener);
         listenersCollection.count++;
-        listenerPath = listenersCollection.path;
-        const cleanPath = this.cleanNotRecursivePath(listenerPath);
+        const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
         if (!listenersCollection.isWildcard) {
             if (!this.isMuted(cleanPath))
                 fn(this.pathGet(this.split(cleanPath), this.data), {
@@ -663,7 +658,7 @@ class DeepState {
                         update: undefined,
                         resolved: this.cleanNotRecursivePath(listenerPath),
                     },
-                    params: this.getParams(listenersCollection.paramsInfo, listenerPath),
+                    params: this.getParams(listenersCollection.paramsInfo, cleanPath),
                     options,
                 });
         }

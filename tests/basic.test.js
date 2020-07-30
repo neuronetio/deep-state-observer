@@ -1224,4 +1224,21 @@ describe('State', () => {
     expect(values.length).toEqual(1);
     expect(values[0]).toEqual('o');
   });
+
+  it('should add two wildcard listeners - one without and one with parameter', () => {
+    const state = new State({ nested: { value: { equals: 'x' } } });
+    const values = [];
+    state.subscribe('nested.*.equals', (val, info) => {
+      values.push(val);
+      expect(info.params).toEqual(undefined);
+    });
+    expect(values.length).toEqual(1);
+    state.subscribe('nested.:val.equals', (val, info) => {
+      values.push(val);
+      expect(info.params).toEqual({ val: 'value' });
+    });
+    expect(values.length).toEqual(2);
+    state.update('nested.value.equals', 'y');
+    expect(values.length).toEqual(4);
+  });
 });
