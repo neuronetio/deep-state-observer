@@ -1,8 +1,8 @@
 (function (global, factory) {
-    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-    typeof define === 'function' && define.amd ? define(['exports'], factory) :
-    (global = global || self, factory(global.DeepStateObserver = {}));
-}(this, (function (exports) { 'use strict';
+    typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+    typeof define === 'function' && define.amd ? define(factory) :
+    (global = global || self, global.DeepStateObserver = factory());
+}(this, (function () { 'use strict';
 
     /*! *****************************************************************************
     Copyright (c) Microsoft Corporation. All rights reserved.
@@ -360,7 +360,7 @@
     }
     function getDefaultOptions() {
         return {
-            delimeter: `.`,
+            delimiter: `.`,
             useMute: true,
             notRecursive: `;`,
             param: `:`,
@@ -411,14 +411,14 @@
                 this.resolved = Promise.resolve();
             }
             this.muted = new Set();
-            this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard);
+            this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
             this.destroyed = false;
         }
         loadWasmMatcher(pathToWasmFile) {
             return __awaiter(this, void 0, void 0, function* () {
                 yield init(pathToWasmFile);
                 this.is_match = is_match;
-                this.scan = new WildcardObject(this.data, this.options.delimeter, this.options.wildcard, this.is_match);
+                this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.is_match);
             });
         }
         same(newValue, oldValue) {
@@ -472,19 +472,19 @@
         cutPath(longer, shorter) {
             longer = this.cleanNotRecursivePath(longer);
             shorter = this.cleanNotRecursivePath(shorter);
-            const shorterPartsLen = this.getIndicesCount(this.options.delimeter, shorter);
-            const longerParts = this.getIndicesOf(this.options.delimeter, longer);
+            const shorterPartsLen = this.getIndicesCount(this.options.delimiter, shorter);
+            const longerParts = this.getIndicesOf(this.options.delimiter, longer);
             return longer.substr(0, longerParts[shorterPartsLen]);
         }
         trimPath(path) {
             path = this.cleanNotRecursivePath(path);
-            if (path.charAt(0) === this.options.delimeter) {
+            if (path.charAt(0) === this.options.delimiter) {
                 return path.substr(1);
             }
             return path;
         }
         split(path) {
-            return path === '' ? [] : path.split(this.options.delimeter);
+            return path === '' ? [] : path.split(this.options.delimiter);
         }
         isWildcard(path) {
             return path.includes(this.options.wildcard) || this.hasParams(path);
@@ -510,7 +510,7 @@
                     replaced: '',
                     name: '',
                 };
-                const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimeter}\\${this.options.param}]+)`, 'g');
+                const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimiter}\\${this.options.param}]+)`, 'g');
                 let param = reg.exec(part);
                 if (param) {
                     paramsInfo.params[partIndex].name = param[1];
@@ -526,7 +526,7 @@
                 fullReplaced.push(paramsInfo.params[partIndex].replaced);
                 partIndex++;
             }
-            paramsInfo.replaced = fullReplaced.join(this.options.delimeter);
+            paramsInfo.replaced = fullReplaced.join(this.options.delimiter);
             return paramsInfo;
         }
         getParams(paramsInfo, path) {
@@ -890,7 +890,7 @@
                 const currentCuttedPath = this.cutPath(listenerPath, updatePath);
                 if (this.match(currentCuttedPath, updatePath)) {
                     const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
-                    const wildcardNewValues = new WildcardObject(newValue, this.options.delimeter, this.options.wildcard).get(restPath);
+                    const wildcardNewValues = new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(restPath);
                     const params = listenersCollection.paramsInfo
                         ? this.getParams(listenersCollection.paramsInfo, updatePath)
                         : undefined;
@@ -898,7 +898,7 @@
                     const bulkListeners = {};
                     for (const currentRestPath in wildcardNewValues) {
                         const value = () => wildcardNewValues[currentRestPath];
-                        const fullPath = [updatePath, currentRestPath].join(this.options.delimeter);
+                        const fullPath = [updatePath, currentRestPath].join(this.options.delimiter);
                         for (const [listenerId, listener] of listenersCollection.listeners) {
                             const eventInfo = {
                                 type,
@@ -965,10 +965,10 @@
                 return listeners;
             }
             for (const notifyPath of options.only) {
-                const wildcardScanNewValue = new WildcardObject(newValue, this.options.delimeter, this.options.wildcard).get(notifyPath);
+                const wildcardScanNewValue = new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(notifyPath);
                 listeners[notifyPath] = { bulk: [], single: [] };
                 for (const wildcardPath in wildcardScanNewValue) {
-                    const fullPath = updatePath + this.options.delimeter + wildcardPath;
+                    const fullPath = updatePath + this.options.delimiter + wildcardPath;
                     for (const [listenerPath, listenersCollection] of this.listeners) {
                         const params = listenersCollection.paramsInfo
                             ? this.getParams(listenersCollection.paramsInfo, fullPath)
@@ -1251,11 +1251,7 @@
                 : 0;
         }
     }
-    const State = DeepState;
 
-    exports.State = State;
-    exports.default = DeepState;
-
-    Object.defineProperty(exports, '__esModule', { value: true });
+    return DeepState;
 
 })));

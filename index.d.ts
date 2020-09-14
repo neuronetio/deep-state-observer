@@ -14,7 +14,7 @@ export interface ListenerFunctionEventInfo {
 export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
 export declare type Match = (path: string) => boolean;
 export interface Options {
-    delimeter?: string;
+    delimiter?: string;
     useMute?: boolean;
     notRecursive?: string;
     param?: string;
@@ -180,4 +180,3 @@ declare class DeepState {
     private debugTime;
 }
 export default DeepState;
-export declare const State: typeof DeepState;

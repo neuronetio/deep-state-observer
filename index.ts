@@ -24,7 +24,7 @@ export type ListenerFunction = (
 export type Match = (path: string) => boolean;
 
 export interface Options {
-  delimeter?: string;
+  delimiter?: string;
   useMute?: boolean;
   notRecursive?: string;
   param?: string;
@@ -140,7 +140,7 @@ function log(message: string, info: any) {
 
 function getDefaultOptions(): Options {
   return {
-    delimeter: `.`,
+    delimiter: `.`,
     useMute: true,
     notRecursive: `;`,
     param: `:`,
@@ -209,7 +209,7 @@ class DeepState {
     this.muted = new Set();
     this.scan = new WildcardObject(
       this.data,
-      this.options.delimeter,
+      this.options.delimiter,
       this.options.wildcard
     );
     this.destroyed = false;
@@ -220,7 +220,7 @@ class DeepState {
     this.is_match = is_match;
     this.scan = new WildcardObject(
       this.data,
-      this.options.delimeter,
+      this.options.delimiter,
       this.options.wildcard,
       this.is_match
     );
@@ -288,23 +288,23 @@ class DeepState {
     longer = this.cleanNotRecursivePath(longer);
     shorter = this.cleanNotRecursivePath(shorter);
     const shorterPartsLen = this.getIndicesCount(
-      this.options.delimeter,
+      this.options.delimiter,
       shorter
     );
-    const longerParts = this.getIndicesOf(this.options.delimeter, longer);
+    const longerParts = this.getIndicesOf(this.options.delimiter, longer);
     return longer.substr(0, longerParts[shorterPartsLen]);
   }
 
   private trimPath(path: string): string {
     path = this.cleanNotRecursivePath(path);
-    if (path.charAt(0) === this.options.delimeter) {
+    if (path.charAt(0) === this.options.delimiter) {
       return path.substr(1);
     }
     return path;
   }
 
   private split(path: string) {
-    return path === '' ? [] : path.split(this.options.delimeter);
+    return path === '' ? [] : path.split(this.options.delimiter);
   }
 
   private isWildcard(path: string): boolean {
@@ -336,7 +336,7 @@ class DeepState {
         name: '',
       };
       const reg = new RegExp(
-        `\\${this.options.param}([^\\${this.options.delimeter}\\${this.options.param}]+)`,
+        `\\${this.options.param}([^\\${this.options.delimiter}\\${this.options.param}]+)`,
         'g'
       );
       let param = reg.exec(part);
@@ -356,7 +356,7 @@ class DeepState {
       fullReplaced.push(paramsInfo.params[partIndex].replaced);
       partIndex++;
     }
-    paramsInfo.replaced = fullReplaced.join(this.options.delimeter);
+    paramsInfo.replaced = fullReplaced.join(this.options.delimiter);
     return paramsInfo;
   }
 
@@ -792,7 +792,7 @@ class DeepState {
         );
         const wildcardNewValues = new WildcardObject(
           newValue,
-          this.options.delimeter,
+          this.options.delimiter,
           this.options.wildcard
         ).get(restPath);
         const params = listenersCollection.paramsInfo
@@ -803,7 +803,7 @@ class DeepState {
         for (const currentRestPath in wildcardNewValues) {
           const value = () => wildcardNewValues[currentRestPath];
           const fullPath = [updatePath, currentRestPath].join(
-            this.options.delimeter
+            this.options.delimiter
           );
           for (const [listenerId, listener] of listenersCollection.listeners) {
             const eventInfo = {
@@ -898,12 +898,12 @@ class DeepState {
     for (const notifyPath of options.only) {
       const wildcardScanNewValue = new WildcardObject(
         newValue,
-        this.options.delimeter,
+        this.options.delimiter,
         this.options.wildcard
       ).get(notifyPath);
       listeners[notifyPath] = { bulk: [], single: [] };
       for (const wildcardPath in wildcardScanNewValue) {
-        const fullPath = updatePath + this.options.delimeter + wildcardPath;
+        const fullPath = updatePath + this.options.delimiter + wildcardPath;
         for (const [listenerPath, listenersCollection] of this.listeners) {
           const params = listenersCollection.paramsInfo
             ? this.getParams(listenersCollection.paramsInfo, fullPath)
@@ -1295,4 +1295,3 @@ class DeepState {
   }
 }
 export default DeepState;
-export const State = DeepState;

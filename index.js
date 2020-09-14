@@ -84,7 +84,8 @@ function log(message, info) {
 }
 function getDefaultOptions() {
     return {
-        delimeter: ".",
+        delimiter: ".",
+        useMute: true,
         notRecursive: ";",
         param: ":",
         wildcard: "*",
@@ -135,7 +136,8 @@ var DeepState = /** @class */ (function () {
         else {
             this.resolved = Promise.resolve();
         }
-        this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimeter, this.options.wildcard);
+        this.muted = new Set();
+        this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard);
         this.destroyed = false;
     }
     DeepState.prototype.loadWasmMatcher = function (pathToWasmFile) {
@@ -146,7 +148,7 @@ var DeepState = /** @class */ (function () {
                     case 1:
                         _a.sent();
                         this.is_match = wildcard_matcher_js_1.is_match;
-                        this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimeter, this.options.wildcard, this.is_match);
+                        this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard, this.is_match);
                         return [2 /*return*/];
                 }
             });
@@ -203,22 +205,22 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.cutPath = function (longer, shorter) {
         longer = this.cleanNotRecursivePath(longer);
         shorter = this.cleanNotRecursivePath(shorter);
-        var shorterPartsLen = this.getIndicesCount(this.options.delimeter, shorter);
-        var longerParts = this.getIndicesOf(this.options.delimeter, longer);
+        var shorterPartsLen = this.getIndicesCount(this.options.delimiter, shorter);
+        var longerParts = this.getIndicesOf(this.options.delimiter, longer);
         return longer.substr(0, longerParts[shorterPartsLen]);
     };
     DeepState.prototype.trimPath = function (path) {
         path = this.cleanNotRecursivePath(path);
-        if (path.charAt(0) === this.options.delimeter) {
+        if (path.charAt(0) === this.options.delimiter) {
             return path.substr(1);
         }
         return path;
     };
     DeepState.prototype.split = function (path) {
-        return path === '' ? [] : path.split(this.options.delimeter);
+        return path === '' ? [] : path.split(this.options.delimiter);
     };
     DeepState.prototype.isWildcard = function (path) {
-        return path.includes(this.options.wildcard);
+        return path.includes(this.options.wildcard) || this.hasParams(path);
     };
     DeepState.prototype.isNotRecursive = function (path) {
         return path.endsWith(this.options.notRecursive);
@@ -244,7 +246,7 @@ var DeepState = /** @class */ (function () {
                     replaced: '',
                     name: ''
                 };
-                var reg = new RegExp("\\" + this.options.param + "([^\\" + this.options.delimeter + "\\" + this.options.param + "]+)", 'g');
+                var reg = new RegExp("\\" + this.options.param + "([^\\" + this.options.delimiter + "\\" + this.options.param + "]+)", 'g');
                 var param = reg.exec(part);
                 if (param) {
                     paramsInfo.params[partIndex].name = param[1];
@@ -268,7 +270,7 @@ var DeepState = /** @class */ (function () {
             }
             finally { if (e_1) throw e_1.error; }
         }
-        paramsInfo.replaced = fullReplaced.join(this.options.delimeter);
+        paramsInfo.replaced = fullReplaced.join(this.options.delimiter);
         return paramsInfo;
     };
     DeepState.prototype.getParams = function (paramsInfo, path) {
@@ -388,7 +390,7 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.getCleanListenersCollection = function (values) {
         if (values === void 0) { values = {}; }
-        return __assign({ listeners: new Map(), isRecursive: false, isWildcard: false, hasParams: false, match: undefined, paramsInfo: undefined, path: undefined, count: 0 }, values);
+        return __assign({ listeners: new Map(), isRecursive: false, isWildcard: false, hasParams: false, match: undefined, paramsInfo: undefined, path: undefined, originalPath: undefined, count: 0 }, values);
     };
     DeepState.prototype.getCleanListener = function (fn, options) {
         if (options === void 0) { options = defaultListenerOptions; }
@@ -414,27 +416,23 @@ var DeepState = /** @class */ (function () {
             listenersCollection_1.listeners.set(++this.id, listener);
             return listenersCollection_1;
         }
+        var hasParams = this.hasParams(listenerPath);
+        var paramsInfo;
+        if (hasParams) {
+            paramsInfo = this.getParamsInfo(listenerPath);
+        }
         var collCfg = {
-            isRecursive: true,
-            isWildcard: false,
-            hasParams: false,
-            paramsInfo: undefined,
+            isRecursive: !this.isNotRecursive(listenerPath),
+            isWildcard: this.isWildcard(listenerPath),
+            hasParams: hasParams,
+            paramsInfo: paramsInfo,
             originalPath: listenerPath,
-            path: listenerPath
+            path: hasParams ? paramsInfo.replaced : listenerPath
         };
-        if (this.hasParams(collCfg.path)) {
-            collCfg.paramsInfo = this.getParamsInfo(collCfg.path);
-            collCfg.path = collCfg.paramsInfo.replaced;
-            collCfg.hasParams = true;
-        }
-        collCfg.isWildcard = this.isWildcard(collCfg.path);
-        if (this.isNotRecursive(collCfg.path)) {
-            collCfg.isRecursive = false;
-        }
         var listenersCollection = this.getCleanListenersCollection(__assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
         this.id++;
         listenersCollection.listeners.set(this.id, listener);
-        this.listeners.set(collCfg.path, listenersCollection);
+        this.listeners.set(collCfg.originalPath, listenersCollection);
         return listenersCollection;
     };
     DeepState.prototype.subscribe = function (listenerPath, fn, options, type) {
@@ -447,31 +445,33 @@ var DeepState = /** @class */ (function () {
         this.listenersIgnoreCache.set(listener, { truthy: [], falsy: [] });
         var listenersCollection = this.getListenersCollection(listenerPath, listener);
         listenersCollection.count++;
-        listenerPath = listenersCollection.path;
+        var cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
         if (!listenersCollection.isWildcard) {
-            fn(this.pathGet(this.split(this.cleanNotRecursivePath(listenerPath)), this.data), {
-                type: type,
-                listener: listener,
-                listenersCollection: listenersCollection,
-                path: {
-                    listener: listenerPath,
-                    update: undefined,
-                    resolved: this.cleanNotRecursivePath(listenerPath)
-                },
-                params: this.getParams(listenersCollection.paramsInfo, listenerPath),
-                options: options
-            });
+            if (!this.isMuted(cleanPath))
+                fn(this.pathGet(this.split(cleanPath), this.data), {
+                    type: type,
+                    listener: listener,
+                    listenersCollection: listenersCollection,
+                    path: {
+                        listener: listenerPath,
+                        update: undefined,
+                        resolved: this.cleanNotRecursivePath(listenerPath)
+                    },
+                    params: this.getParams(listenersCollection.paramsInfo, cleanPath),
+                    options: options
+                });
         }
         else {
-            var paths = this.scan.get(this.cleanNotRecursivePath(listenerPath));
+            var paths = this.scan.get(cleanPath);
             if (options.bulk) {
                 var bulkValue = [];
                 for (var path in paths) {
-                    bulkValue.push({
-                        path: path,
-                        params: this.getParams(listenersCollection.paramsInfo, path),
-                        value: paths[path]
-                    });
+                    if (!this.isMuted(path))
+                        bulkValue.push({
+                            path: path,
+                            params: this.getParams(listenersCollection.paramsInfo, path),
+                            value: paths[path]
+                        });
                 }
                 fn(bulkValue, {
                     type: type,
@@ -488,18 +488,19 @@ var DeepState = /** @class */ (function () {
             }
             else {
                 for (var path in paths) {
-                    fn(paths[path], {
-                        type: type,
-                        listener: listener,
-                        listenersCollection: listenersCollection,
-                        path: {
-                            listener: listenerPath,
-                            update: undefined,
-                            resolved: this.cleanNotRecursivePath(path)
-                        },
-                        params: this.getParams(listenersCollection.paramsInfo, path),
-                        options: options
-                    });
+                    if (!this.isMuted(path))
+                        fn(paths[path], {
+                            type: type,
+                            listener: listener,
+                            listenersCollection: listenersCollection,
+                            path: {
+                                listener: listenerPath,
+                                update: undefined,
+                                resolved: this.cleanNotRecursivePath(path)
+                            },
+                            params: this.getParams(listenersCollection.paramsInfo, path),
+                            options: options
+                        });
                 }
             }
         }
@@ -553,6 +554,8 @@ var DeepState = /** @class */ (function () {
         if (returnNotified === void 0) { returnNotified = true; }
         var alreadyNotified = [];
         for (var path in listeners) {
+            if (this.isMuted(path))
+                continue;
             var _c = listeners[path], single = _c.single, bulk = _c.bulk;
             var _loop_1 = function (singleListener) {
                 if (exclude.includes(singleListener))
@@ -768,7 +771,7 @@ var DeepState = /** @class */ (function () {
             var currentCuttedPath = this_4.cutPath(listenerPath, updatePath);
             if (this_4.match(currentCuttedPath, updatePath)) {
                 var restPath = this_4.trimPath(listenerPath.substr(currentCuttedPath.length));
-                var wildcardNewValues_1 = new wildcard_object_scan_1["default"](newValue, this_4.options.delimeter, this_4.options.wildcard).get(restPath);
+                var wildcardNewValues_1 = new wildcard_object_scan_1["default"](newValue, this_4.options.delimiter, this_4.options.wildcard).get(restPath);
                 var params = listenersCollection.paramsInfo
                     ? this_4.getParams(listenersCollection.paramsInfo, updatePath)
                     : undefined;
@@ -777,7 +780,7 @@ var DeepState = /** @class */ (function () {
                 var _loop_5 = function (currentRestPath) {
                     var e_13, _a;
                     var value = function () { return wildcardNewValues_1[currentRestPath]; };
-                    var fullPath = [updatePath, currentRestPath].join(this_4.options.delimeter);
+                    var fullPath = [updatePath, currentRestPath].join(this_4.options.delimiter);
                     try {
                         for (var _b = (e_13 = void 0, __values(listenersCollection.listeners)), _c = _b.next(); !_c.done; _c = _b.next()) {
                             var _d = __read(_c.value, 2), listenerId = _d[0], listener = _d[1];
@@ -876,11 +879,11 @@ var DeepState = /** @class */ (function () {
             return listeners;
         }
         var _loop_6 = function (notifyPath) {
-            var wildcardScanNewValue = new wildcard_object_scan_1["default"](newValue, this_5.options.delimeter, this_5.options.wildcard).get(notifyPath);
+            var wildcardScanNewValue = new wildcard_object_scan_1["default"](newValue, this_5.options.delimiter, this_5.options.wildcard).get(notifyPath);
             listeners[notifyPath] = { bulk: [], single: [] };
             var _loop_7 = function (wildcardPath) {
                 var e_15, _a, e_16, _b;
-                var fullPath = updatePath + this_5.options.delimeter + wildcardPath;
+                var fullPath = updatePath + this_5.options.delimiter + wildcardPath;
                 try {
                     for (var _c = (e_15 = void 0, __values(this_5.listeners)), _d = _c.next(); !_d.done; _d = _c.next()) {
                         var _e = __read(_d.value, 2), listenerPath = _e[0], listenersCollection = _e[1];
@@ -1202,6 +1205,34 @@ var DeepState = /** @class */ (function () {
             }
         });
     };
+    DeepState.prototype.isMuted = function (path) {
+        var e_20, _a;
+        if (!this.options.useMute)
+            return false;
+        try {
+            for (var _b = __values(this.muted), _c = _b.next(); !_c.done; _c = _b.next()) {
+                var mutedPath = _c.value;
+                if (this.match(path, mutedPath))
+                    return true;
+                if (this.match(mutedPath, path))
+                    return true;
+            }
+        }
+        catch (e_20_1) { e_20 = { error: e_20_1 }; }
+        finally {
+            try {
+                if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
+            }
+            finally { if (e_20) throw e_20.error; }
+        }
+        return false;
+    };
+    DeepState.prototype.mute = function (path) {
+        this.muted.add(path);
+    };
+    DeepState.prototype.unmute = function (path) {
+        this.muted["delete"](path);
+    };
     DeepState.prototype.debugSubscribe = function (listener, listenersCollection, listenerPath) {
         if (listener.options.debug) {
             this.options.log('listener subscribed', {
@@ -1229,4 +1260,3 @@ var DeepState = /** @class */ (function () {
     return DeepState;
 }());
 exports["default"] = DeepState;
-exports.State = DeepState;

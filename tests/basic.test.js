@@ -1,4 +1,4 @@
-const { State } = require('../index.cjs.js');
+const State = require('../index.cjs.js');
 const path = require('path');
 const fs = require('fs');
 
@@ -139,7 +139,7 @@ describe('State', () => {
     const state = new State({
       one: {
         two: { three: { four: { five: 5 } } },
-        '2': { three: { four: { five: 5, six: 6 } } },
+        2: { three: { four: { five: 5, six: 6 } } },
       },
     });
     const paths = [];
@@ -314,7 +314,7 @@ describe('State', () => {
     expect(paths[0]).toEqual('one.two');
     expect(values[0]).toEqual({
       1: { x: 1 },
-      '2': { x: 2 },
+      2: { x: 2 },
       3: { x: 3 },
     });
 
@@ -324,7 +324,7 @@ describe('State', () => {
     expect(paths[1]).toEqual('one.two.2.x');
     expect(values[1]).toEqual({
       1: { x: 1 },
-      '2': { x: 22 },
+      2: { x: 22 },
       3: { x: 3 },
     });
   });

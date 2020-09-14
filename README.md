@@ -25,7 +25,7 @@ Deep state observer is framework agnostic with node and browser support, so you 
 
 ```javascript
 import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+import State from 'deep-state-observer'; // const State = require('deep-state-observer');
 
 // first parameter is an object that hold the state, and the second one is just options
 const state = new State({
@@ -35,7 +35,7 @@ const state = new State({
     }
   },
   // options
-  { delimeter:'.' , notRecursive:';',  param: ':', log: console.log }
+  { delimiter:'.' , notRecursive:';',  param: ':', log: console.log }
 );
 
 // store some unsubscribe methods
@@ -88,9 +88,9 @@ onDestroy(() => {
 
 ```javascript
 import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+import State from 'deep-state-observer'; // const State = require('deep-state-observer');
 
-// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
+// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimiter :P )
 const state = new State({
   some: { thing: { test: 0 } },
   someOther: { nested: { node: 'ok' } },
@@ -119,9 +119,9 @@ onDestroy(() => {
 
 ```javascript
 import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+import State from 'deep-state-observer'; // const State = require('deep-state-observer');
 
-// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
+// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimiter :P )
 const state = new State({
   items: [{ val: 1 }, { val: 2 }, { val: 3 }],
   byId: {
@@ -184,9 +184,9 @@ onDestroy(() => {
 
 ```javascript
 import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+import State from 'deep-state-observer'; // const State = require('deep-state-observer');
 
-// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimeter :P )
+// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimiter :P )
 const state = new State({
   byId: {
     1: { val: 1 },
@@ -259,7 +259,7 @@ onDestroy(() => {
 
 ```javascript
 import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const { State } = require('deep-state-observer');
+import State from 'deep-state-observer'; // const State = require('deep-state-observer');
 
 const state = new State({
   some: 'value',
