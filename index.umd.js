@@ -1105,7 +1105,7 @@
                 const self = this;
                 return function () {
                     const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
-                    this.sortAndRunQueue(queue);
+                    self.sortAndRunQueue(queue);
                 };
             }
             const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);

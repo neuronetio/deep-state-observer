@@ -1116,7 +1116,7 @@ var DeepState = /** @class */ (function () {
             var self_1 = this;
             return function () {
                 var queue = self_1.wildcardNotify(groupedListenersPack, waitingPaths);
-                this.sortAndRunQueue(queue);
+                self_1.sortAndRunQueue(queue);
             };
         }
         var queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
