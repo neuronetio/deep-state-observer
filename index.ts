@@ -34,6 +34,7 @@ export interface Options {
   maxSimultaneousJobs?: number;
   maxQueueRuns?: number;
   log?: (message: string, info: any) => void;
+  debug?: boolean;
   Promise?: Promise<unknown> | any;
 }
 
@@ -981,6 +982,18 @@ class DeepState {
     return listeners;
   }
 
+  private sortAndRunQueue(queue: Queue[]) {
+    queue.sort(function (a, b) {
+      return a.id - b.id;
+    });
+    if (this.options.debug) {
+      console.log('queue', queue);
+    }
+    for (const q of queue) {
+      q.fn();
+    }
+  }
+
   private notifyOnly(
     updatePath: string,
     newValue,
@@ -997,12 +1010,7 @@ class DeepState {
         originalPath
       )
     );
-    queue.sort(function (a, b) {
-      return a.id - b.id;
-    });
-    for (const q of queue) {
-      q.fn();
-    }
+    this.sortAndRunQueue(queue);
   }
 
   private canBeNested(newValue): boolean {
@@ -1093,21 +1101,11 @@ class DeepState {
       const self = this;
       return function () {
         const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
-        queue.sort(function (a, b) {
-          return a.id - b.id;
-        });
-        for (const q of queue) {
-          q.fn();
-        }
+        this.sortAndRunQueue(queue);
       };
     }
     const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
-    queue.sort(function (a, b) {
-      return a.id - b.id;
-    });
-    for (const q of queue) {
-      q.fn();
-    }
+    this.sortAndRunQueue(queue);
   }
 
   private runUpdateQueue() {
@@ -1142,12 +1140,7 @@ class DeepState {
         queue
       );
     }
-    queue.sort((a, b) => {
-      return a.id - b.id;
-    });
-    for (const q of queue) {
-      q.fn();
-    }
+    this.sortAndRunQueue(queue);
     this.executeWaitingListeners(updatePath);
   }
 

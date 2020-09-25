@@ -24,6 +24,7 @@ export interface Options {
     maxSimultaneousJobs?: number;
     maxQueueRuns?: number;
     log?: (message: string, info: any) => void;
+    debug?: boolean;
     Promise?: Promise<unknown> | any;
 }
 export interface ListenerOptions {
@@ -161,6 +162,7 @@ declare class DeepState {
     private getNestedListeners;
     private notifyNestedListeners;
     private getNotifyOnlyListeners;
+    private sortAndRunQueue;
     private notifyOnly;
     private canBeNested;
     private getUpdateValues;

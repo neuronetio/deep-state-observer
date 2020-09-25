@@ -1033,14 +1033,20 @@ class DeepState {
         }
         return listeners;
     }
-    notifyOnly(updatePath, newValue, options, type = 'update', originalPath = '') {
-        const queue = this.getQueueNotifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath));
+    sortAndRunQueue(queue) {
         queue.sort(function (a, b) {
             return a.id - b.id;
         });
+        if (this.options.debug) {
+            console.log('queue', queue);
+        }
         for (const q of queue) {
             q.fn();
         }
+    }
+    notifyOnly(updatePath, newValue, options, type = 'update', originalPath = '') {
+        const queue = this.getQueueNotifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath));
+        this.sortAndRunQueue(queue);
     }
     canBeNested(newValue) {
         return typeof newValue === 'object' && newValue !== null;
@@ -1095,21 +1101,11 @@ class DeepState {
             const self = this;
             return function () {
                 const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
-                queue.sort(function (a, b) {
-                    return a.id - b.id;
-                });
-                for (const q of queue) {
-                    q.fn();
-                }
+                this.sortAndRunQueue(queue);
             };
         }
         const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
-        queue.sort(function (a, b) {
-            return a.id - b.id;
-        });
-        for (const q of queue) {
-            q.fn();
-        }
+        this.sortAndRunQueue(queue);
     }
     runUpdateQueue() {
         if (this.destroyed)
@@ -1126,12 +1122,7 @@ class DeepState {
         if (this.canBeNested(newValue)) {
             this.notifyNestedListeners(updatePath, newValue, options, 'update', queue);
         }
-        queue.sort((a, b) => {
-            return a.id - b.id;
-        });
-        for (const q of queue) {
-            q.fn();
-        }
+        this.sortAndRunQueue(queue);
         this.executeWaitingListeners(updatePath);
     }
     updateNotifyOnly(updatePath, newValue, options) {
