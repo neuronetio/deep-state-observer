@@ -58,6 +58,12 @@ export interface UpdateOptions {
 export interface Listener {
   fn: ListenerFunction;
   options: ListenerOptions;
+  id?: number;
+}
+
+export interface Queue {
+  id: number;
+  fn: () => void;
 }
 
 export interface GroupedListener {
@@ -479,6 +485,7 @@ class DeepState {
     if (this.listeners.has(listenerPath)) {
       let listenersCollection = this.listeners.get(listenerPath);
       listenersCollection.listeners.set(++this.id, listener);
+      listener.id = this.id;
       return listenersCollection;
     }
     const hasParams = this.hasParams(listenerPath);
@@ -504,6 +511,7 @@ class DeepState {
     });
     this.id++;
     listenersCollection.listeners.set(this.id, listener);
+    listener.id = this.id;
     this.listeners.set(collCfg.originalPath, listenersCollection);
     return listenersCollection;
   }
@@ -622,17 +630,22 @@ class DeepState {
     }
   }
 
-  private notifyListeners(
+  private getQueueNotifyListeners(
     listeners: GroupedListeners,
-    exclude: GroupedListener[] = [],
-    returnNotified: boolean = true
-  ): GroupedListener[] {
-    const alreadyNotified = [];
+    queue: Queue[] = []
+  ): Queue[] {
     for (const path in listeners) {
       if (this.isMuted(path)) continue;
       let { single, bulk } = listeners[path];
       for (const singleListener of single) {
-        if (exclude.includes(singleListener)) continue;
+        let alreadyInQueue = false;
+        for (const excludedListener of queue) {
+          if (excludedListener.id === singleListener.listener.id) {
+            alreadyInQueue = true;
+            break;
+          }
+        }
+        if (alreadyInQueue) continue;
         const time = this.debugTime(singleListener);
         if (singleListener.listener.options.queue && this.jobsRunning) {
           this.subscribeQueue.push(() => {
@@ -642,16 +655,27 @@ class DeepState {
             );
           });
         } else {
-          singleListener.listener.fn(
-            singleListener.value(),
-            singleListener.eventInfo
-          );
+          queue.push({
+            id: singleListener.listener.id,
+            fn: () => {
+              singleListener.listener.fn(
+                singleListener.value(),
+                singleListener.eventInfo
+              );
+            },
+          });
         }
-        if (returnNotified) alreadyNotified.push(singleListener);
         this.debugListener(time, singleListener);
       }
       for (const bulkListener of bulk) {
-        if (exclude.includes(bulkListener)) continue;
+        let alreadyInQueue = false;
+        for (const excludedListener of queue) {
+          if (excludedListener.id === bulkListener.listener.id) {
+            alreadyInQueue = true;
+            break;
+          }
+        }
+        if (alreadyInQueue) continue;
         const time = this.debugTime(bulkListener);
         const bulkValue = [];
         for (const bulk of bulkListener.value) {
@@ -666,14 +690,18 @@ class DeepState {
             return false;
           });
         } else {
-          bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+          queue.push({
+            id: bulkListener.listener.id,
+            fn: () => {
+              bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+            },
+          });
         }
-        if (returnNotified) alreadyNotified.push(bulkListener);
         this.debugListener(time, bulkListener);
       }
     }
     Promise.resolve().then(() => this.runQueuedListeners());
-    return alreadyNotified;
+    return queue;
   }
 
   private shouldIgnore(listener: Listener, updatePath: string): boolean {
@@ -763,8 +791,8 @@ class DeepState {
     options: UpdateOptions,
     type: string = 'update',
     originalPath: string = null
-  ): GroupedListener[] {
-    return this.notifyListeners(
+  ): Queue[] {
+    return this.getQueueNotifyListeners(
       this.getSubscribedListeners(
         updatePath,
         newValue,
@@ -863,10 +891,10 @@ class DeepState {
     newValue,
     options: UpdateOptions,
     type: string = 'update',
-    alreadyNotified: GroupedListener[],
+    queue: Queue[],
     originalPath: string = null
   ) {
-    return this.notifyListeners(
+    return this.getQueueNotifyListeners(
       this.getNestedListeners(
         updatePath,
         newValue,
@@ -874,8 +902,7 @@ class DeepState {
         type,
         originalPath
       ),
-      alreadyNotified,
-      false
+      queue
     );
   }
 
@@ -960,18 +987,22 @@ class DeepState {
     options: UpdateOptions,
     type: string = 'update',
     originalPath: string = ''
-  ): boolean {
-    return (
-      typeof this.notifyListeners(
-        this.getNotifyOnlyListeners(
-          updatePath,
-          newValue,
-          options,
-          type,
-          originalPath
-        )
-      )[0] !== 'undefined'
+  ) {
+    const queue = this.getQueueNotifyListeners(
+      this.getNotifyOnlyListeners(
+        updatePath,
+        newValue,
+        options,
+        type,
+        originalPath
+      )
     );
+    queue.sort(function (a, b) {
+      return a.id - b.id;
+    });
+    for (const q of queue) {
+      q.fn();
+    }
   }
 
   private canBeNested(newValue): boolean {
@@ -987,17 +1018,15 @@ class DeepState {
   }
 
   private wildcardNotify(groupedListenersPack, waitingPaths) {
-    let alreadyNotified = [];
+    let queue = [];
     for (const groupedListeners of groupedListenersPack) {
-      const notified = this.notifyListeners(groupedListeners, alreadyNotified);
-      for (const notifiedId of notified) {
-        alreadyNotified.push(notifiedId);
-      }
+      this.getQueueNotifyListeners(groupedListeners, queue);
     }
     for (const path of waitingPaths) {
       this.executeWaitingListeners(path);
     }
     this.jobsRunning--;
+    return queue;
   }
 
   private wildcardUpdate(
@@ -1063,10 +1092,22 @@ class DeepState {
     if (multi) {
       const self = this;
       return function () {
-        return self.wildcardNotify(groupedListenersPack, waitingPaths);
+        const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
+        queue.sort(function (a, b) {
+          return a.id - b.id;
+        });
+        for (const q of queue) {
+          q.fn();
+        }
       };
     }
-    this.wildcardNotify(groupedListenersPack, waitingPaths);
+    const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
+    queue.sort(function (a, b) {
+      return a.id - b.id;
+    });
+    for (const q of queue) {
+      q.fn();
+    }
   }
 
   private runUpdateQueue() {
@@ -1091,19 +1132,21 @@ class DeepState {
     newValue: unknown,
     options: UpdateOptions
   ) {
-    const alreadyNotified = this.notifySubscribedListeners(
-      updatePath,
-      newValue,
-      options
-    );
+    const queue = this.notifySubscribedListeners(updatePath, newValue, options);
     if (this.canBeNested(newValue)) {
       this.notifyNestedListeners(
         updatePath,
         newValue,
         options,
         'update',
-        alreadyNotified
+        queue
       );
+    }
+    queue.sort((a, b) => {
+      return a.id - b.id;
+    });
+    for (const q of queue) {
+      q.fn();
     }
     this.executeWaitingListeners(updatePath);
   }

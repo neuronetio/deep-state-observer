@@ -619,6 +619,7 @@ class DeepState {
         if (this.listeners.has(listenerPath)) {
             let listenersCollection = this.listeners.get(listenerPath);
             listenersCollection.listeners.set(++this.id, listener);
+            listener.id = this.id;
             return listenersCollection;
         }
         const hasParams = this.hasParams(listenerPath);
@@ -637,6 +638,7 @@ class DeepState {
         let listenersCollection = this.getCleanListenersCollection(Object.assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
         this.id++;
         listenersCollection.listeners.set(this.id, listener);
+        listener.id = this.id;
         this.listeners.set(collCfg.originalPath, listenersCollection);
         return listenersCollection;
     }
@@ -750,14 +752,20 @@ class DeepState {
             }
         }
     }
-    notifyListeners(listeners, exclude = [], returnNotified = true) {
-        const alreadyNotified = [];
+    getQueueNotifyListeners(listeners, queue = []) {
         for (const path in listeners) {
             if (this.isMuted(path))
                 continue;
             let { single, bulk } = listeners[path];
             for (const singleListener of single) {
-                if (exclude.includes(singleListener))
+                let alreadyInQueue = false;
+                for (const excludedListener of queue) {
+                    if (excludedListener.id === singleListener.listener.id) {
+                        alreadyInQueue = true;
+                        break;
+                    }
+                }
+                if (alreadyInQueue)
                     continue;
                 const time = this.debugTime(singleListener);
                 if (singleListener.listener.options.queue && this.jobsRunning) {
@@ -766,14 +774,24 @@ class DeepState {
                     });
                 }
                 else {
-                    singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                    queue.push({
+                        id: singleListener.listener.id,
+                        fn: () => {
+                            singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                        },
+                    });
                 }
-                if (returnNotified)
-                    alreadyNotified.push(singleListener);
                 this.debugListener(time, singleListener);
             }
             for (const bulkListener of bulk) {
-                if (exclude.includes(bulkListener))
+                let alreadyInQueue = false;
+                for (const excludedListener of queue) {
+                    if (excludedListener.id === bulkListener.listener.id) {
+                        alreadyInQueue = true;
+                        break;
+                    }
+                }
+                if (alreadyInQueue)
                     continue;
                 const time = this.debugTime(bulkListener);
                 const bulkValue = [];
@@ -790,15 +808,18 @@ class DeepState {
                     });
                 }
                 else {
-                    bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                    queue.push({
+                        id: bulkListener.listener.id,
+                        fn: () => {
+                            bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                        },
+                    });
                 }
-                if (returnNotified)
-                    alreadyNotified.push(bulkListener);
                 this.debugListener(time, bulkListener);
             }
         }
         Promise.resolve().then(() => this.runQueuedListeners());
-        return alreadyNotified;
+        return queue;
     }
     shouldIgnore(listener, updatePath) {
         if (!listener.options.ignore)
@@ -877,7 +898,7 @@ class DeepState {
         return listeners;
     }
     notifySubscribedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
-        return this.notifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
+        return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
     }
     getNestedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
         const listeners = {};
@@ -949,8 +970,8 @@ class DeepState {
         }
         return listeners;
     }
-    notifyNestedListeners(updatePath, newValue, options, type = 'update', alreadyNotified, originalPath = null) {
-        return this.notifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), alreadyNotified, false);
+    notifyNestedListeners(updatePath, newValue, options, type = 'update', queue, originalPath = null) {
+        return this.getQueueNotifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), queue);
     }
     getNotifyOnlyListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
         const listeners = {};
@@ -1013,7 +1034,13 @@ class DeepState {
         return listeners;
     }
     notifyOnly(updatePath, newValue, options, type = 'update', originalPath = '') {
-        return (typeof this.notifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath))[0] !== 'undefined');
+        const queue = this.getQueueNotifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath));
+        queue.sort(function (a, b) {
+            return a.id - b.id;
+        });
+        for (const q of queue) {
+            q.fn();
+        }
     }
     canBeNested(newValue) {
         return typeof newValue === 'object' && newValue !== null;
@@ -1026,17 +1053,15 @@ class DeepState {
         return { newValue, oldValue };
     }
     wildcardNotify(groupedListenersPack, waitingPaths) {
-        let alreadyNotified = [];
+        let queue = [];
         for (const groupedListeners of groupedListenersPack) {
-            const notified = this.notifyListeners(groupedListeners, alreadyNotified);
-            for (const notifiedId of notified) {
-                alreadyNotified.push(notifiedId);
-            }
+            this.getQueueNotifyListeners(groupedListeners, queue);
         }
         for (const path of waitingPaths) {
             this.executeWaitingListeners(path);
         }
         this.jobsRunning--;
+        return queue;
     }
     wildcardUpdate(updatePath, fn, options = defaultUpdateOptions, multi = false) {
         ++this.jobsRunning;
@@ -1069,10 +1094,22 @@ class DeepState {
         if (multi) {
             const self = this;
             return function () {
-                return self.wildcardNotify(groupedListenersPack, waitingPaths);
+                const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
+                queue.sort(function (a, b) {
+                    return a.id - b.id;
+                });
+                for (const q of queue) {
+                    q.fn();
+                }
             };
         }
-        this.wildcardNotify(groupedListenersPack, waitingPaths);
+        const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
+        queue.sort(function (a, b) {
+            return a.id - b.id;
+        });
+        for (const q of queue) {
+            q.fn();
+        }
     }
     runUpdateQueue() {
         if (this.destroyed)
@@ -1085,9 +1122,15 @@ class DeepState {
         }
     }
     updateNotify(updatePath, newValue, options) {
-        const alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, options);
+        const queue = this.notifySubscribedListeners(updatePath, newValue, options);
         if (this.canBeNested(newValue)) {
-            this.notifyNestedListeners(updatePath, newValue, options, 'update', alreadyNotified);
+            this.notifyNestedListeners(updatePath, newValue, options, 'update', queue);
+        }
+        queue.sort((a, b) => {
+            return a.id - b.id;
+        });
+        for (const q of queue) {
+            q.fn();
         }
         this.executeWaitingListeners(updatePath);
     }

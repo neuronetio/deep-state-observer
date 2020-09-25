@@ -45,6 +45,11 @@ export interface UpdateOptions {
 export interface Listener {
     fn: ListenerFunction;
     options: ListenerOptions;
+    id?: number;
+}
+export interface Queue {
+    id: number;
+    fn: () => void;
 }
 export interface GroupedListener {
     listener: Listener;
@@ -149,7 +154,7 @@ declare class DeepState {
     subscribe(listenerPath: string, fn: ListenerFunction, options?: ListenerOptions, type?: string): () => void;
     private unsubscribe;
     private runQueuedListeners;
-    private notifyListeners;
+    private getQueueNotifyListeners;
     private shouldIgnore;
     private getSubscribedListeners;
     private notifySubscribedListeners;
