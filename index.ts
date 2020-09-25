@@ -894,7 +894,7 @@ class DeepState {
     type: string = 'update',
     queue: Queue[],
     originalPath: string = null
-  ) {
+  ): Queue[] {
     return this.getQueueNotifyListeners(
       this.getNestedListeners(
         updatePath,

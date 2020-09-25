@@ -1293,14 +1293,15 @@ describe('State', () => {
       values.push(4);
     }
 
-    state.subscribeAll(['nested;'], first, { bulk: true });
+    state.subscribeAll(['nested'], first, { bulk: true });
     state.subscribe('nested.value.equals', second);
     state.subscribe('nested.value.equals', third, {
       bulk: true,
       ignore: ['nested.value.equals.test'],
     });
-    state.subscribeAll(['nested'], fourth);
+    state.subscribe('nested', fourth);
     expect(values).toEqual([1, 2, 3, 4]);
+
     values = [];
     state.update('nested', () => {
       return {
@@ -1309,6 +1310,24 @@ describe('State', () => {
             test: 'x',
           },
         },
+      };
+    });
+    expect(values).toEqual([1, 2, 3, 4]);
+
+    values = [];
+    state.update('nested.value', () => {
+      return {
+        equals: {
+          test: 'x',
+        },
+      };
+    });
+    expect(values).toEqual([1, 2, 3, 4]);
+
+    values = [];
+    state.update('nested.value.equals', () => {
+      return {
+        test: 'x',
       };
     });
     expect(values).toEqual([1, 2, 3, 4]);
