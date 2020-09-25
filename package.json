@@ -7,7 +7,7 @@
   "module": "index.js",
   "browser": "index.js",
   "scripts": {
-    "build": "rollup -c",
+    "build": "npm run types && rollup -c",
     "types": "tsc -d index.ts --downlevelIteration",
     "test": "node --max-old-space-size=8192 node_modules/jasmine/bin/jasmine.js --config=./jasmine.json",
     "bench": "node benchmark.js",

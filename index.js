@@ -414,6 +414,7 @@ var DeepState = /** @class */ (function () {
         if (this.listeners.has(listenerPath)) {
             var listenersCollection_1 = this.listeners.get(listenerPath);
             listenersCollection_1.listeners.set(++this.id, listener);
+            listener.id = this.id;
             return listenersCollection_1;
         }
         var hasParams = this.hasParams(listenerPath);
@@ -432,6 +433,7 @@ var DeepState = /** @class */ (function () {
         var listenersCollection = this.getCleanListenersCollection(__assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
         this.id++;
         listenersCollection.listeners.set(this.id, listener);
+        listener.id = this.id;
         this.listeners.set(collCfg.originalPath, listenersCollection);
         return listenersCollection;
     };
@@ -547,18 +549,34 @@ var DeepState = /** @class */ (function () {
             }
         }
     };
-    DeepState.prototype.notifyListeners = function (listeners, exclude, returnNotified) {
+    DeepState.prototype.getQueueNotifyListeners = function (listeners, queue) {
         var e_6, _a, e_7, _b;
         var _this = this;
-        if (exclude === void 0) { exclude = []; }
-        if (returnNotified === void 0) { returnNotified = true; }
-        var alreadyNotified = [];
+        if (queue === void 0) { queue = []; }
         for (var path in listeners) {
             if (this.isMuted(path))
                 continue;
             var _c = listeners[path], single = _c.single, bulk = _c.bulk;
             var _loop_1 = function (singleListener) {
-                if (exclude.includes(singleListener))
+                var e_8, _a;
+                var alreadyInQueue = false;
+                try {
+                    for (var queue_1 = (e_8 = void 0, __values(queue)), queue_1_1 = queue_1.next(); !queue_1_1.done; queue_1_1 = queue_1.next()) {
+                        var excludedListener = queue_1_1.value;
+                        if (excludedListener.id === singleListener.listener.id) {
+                            alreadyInQueue = true;
+                            break;
+                        }
+                    }
+                }
+                catch (e_8_1) { e_8 = { error: e_8_1 }; }
+                finally {
+                    try {
+                        if (queue_1_1 && !queue_1_1.done && (_a = queue_1["return"])) _a.call(queue_1);
+                    }
+                    finally { if (e_8) throw e_8.error; }
+                }
+                if (alreadyInQueue)
                     return "continue";
                 var time = this_1.debugTime(singleListener);
                 if (singleListener.listener.options.queue && this_1.jobsRunning) {
@@ -567,10 +585,13 @@ var DeepState = /** @class */ (function () {
                     });
                 }
                 else {
-                    singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                    queue.push({
+                        id: singleListener.listener.id,
+                        fn: function () {
+                            singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                        }
+                    });
                 }
-                if (returnNotified)
-                    alreadyNotified.push(singleListener);
                 this_1.debugListener(time, singleListener);
             };
             var this_1 = this;
@@ -588,23 +609,40 @@ var DeepState = /** @class */ (function () {
                 finally { if (e_6) throw e_6.error; }
             }
             var _loop_2 = function (bulkListener) {
-                var e_8, _a;
-                if (exclude.includes(bulkListener))
+                var e_9, _a, e_10, _b;
+                var alreadyInQueue = false;
+                try {
+                    for (var queue_2 = (e_9 = void 0, __values(queue)), queue_2_1 = queue_2.next(); !queue_2_1.done; queue_2_1 = queue_2.next()) {
+                        var excludedListener = queue_2_1.value;
+                        if (excludedListener.id === bulkListener.listener.id) {
+                            alreadyInQueue = true;
+                            break;
+                        }
+                    }
+                }
+                catch (e_9_1) { e_9 = { error: e_9_1 }; }
+                finally {
+                    try {
+                        if (queue_2_1 && !queue_2_1.done && (_a = queue_2["return"])) _a.call(queue_2);
+                    }
+                    finally { if (e_9) throw e_9.error; }
+                }
+                if (alreadyInQueue)
                     return "continue";
                 var time = this_2.debugTime(bulkListener);
                 var bulkValue = [];
                 try {
-                    for (var _b = (e_8 = void 0, __values(bulkListener.value)), _c = _b.next(); !_c.done; _c = _b.next()) {
-                        var bulk_2 = _c.value;
+                    for (var _c = (e_10 = void 0, __values(bulkListener.value)), _d = _c.next(); !_d.done; _d = _c.next()) {
+                        var bulk_2 = _d.value;
                         bulkValue.push(__assign({}, bulk_2, { value: bulk_2.value() }));
                     }
                 }
-                catch (e_8_1) { e_8 = { error: e_8_1 }; }
+                catch (e_10_1) { e_10 = { error: e_10_1 }; }
                 finally {
                     try {
-                        if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
+                        if (_d && !_d.done && (_b = _c["return"])) _b.call(_c);
                     }
-                    finally { if (e_8) throw e_8.error; }
+                    finally { if (e_10) throw e_10.error; }
                 }
                 if (bulkListener.listener.options.queue && this_2.jobsRunning) {
                     this_2.subscribeQueue.push(function () {
@@ -616,10 +654,13 @@ var DeepState = /** @class */ (function () {
                     });
                 }
                 else {
-                    bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                    queue.push({
+                        id: bulkListener.listener.id,
+                        fn: function () {
+                            bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                        }
+                    });
                 }
-                if (returnNotified)
-                    alreadyNotified.push(bulkListener);
                 this_2.debugListener(time, bulkListener);
             };
             var this_2 = this;
@@ -638,10 +679,10 @@ var DeepState = /** @class */ (function () {
             }
         }
         Promise.resolve().then(function () { return _this.runQueuedListeners(); });
-        return alreadyNotified;
+        return queue;
     };
     DeepState.prototype.shouldIgnore = function (listener, updatePath) {
-        var e_9, _a;
+        var e_11, _a;
         if (!listener.options.ignore)
             return false;
         try {
@@ -661,24 +702,24 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_9_1) { e_9 = { error: e_9_1 }; }
+        catch (e_11_1) { e_11 = { error: e_11_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_9) throw e_9.error; }
+            finally { if (e_11) throw e_11.error; }
         }
         return false;
     };
     DeepState.prototype.getSubscribedListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_10, _a;
+        var e_12, _a;
         var _this = this;
         if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
         options = __assign({}, defaultUpdateOptions, options);
         var listeners = {};
         var _loop_3 = function (listenerPath, listenersCollection) {
-            var e_11, _a;
+            var e_13, _a;
             listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
             if (listenersCollection.match(updatePath)) {
                 var params = listenersCollection.paramsInfo
@@ -689,7 +730,7 @@ var DeepState = /** @class */ (function () {
                 var value = traverse ? function () { return _this.get(cutPath_1); } : function () { return newValue; };
                 var bulkValue = [{ value: value, path: updatePath, params: params }];
                 try {
-                    for (var _b = (e_11 = void 0, __values(listenersCollection.listeners.values())), _c = _b.next(); !_c.done; _c = _b.next()) {
+                    for (var _b = (e_13 = void 0, __values(listenersCollection.listeners.values())), _c = _b.next(); !_c.done; _c = _b.next()) {
                         var listener = _c.value;
                         if (this_3.shouldIgnore(listener, updatePath))
                             continue;
@@ -731,12 +772,12 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_11_1) { e_11 = { error: e_11_1 }; }
+                catch (e_13_1) { e_13 = { error: e_13_1 }; }
                 finally {
                     try {
                         if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
                     }
-                    finally { if (e_11) throw e_11.error; }
+                    finally { if (e_13) throw e_13.error; }
                 }
             }
         };
@@ -747,22 +788,22 @@ var DeepState = /** @class */ (function () {
                 _loop_3(listenerPath, listenersCollection);
             }
         }
-        catch (e_10_1) { e_10 = { error: e_10_1 }; }
+        catch (e_12_1) { e_12 = { error: e_12_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_10) throw e_10.error; }
+            finally { if (e_12) throw e_12.error; }
         }
         return listeners;
     };
     DeepState.prototype.notifySubscribedListeners = function (updatePath, newValue, options, type, originalPath) {
         if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
-        return this.notifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
+        return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
     };
     DeepState.prototype.getNestedListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_12, _a;
+        var e_14, _a;
         if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
@@ -778,11 +819,11 @@ var DeepState = /** @class */ (function () {
                 var bulk = [];
                 var bulkListeners = {};
                 var _loop_5 = function (currentRestPath) {
-                    var e_13, _a;
+                    var e_15, _a;
                     var value = function () { return wildcardNewValues_1[currentRestPath]; };
                     var fullPath = [updatePath, currentRestPath].join(this_4.options.delimiter);
                     try {
-                        for (var _b = (e_13 = void 0, __values(listenersCollection.listeners)), _c = _b.next(); !_c.done; _c = _b.next()) {
+                        for (var _b = (e_15 = void 0, __values(listenersCollection.listeners)), _c = _b.next(); !_c.done; _c = _b.next()) {
                             var _d = __read(_c.value, 2), listenerId = _d[0], listener = _d[1];
                             var eventInfo = {
                                 type: type,
@@ -812,12 +853,12 @@ var DeepState = /** @class */ (function () {
                             }
                         }
                     }
-                    catch (e_13_1) { e_13 = { error: e_13_1 }; }
+                    catch (e_15_1) { e_15 = { error: e_15_1 }; }
                     finally {
                         try {
                             if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
                         }
-                        finally { if (e_13) throw e_13.error; }
+                        finally { if (e_15) throw e_15.error; }
                     }
                 };
                 for (var currentRestPath in wildcardNewValues_1) {
@@ -853,22 +894,22 @@ var DeepState = /** @class */ (function () {
                 _loop_4(listenerPath, listenersCollection);
             }
         }
-        catch (e_12_1) { e_12 = { error: e_12_1 }; }
+        catch (e_14_1) { e_14 = { error: e_14_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_12) throw e_12.error; }
+            finally { if (e_14) throw e_14.error; }
         }
         return listeners;
     };
-    DeepState.prototype.notifyNestedListeners = function (updatePath, newValue, options, type, alreadyNotified, originalPath) {
+    DeepState.prototype.notifyNestedListeners = function (updatePath, newValue, options, type, queue, originalPath) {
         if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
-        return this.notifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), alreadyNotified, false);
+        return this.getQueueNotifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), queue);
     };
     DeepState.prototype.getNotifyOnlyListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_14, _a;
+        var e_16, _a;
         if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
@@ -882,10 +923,10 @@ var DeepState = /** @class */ (function () {
             var wildcardScanNewValue = new wildcard_object_scan_1["default"](newValue, this_5.options.delimiter, this_5.options.wildcard).get(notifyPath);
             listeners[notifyPath] = { bulk: [], single: [] };
             var _loop_7 = function (wildcardPath) {
-                var e_15, _a, e_16, _b;
+                var e_17, _a, e_18, _b;
                 var fullPath = updatePath + this_5.options.delimiter + wildcardPath;
                 try {
-                    for (var _c = (e_15 = void 0, __values(this_5.listeners)), _d = _c.next(); !_d.done; _d = _c.next()) {
+                    for (var _c = (e_17 = void 0, __values(this_5.listeners)), _d = _c.next(); !_d.done; _d = _c.next()) {
                         var _e = __read(_d.value, 2), listenerPath = _e[0], listenersCollection = _e[1];
                         var params = listenersCollection.paramsInfo
                             ? this_5.getParams(listenersCollection.paramsInfo, fullPath)
@@ -928,27 +969,27 @@ var DeepState = /** @class */ (function () {
                                 }
                             };
                             try {
-                                for (var _f = (e_16 = void 0, __values(listenersCollection.listeners.values())), _g = _f.next(); !_g.done; _g = _f.next()) {
+                                for (var _f = (e_18 = void 0, __values(listenersCollection.listeners.values())), _g = _f.next(); !_g.done; _g = _f.next()) {
                                     var listener = _g.value;
                                     _loop_8(listener);
                                 }
                             }
-                            catch (e_16_1) { e_16 = { error: e_16_1 }; }
+                            catch (e_18_1) { e_18 = { error: e_18_1 }; }
                             finally {
                                 try {
                                     if (_g && !_g.done && (_b = _f["return"])) _b.call(_f);
                                 }
-                                finally { if (e_16) throw e_16.error; }
+                                finally { if (e_18) throw e_18.error; }
                             }
                         }
                     }
                 }
-                catch (e_15_1) { e_15 = { error: e_15_1 }; }
+                catch (e_17_1) { e_17 = { error: e_17_1 }; }
                 finally {
                     try {
                         if (_d && !_d.done && (_a = _c["return"])) _a.call(_c);
                     }
-                    finally { if (e_15) throw e_15.error; }
+                    finally { if (e_17) throw e_17.error; }
                 }
             };
             for (var wildcardPath in wildcardScanNewValue) {
@@ -962,19 +1003,42 @@ var DeepState = /** @class */ (function () {
                 _loop_6(notifyPath);
             }
         }
-        catch (e_14_1) { e_14 = { error: e_14_1 }; }
+        catch (e_16_1) { e_16 = { error: e_16_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_14) throw e_14.error; }
+            finally { if (e_16) throw e_16.error; }
         }
         return listeners;
+    };
+    DeepState.prototype.sortAndRunQueue = function (queue) {
+        var e_19, _a;
+        queue.sort(function (a, b) {
+            return a.id - b.id;
+        });
+        if (this.options.debug) {
+            console.log('queue', queue);
+        }
+        try {
+            for (var queue_3 = __values(queue), queue_3_1 = queue_3.next(); !queue_3_1.done; queue_3_1 = queue_3.next()) {
+                var q = queue_3_1.value;
+                q.fn();
+            }
+        }
+        catch (e_19_1) { e_19 = { error: e_19_1 }; }
+        finally {
+            try {
+                if (queue_3_1 && !queue_3_1.done && (_a = queue_3["return"])) _a.call(queue_3);
+            }
+            finally { if (e_19) throw e_19.error; }
+        }
     };
     DeepState.prototype.notifyOnly = function (updatePath, newValue, options, type, originalPath) {
         if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = ''; }
-        return (typeof this.notifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath))[0] !== 'undefined');
+        var queue = this.getQueueNotifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath));
+        this.sortAndRunQueue(queue);
     };
     DeepState.prototype.canBeNested = function (newValue) {
         return typeof newValue === 'object' && newValue !== null;
@@ -987,33 +1051,20 @@ var DeepState = /** @class */ (function () {
         return { newValue: newValue, oldValue: oldValue };
     };
     DeepState.prototype.wildcardNotify = function (groupedListenersPack, waitingPaths) {
-        var e_17, _a, e_18, _b, e_19, _c;
-        var alreadyNotified = [];
+        var e_20, _a, e_21, _b;
+        var queue = [];
         try {
             for (var groupedListenersPack_1 = __values(groupedListenersPack), groupedListenersPack_1_1 = groupedListenersPack_1.next(); !groupedListenersPack_1_1.done; groupedListenersPack_1_1 = groupedListenersPack_1.next()) {
                 var groupedListeners = groupedListenersPack_1_1.value;
-                var notified = this.notifyListeners(groupedListeners, alreadyNotified);
-                try {
-                    for (var notified_1 = (e_18 = void 0, __values(notified)), notified_1_1 = notified_1.next(); !notified_1_1.done; notified_1_1 = notified_1.next()) {
-                        var notifiedId = notified_1_1.value;
-                        alreadyNotified.push(notifiedId);
-                    }
-                }
-                catch (e_18_1) { e_18 = { error: e_18_1 }; }
-                finally {
-                    try {
-                        if (notified_1_1 && !notified_1_1.done && (_b = notified_1["return"])) _b.call(notified_1);
-                    }
-                    finally { if (e_18) throw e_18.error; }
-                }
+                this.getQueueNotifyListeners(groupedListeners, queue);
             }
         }
-        catch (e_17_1) { e_17 = { error: e_17_1 }; }
+        catch (e_20_1) { e_20 = { error: e_20_1 }; }
         finally {
             try {
                 if (groupedListenersPack_1_1 && !groupedListenersPack_1_1.done && (_a = groupedListenersPack_1["return"])) _a.call(groupedListenersPack_1);
             }
-            finally { if (e_17) throw e_17.error; }
+            finally { if (e_20) throw e_20.error; }
         }
         try {
             for (var waitingPaths_1 = __values(waitingPaths), waitingPaths_1_1 = waitingPaths_1.next(); !waitingPaths_1_1.done; waitingPaths_1_1 = waitingPaths_1.next()) {
@@ -1021,14 +1072,15 @@ var DeepState = /** @class */ (function () {
                 this.executeWaitingListeners(path);
             }
         }
-        catch (e_19_1) { e_19 = { error: e_19_1 }; }
+        catch (e_21_1) { e_21 = { error: e_21_1 }; }
         finally {
             try {
-                if (waitingPaths_1_1 && !waitingPaths_1_1.done && (_c = waitingPaths_1["return"])) _c.call(waitingPaths_1);
+                if (waitingPaths_1_1 && !waitingPaths_1_1.done && (_b = waitingPaths_1["return"])) _b.call(waitingPaths_1);
             }
-            finally { if (e_19) throw e_19.error; }
+            finally { if (e_21) throw e_21.error; }
         }
         this.jobsRunning--;
+        return queue;
     };
     DeepState.prototype.wildcardUpdate = function (updatePath, fn, options, multi) {
         if (options === void 0) { options = defaultUpdateOptions; }
@@ -1063,10 +1115,12 @@ var DeepState = /** @class */ (function () {
         if (multi) {
             var self_1 = this;
             return function () {
-                return self_1.wildcardNotify(groupedListenersPack, waitingPaths);
+                var queue = self_1.wildcardNotify(groupedListenersPack, waitingPaths);
+                this.sortAndRunQueue(queue);
             };
         }
-        this.wildcardNotify(groupedListenersPack, waitingPaths);
+        var queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
+        this.sortAndRunQueue(queue);
     };
     DeepState.prototype.runUpdateQueue = function () {
         if (this.destroyed)
@@ -1079,10 +1133,11 @@ var DeepState = /** @class */ (function () {
         }
     };
     DeepState.prototype.updateNotify = function (updatePath, newValue, options) {
-        var alreadyNotified = this.notifySubscribedListeners(updatePath, newValue, options);
+        var queue = this.notifySubscribedListeners(updatePath, newValue, options);
         if (this.canBeNested(newValue)) {
-            this.notifyNestedListeners(updatePath, newValue, options, 'update', alreadyNotified);
+            this.notifyNestedListeners(updatePath, newValue, options, 'update', queue);
         }
+        this.sortAndRunQueue(queue);
         this.executeWaitingListeners(updatePath);
     };
     DeepState.prototype.updateNotifyOnly = function (updatePath, newValue, options) {
@@ -1206,7 +1261,7 @@ var DeepState = /** @class */ (function () {
         });
     };
     DeepState.prototype.isMuted = function (path) {
-        var e_20, _a;
+        var e_22, _a;
         if (!this.options.useMute)
             return false;
         try {
@@ -1218,12 +1273,12 @@ var DeepState = /** @class */ (function () {
                     return true;
             }
         }
-        catch (e_20_1) { e_20 = { error: e_20_1 }; }
+        catch (e_22_1) { e_22 = { error: e_22_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_20) throw e_20.error; }
+            finally { if (e_22) throw e_22.error; }
         }
         return false;
     };
