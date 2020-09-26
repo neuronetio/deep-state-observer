@@ -1270,6 +1270,124 @@ describe('State', () => {
     expect(values2[1]).toEqual(1);
   });
 
+  it('should update nested listeners', () => {
+    const state = new State({ x: { z: 'z', i: { o: 'o' } }, y: 'y' });
+    const values = [];
+    function listener1() {
+      values.push('1');
+    }
+    function listener2() {
+      values.push('2');
+    }
+    function listener3() {
+      values.push('3');
+    }
+    function listener4() {
+      values.push('4');
+    }
+    state.subscribe('x.i.o', listener1);
+    state.subscribe('x.i.o', listener2);
+    state.subscribe('x.y', listener3);
+    state.subscribe('x.i', listener4);
+    expect(values).toEqual(['1', '2', '3', '4']);
+
+    values.length = 0;
+    state.update('x', { z: 'zz', i: { o: 'oooo' } });
+    expect(values).toEqual(['1', '2', '4']);
+  });
+
+  it('should mute specified listeners', () => {
+    const state = new State({ x: { z: 'z', i: { o: 'o' } }, y: 'y' });
+    const values = [];
+    function listener1() {
+      values.push('1');
+    }
+    function listener2() {
+      values.push('2');
+    }
+    function listener3() {
+      values.push('3');
+    }
+    function listener4() {
+      values.push('4');
+    }
+    state.subscribe('x.i.o', listener1);
+    state.subscribe('x.i.o', listener2);
+    state.subscribe('x.y', listener3);
+    state.subscribe('x.i', listener4);
+    expect(values.length).toEqual(4);
+    expect(values).toEqual(['1', '2', '3', '4']);
+
+    state.mute(listener2);
+
+    expect(state.isMuted(listener1)).toEqual(false);
+    expect(state.isMuted(listener2)).toEqual(true);
+    expect(state.isMuted(listener3)).toEqual(false);
+    expect(state.isMuted(listener4)).toEqual(false);
+
+    values.length = 0;
+    state.update('x.i.o', 'oo');
+    expect(values.length).toEqual(2);
+    expect(values).toEqual(['1', '4']);
+
+    expect(state.isMuted(listener1)).toEqual(false);
+    expect(state.isMuted(listener2)).toEqual(true);
+    expect(state.isMuted(listener3)).toEqual(false);
+    expect(state.isMuted(listener4)).toEqual(false);
+
+    values.length = 0;
+    state.update('x.i', { o: 'ooo' });
+    expect(values.length).toEqual(2);
+    expect(values).toEqual(['1', '4']);
+
+    expect(state.isMuted(listener1)).toEqual(false);
+    expect(state.isMuted(listener2)).toEqual(true);
+    expect(state.isMuted(listener3)).toEqual(false);
+    expect(state.isMuted(listener4)).toEqual(false);
+
+    values.length = 0;
+    state.update('x', { z: 'zz', i: { o: 'oooo' } });
+    expect(values).toEqual(['1', '4']);
+
+    expect(state.isMuted(listener1)).toEqual(false);
+    expect(state.isMuted(listener2)).toEqual(true);
+    expect(state.isMuted(listener3)).toEqual(false);
+    expect(state.isMuted(listener4)).toEqual(false);
+
+    state.unmute(listener2);
+    state.mute(listener1);
+
+    expect(state.isMuted(listener1)).toEqual(true);
+    expect(state.isMuted(listener2)).toEqual(false);
+    expect(state.isMuted(listener3)).toEqual(false);
+    expect(state.isMuted(listener4)).toEqual(false);
+
+    values.length = 0;
+    state.update('x', { z: 'zzz', i: { o: 'ooooo' } });
+    expect(values).toEqual(['2', '4']);
+
+    expect(state.isMuted(listener1)).toEqual(true);
+    expect(state.isMuted(listener2)).toEqual(false);
+    expect(state.isMuted(listener3)).toEqual(false);
+    expect(state.isMuted(listener4)).toEqual(false);
+
+    state.unmute(listener1);
+
+    expect(state.isMuted(listener1)).toEqual(false);
+    expect(state.isMuted(listener2)).toEqual(false);
+    expect(state.isMuted(listener3)).toEqual(false);
+    expect(state.isMuted(listener4)).toEqual(false);
+
+    values.length = 0;
+    state.update('x', { z: 'zz', i: { o: 'oooooo' } });
+    expect(values).toEqual(['1', '2', '4']);
+
+    expect(state.isMuted(listener1)).toEqual(false);
+    expect(state.isMuted(listener2)).toEqual(false);
+    expect(state.isMuted(listener3)).toEqual(false);
+    expect(state.isMuted(listener4)).toEqual(false);
+  });
+
   it('should add two wildcard listeners - one without and one with parameter', () => {
     const state = new State({ nested: { value: { equals: 'x' } } });
     const values = [];

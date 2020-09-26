@@ -411,6 +411,7 @@
                 this.resolved = Promise.resolve();
             }
             this.muted = new Set();
+            this.mutedListeners = new Set();
             this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
             this.destroyed = false;
         }
@@ -656,7 +657,7 @@
             listenersCollection.count++;
             const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
             if (!listenersCollection.isWildcard) {
-                if (!this.isMuted(cleanPath))
+                if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
                     fn(this.pathGet(this.split(cleanPath), this.data), {
                         type,
                         listener,
@@ -669,35 +670,39 @@
                         params: this.getParams(listenersCollection.paramsInfo, cleanPath),
                         options,
                     });
+                }
             }
             else {
                 const paths = this.scan.get(cleanPath);
                 if (options.bulk) {
                     const bulkValue = [];
                     for (const path in paths) {
-                        if (!this.isMuted(path))
-                            bulkValue.push({
-                                path,
-                                params: this.getParams(listenersCollection.paramsInfo, path),
-                                value: paths[path],
-                            });
+                        if (this.isMuted(path))
+                            continue;
+                        bulkValue.push({
+                            path,
+                            params: this.getParams(listenersCollection.paramsInfo, path),
+                            value: paths[path],
+                        });
                     }
-                    fn(bulkValue, {
-                        type,
-                        listener,
-                        listenersCollection,
-                        path: {
-                            listener: listenerPath,
-                            update: undefined,
-                            resolved: undefined,
-                        },
-                        options,
-                        params: undefined,
-                    });
+                    if (!this.isMuted(fn)) {
+                        fn(bulkValue, {
+                            type,
+                            listener,
+                            listenersCollection,
+                            path: {
+                                listener: listenerPath,
+                                update: undefined,
+                                resolved: undefined,
+                            },
+                            options,
+                            params: undefined,
+                        });
+                    }
                 }
                 else {
                     for (const path in paths) {
-                        if (!this.isMuted(path))
+                        if (!this.isMuted(path) && !this.isMuted(fn)) {
                             fn(paths[path], {
                                 type,
                                 listener,
@@ -710,6 +715,7 @@
                                 params: this.getParams(listenersCollection.paramsInfo, path),
                                 options,
                             });
+                        }
                     }
                 }
             }
@@ -772,18 +778,21 @@
                     if (alreadyInQueue)
                         continue;
                     const time = this.debugTime(singleListener);
-                    if (singleListener.listener.options.queue && this.jobsRunning) {
-                        this.subscribeQueue.push(() => {
-                            singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
-                        });
-                    }
-                    else {
-                        queue.push({
-                            id: singleListener.listener.id,
-                            fn: () => {
+                    if (!this.isMuted(singleListener.listener.fn)) {
+                        if (singleListener.listener.options.queue && this.jobsRunning) {
+                            this.subscribeQueue.push(() => {
                                 singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
-                            },
-                        });
+                            });
+                        }
+                        else {
+                            queue.push({
+                                id: singleListener.listener.id,
+                                originalFn: singleListener.listener.fn,
+                                fn: () => {
+                                    singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                                },
+                            });
+                        }
                     }
                     this.debugListener(time, singleListener);
                 }
@@ -802,22 +811,25 @@
                     for (const bulk of bulkListener.value) {
                         bulkValue.push(Object.assign({}, bulk, { value: bulk.value() }));
                     }
-                    if (bulkListener.listener.options.queue && this.jobsRunning) {
-                        this.subscribeQueue.push(() => {
-                            if (!this.jobsRunning) {
-                                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
-                                return true;
-                            }
-                            return false;
-                        });
-                    }
-                    else {
-                        queue.push({
-                            id: bulkListener.listener.id,
-                            fn: () => {
-                                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
-                            },
-                        });
+                    if (!this.isMuted(bulkListener.listener.fn)) {
+                        if (bulkListener.listener.options.queue && this.jobsRunning) {
+                            this.subscribeQueue.push(() => {
+                                if (!this.jobsRunning) {
+                                    bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                                    return true;
+                                }
+                                return false;
+                            });
+                        }
+                        else {
+                            queue.push({
+                                id: bulkListener.listener.id,
+                                originalFn: bulkListener.listener.fn,
+                                fn: () => {
+                                    bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                                },
+                            });
+                        }
                     }
                     this.debugListener(time, bulkListener);
                 }
@@ -908,9 +920,9 @@
             const listeners = {};
             for (let [listenerPath, listenersCollection] of this.listeners) {
                 listeners[listenerPath] = { single: [], bulk: [] };
-                const currentCuttedPath = this.cutPath(listenerPath, updatePath);
-                if (this.match(currentCuttedPath, updatePath)) {
-                    const restPath = this.trimPath(listenerPath.substr(currentCuttedPath.length));
+                const currentCutPath = this.cutPath(listenerPath, updatePath);
+                if (this.match(currentCutPath, updatePath)) {
+                    const restPath = this.trimPath(listenerPath.substr(currentCutPath.length));
                     const wildcardNewValues = new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(restPath);
                     const params = listenersCollection.paramsInfo
                         ? this.getParams(listenersCollection.paramsInfo, updatePath)
@@ -1037,12 +1049,12 @@
             }
             return listeners;
         }
-        sortAndRunQueue(queue) {
+        sortAndRunQueue(queue, path) {
             queue.sort(function (a, b) {
                 return a.id - b.id;
             });
             if (this.options.debug) {
-                console.log('queue', queue);
+                console.log(`[deep-state-observer] queue for ${path}`, queue);
             }
             for (const q of queue) {
                 q.fn();
@@ -1050,7 +1062,7 @@
         }
         notifyOnly(updatePath, newValue, options, type = 'update', originalPath = '') {
             const queue = this.getQueueNotifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath));
-            this.sortAndRunQueue(queue);
+            this.sortAndRunQueue(queue, updatePath);
         }
         canBeNested(newValue) {
             return typeof newValue === 'object' && newValue !== null;
@@ -1105,11 +1117,11 @@
                 const self = this;
                 return function () {
                     const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
-                    self.sortAndRunQueue(queue);
+                    self.sortAndRunQueue(queue, updatePath);
                 };
             }
             const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
-            this.sortAndRunQueue(queue);
+            this.sortAndRunQueue(queue, updatePath);
         }
         runUpdateQueue() {
             if (this.destroyed)
@@ -1126,7 +1138,7 @@
             if (this.canBeNested(newValue)) {
                 this.notifyNestedListeners(updatePath, newValue, options, 'update', queue);
             }
-            this.sortAndRunQueue(queue);
+            this.sortAndRunQueue(queue, updatePath);
             this.executeWaitingListeners(updatePath);
         }
         updateNotifyOnly(updatePath, newValue, options) {
@@ -1243,18 +1255,21 @@
                 }
             });
         }
-        isMuted(path) {
+        isMuted(pathOrListenerFunction) {
             if (!this.options.useMute)
                 return false;
+            if (typeof pathOrListenerFunction === 'function') {
+                return this.isMutedListener(pathOrListenerFunction);
+            }
             for (const mutedPath of this.muted) {
                 const recursive = !this.isNotRecursive(mutedPath);
                 const trimmedMutedPath = this.trimPath(mutedPath);
-                if (this.match(path, trimmedMutedPath))
+                if (this.match(pathOrListenerFunction, trimmedMutedPath))
                     return true;
-                if (this.match(trimmedMutedPath, path))
+                if (this.match(trimmedMutedPath, pathOrListenerFunction))
                     return true;
                 if (recursive) {
-                    const cutPath = this.cutPath(trimmedMutedPath, path);
+                    const cutPath = this.cutPath(trimmedMutedPath, pathOrListenerFunction);
                     if (this.match(cutPath, mutedPath))
                         return true;
                     if (this.match(mutedPath, cutPath))
@@ -1263,11 +1278,20 @@
             }
             return false;
         }
-        mute(path) {
-            this.muted.add(path);
+        isMutedListener(listenerFunc) {
+            return this.mutedListeners.has(listenerFunc);
         }
-        unmute(path) {
-            this.muted.delete(path);
+        mute(pathOrListenerFunction) {
+            if (typeof pathOrListenerFunction === 'function') {
+                return this.mutedListeners.add(pathOrListenerFunction);
+            }
+            this.muted.add(pathOrListenerFunction);
+        }
+        unmute(pathOrListenerFunction) {
+            if (typeof pathOrListenerFunction === 'function') {
+                return this.mutedListeners.delete(pathOrListenerFunction);
+            }
+            this.muted.delete(pathOrListenerFunction);
         }
         debugSubscribe(listener, listenersCollection, listenerPath) {
             if (listener.options.debug) {

@@ -65,6 +65,7 @@ export interface Listener {
 export interface Queue {
   id: number;
   fn: () => void;
+  originalFn: ListenerFunction;
 }
 
 export interface GroupedListener {
@@ -199,6 +200,7 @@ class DeepState {
   private queueRuns = 0;
   private resolved: Promise<unknown> | any;
   private muted: Set<string>;
+  private mutedListeners: Set<ListenerFunction>;
 
   constructor(data = {}, options: Options = {}) {
     this.listeners = new Map();
@@ -214,6 +216,7 @@ class DeepState {
       this.resolved = Promise.resolve();
     }
     this.muted = new Set();
+    this.mutedListeners = new Set();
     this.scan = new WildcardObject(
       this.data,
       this.options.delimiter,
@@ -534,7 +537,7 @@ class DeepState {
     listenersCollection.count++;
     const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
     if (!listenersCollection.isWildcard) {
-      if (!this.isMuted(cleanPath))
+      if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
         fn(this.pathGet(this.split(cleanPath), this.data), {
           type,
           listener,
@@ -547,33 +550,36 @@ class DeepState {
           params: this.getParams(listenersCollection.paramsInfo, cleanPath),
           options,
         });
+      }
     } else {
       const paths = this.scan.get(cleanPath);
       if (options.bulk) {
         const bulkValue = [];
         for (const path in paths) {
-          if (!this.isMuted(path))
-            bulkValue.push({
-              path,
-              params: this.getParams(listenersCollection.paramsInfo, path),
-              value: paths[path],
-            });
+          if (this.isMuted(path)) continue;
+          bulkValue.push({
+            path,
+            params: this.getParams(listenersCollection.paramsInfo, path),
+            value: paths[path],
+          });
         }
-        fn(bulkValue, {
-          type,
-          listener,
-          listenersCollection,
-          path: {
-            listener: listenerPath,
-            update: undefined,
-            resolved: undefined,
-          },
-          options,
-          params: undefined,
-        });
+        if (!this.isMuted(fn)) {
+          fn(bulkValue, {
+            type,
+            listener,
+            listenersCollection,
+            path: {
+              listener: listenerPath,
+              update: undefined,
+              resolved: undefined,
+            },
+            options,
+            params: undefined,
+          });
+        }
       } else {
         for (const path in paths) {
-          if (!this.isMuted(path))
+          if (!this.isMuted(path) && !this.isMuted(fn)) {
             fn(paths[path], {
               type,
               listener,
@@ -586,6 +592,7 @@ class DeepState {
               params: this.getParams(listenersCollection.paramsInfo, path),
               options,
             });
+          }
         }
       }
     }
@@ -648,23 +655,26 @@ class DeepState {
         }
         if (alreadyInQueue) continue;
         const time = this.debugTime(singleListener);
-        if (singleListener.listener.options.queue && this.jobsRunning) {
-          this.subscribeQueue.push(() => {
-            singleListener.listener.fn(
-              singleListener.value(),
-              singleListener.eventInfo
-            );
-          });
-        } else {
-          queue.push({
-            id: singleListener.listener.id,
-            fn: () => {
+        if (!this.isMuted(singleListener.listener.fn)) {
+          if (singleListener.listener.options.queue && this.jobsRunning) {
+            this.subscribeQueue.push(() => {
               singleListener.listener.fn(
                 singleListener.value(),
                 singleListener.eventInfo
               );
-            },
-          });
+            });
+          } else {
+            queue.push({
+              id: singleListener.listener.id,
+              originalFn: singleListener.listener.fn,
+              fn: () => {
+                singleListener.listener.fn(
+                  singleListener.value(),
+                  singleListener.eventInfo
+                );
+              },
+            });
+          }
         }
         this.debugListener(time, singleListener);
       }
@@ -682,21 +692,24 @@ class DeepState {
         for (const bulk of bulkListener.value) {
           bulkValue.push({ ...bulk, value: bulk.value() });
         }
-        if (bulkListener.listener.options.queue && this.jobsRunning) {
-          this.subscribeQueue.push(() => {
-            if (!this.jobsRunning) {
-              bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
-              return true;
-            }
-            return false;
-          });
-        } else {
-          queue.push({
-            id: bulkListener.listener.id,
-            fn: () => {
-              bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
-            },
-          });
+        if (!this.isMuted(bulkListener.listener.fn)) {
+          if (bulkListener.listener.options.queue && this.jobsRunning) {
+            this.subscribeQueue.push(() => {
+              if (!this.jobsRunning) {
+                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                return true;
+              }
+              return false;
+            });
+          } else {
+            queue.push({
+              id: bulkListener.listener.id,
+              originalFn: bulkListener.listener.fn,
+              fn: () => {
+                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+              },
+            });
+          }
         }
         this.debugListener(time, bulkListener);
       }
@@ -814,10 +827,10 @@ class DeepState {
     const listeners: GroupedListeners = {};
     for (let [listenerPath, listenersCollection] of this.listeners) {
       listeners[listenerPath] = { single: [], bulk: [] };
-      const currentCuttedPath = this.cutPath(listenerPath, updatePath);
-      if (this.match(currentCuttedPath, updatePath)) {
+      const currentCutPath = this.cutPath(listenerPath, updatePath);
+      if (this.match(currentCutPath, updatePath)) {
         const restPath = this.trimPath(
-          listenerPath.substr(currentCuttedPath.length)
+          listenerPath.substr(currentCutPath.length)
         );
         const wildcardNewValues = new WildcardObject(
           newValue,
@@ -982,12 +995,12 @@ class DeepState {
     return listeners;
   }
 
-  private sortAndRunQueue(queue: Queue[]) {
+  private sortAndRunQueue(queue: Queue[], path: string) {
     queue.sort(function (a, b) {
       return a.id - b.id;
     });
     if (this.options.debug) {
-      console.log('queue', queue);
+      console.log(`[deep-state-observer] queue for ${path}`, queue);
     }
     for (const q of queue) {
       q.fn();
@@ -1010,7 +1023,7 @@ class DeepState {
         originalPath
       )
     );
-    this.sortAndRunQueue(queue);
+    this.sortAndRunQueue(queue, updatePath);
   }
 
   private canBeNested(newValue): boolean {
@@ -1101,11 +1114,11 @@ class DeepState {
       const self = this;
       return function () {
         const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
-        self.sortAndRunQueue(queue);
+        self.sortAndRunQueue(queue, updatePath);
       };
     }
     const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
-    this.sortAndRunQueue(queue);
+    this.sortAndRunQueue(queue, updatePath);
   }
 
   private runUpdateQueue() {
@@ -1140,7 +1153,7 @@ class DeepState {
         queue
       );
     }
-    this.sortAndRunQueue(queue);
+    this.sortAndRunQueue(queue, updatePath);
     this.executeWaitingListeners(updatePath);
   }
 
@@ -1280,15 +1293,18 @@ class DeepState {
     });
   }
 
-  public isMuted(path: string): boolean {
+  public isMuted(pathOrListenerFunction: string | ListenerFunction): boolean {
     if (!this.options.useMute) return false;
+    if (typeof pathOrListenerFunction === 'function') {
+      return this.isMutedListener(pathOrListenerFunction);
+    }
     for (const mutedPath of this.muted) {
       const recursive = !this.isNotRecursive(mutedPath);
       const trimmedMutedPath = this.trimPath(mutedPath);
-      if (this.match(path, trimmedMutedPath)) return true;
-      if (this.match(trimmedMutedPath, path)) return true;
+      if (this.match(pathOrListenerFunction, trimmedMutedPath)) return true;
+      if (this.match(trimmedMutedPath, pathOrListenerFunction)) return true;
       if (recursive) {
-        const cutPath = this.cutPath(trimmedMutedPath, path);
+        const cutPath = this.cutPath(trimmedMutedPath, pathOrListenerFunction);
         if (this.match(cutPath, mutedPath)) return true;
         if (this.match(mutedPath, cutPath)) return true;
       }
@@ -1296,12 +1312,22 @@ class DeepState {
     return false;
   }
 
-  public mute(path: string) {
-    this.muted.add(path);
+  public isMutedListener(listenerFunc: ListenerFunction): boolean {
+    return this.mutedListeners.has(listenerFunc);
   }
 
-  public unmute(path: string) {
-    this.muted.delete(path);
+  public mute(pathOrListenerFunction: string | ListenerFunction) {
+    if (typeof pathOrListenerFunction === 'function') {
+      return this.mutedListeners.add(pathOrListenerFunction);
+    }
+    this.muted.add(pathOrListenerFunction);
+  }
+
+  public unmute(pathOrListenerFunction: string | ListenerFunction) {
+    if (typeof pathOrListenerFunction === 'function') {
+      return this.mutedListeners.delete(pathOrListenerFunction);
+    }
+    this.muted.delete(pathOrListenerFunction);
   }
 
   private debugSubscribe(
