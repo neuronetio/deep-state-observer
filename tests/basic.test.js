@@ -1225,6 +1225,51 @@ describe('State', () => {
     expect(values[0]).toEqual('o');
   });
 
+  it('should mute nested properties', () => {
+    const state = new State({ x: { z: 'z', i: { o: 'o' } }, y: 'y' });
+    const values = [];
+    state.subscribe('x.i.o', (val) => {
+      values.push(val);
+    });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual('o');
+    state.mute('x');
+    state.update('x.*.o', 'oo');
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual('o');
+  });
+
+  it('should not mute nested properties', () => {
+    const state = new State({ x: { z: 'z', i: { o: 'o' } }, y: 'y' });
+    const values = [];
+    state.subscribe('x.i.o', (val) => {
+      values.push(val);
+    });
+    const values2 = [];
+    let lastX = 0;
+    state.subscribe('x', (val) => {
+      values2.push(lastX++);
+    });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual('o');
+    expect(values2.length).toEqual(1);
+    expect(values2[0]).toEqual(0);
+
+    state.mute('x;');
+    state.update('x.*.o', 'oo');
+    expect(values.length).toEqual(2);
+    expect(values[1]).toEqual('oo');
+    expect(values2.length).toEqual(1);
+    expect(values2[0]).toEqual(0);
+
+    state.unmute('x;');
+    state.update('x.*.o', 'ooo');
+    expect(values.length).toEqual(3);
+    expect(values[2]).toEqual('ooo');
+    expect(values2.length).toEqual(2);
+    expect(values2[1]).toEqual(1);
+  });
+
   it('should add two wildcard listeners - one without and one with parameter', () => {
     const state = new State({ nested: { value: { equals: 'x' } } });
     const values = [];

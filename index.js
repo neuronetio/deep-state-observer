@@ -1267,10 +1267,19 @@ var DeepState = /** @class */ (function () {
         try {
             for (var _b = __values(this.muted), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var mutedPath = _c.value;
-                if (this.match(path, mutedPath))
+                var recursive = !this.isNotRecursive(mutedPath);
+                var trimmedMutedPath = this.trimPath(mutedPath);
+                if (this.match(path, trimmedMutedPath))
                     return true;
-                if (this.match(mutedPath, path))
+                if (this.match(trimmedMutedPath, path))
                     return true;
+                if (recursive) {
+                    var cutPath = this.cutPath(trimmedMutedPath, path);
+                    if (this.match(cutPath, mutedPath))
+                        return true;
+                    if (this.match(mutedPath, cutPath))
+                        return true;
+                }
             }
         }
         catch (e_22_1) { e_22 = { error: e_22_1 }; }

@@ -1283,8 +1283,15 @@ class DeepState {
   public isMuted(path: string): boolean {
     if (!this.options.useMute) return false;
     for (const mutedPath of this.muted) {
-      if (this.match(path, mutedPath)) return true;
-      if (this.match(mutedPath, path)) return true;
+      const recursive = !this.isNotRecursive(mutedPath);
+      const trimmedMutedPath = this.trimPath(mutedPath);
+      if (this.match(path, trimmedMutedPath)) return true;
+      if (this.match(trimmedMutedPath, path)) return true;
+      if (recursive) {
+        const cutPath = this.cutPath(trimmedMutedPath, path);
+        if (this.match(cutPath, mutedPath)) return true;
+        if (this.match(mutedPath, cutPath)) return true;
+      }
     }
     return false;
   }
