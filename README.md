@@ -332,6 +332,45 @@ state.update('x.i.o', 'oo');
 state.unmute('x.*.o');
 state.update('x.i.o', 'ooo');
 // values.length === 2 (x.i.o listener was fired)
+
+state.mute('x');
+state.update('x.i.o', 'oooo');
+// values.length === 2 (x.i.o listener was not fired)
+
+state.unmute('x');
+state.mute('x;'); // mute only x (not nested)
+state.update('x.i.o', 'oooo');
+// values.length === 3 (x.i.o listener was fired)
+```
+
+You can also mute specific listeners (functions)
+
+```javascript
+const state = new State({ x: { z: 'z', i: { o: 'o' } }, y: 'y' });
+const values = [];
+
+function listener1() {
+  values.push('1');
+}
+function listener2() {
+  values.push('2');
+}
+
+state.subscribe('x.i.o', listener1);
+state.subscribe('x.i.o', listener2);
+// values = ['1', '2']
+
+state.mute(listener2); // from now on listener2 will not fire
+
+values.length = 0;
+state.update('x.i.o', 'oo');
+// values = ['1']
+
+state.unmute(listener2);
+
+values.length = 0;
+state.update('x.i.o', 'oo');
+// values = ['1','2']
 ```
 
 ## ignore
