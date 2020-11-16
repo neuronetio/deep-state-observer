@@ -1440,6 +1440,29 @@ describe('State', () => {
     expect(values).toEqual([1, 2, 3, 4]);
   });
 
+  it('should run listeners with proper order #2', () => {
+    const state = new State({
+      nested: { value: { equals: { test: { x: 'x' } } } },
+    });
+    let values = [];
+    function first() {
+      values.push(1);
+    }
+    function second() {
+      values.push(2);
+    }
+
+    state.subscribe('nested.value.equals.*;', first);
+    state.subscribeAll(['nested.value.equals.*.x'], second, {
+      bulk: true,
+    });
+    expect(values).toEqual([1, 2]);
+    state.update('nested.value.equals.test2', {
+      x: 'y',
+    });
+    expect(values).toEqual([1, 2, 1, 2]);
+  });
+
   it('should run listeners with proper order (bulk)', () => {
     const state = new State({ nested: { value: { equals: { test: 'x' } } } });
     let values = [];
