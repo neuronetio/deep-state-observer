@@ -170,13 +170,20 @@ var DeepState = /** @class */ (function () {
         this.updateQueue = [];
         this.jobsRunning = 0;
     };
-    DeepState.prototype.match = function (first, second) {
+    DeepState.prototype.match = function (first, second, nested) {
+        if (nested === void 0) { nested = true; }
         if (this.is_match)
             return this.is_match(first, second);
         if (first === second)
             return true;
         if (first === this.options.wildcard || second === this.options.wildcard)
             return true;
+        if (!nested &&
+            this.getIndicesCount(this.options.delimiter, first) <
+                this.getIndicesCount(this.options.delimiter, second)) {
+            // first < second because first is a listener path and may be longer but not shorter
+            return false;
+        }
         return this.scan.match(first, second);
     };
     DeepState.prototype.getIndicesOf = function (searchStr, str) {
@@ -404,9 +411,13 @@ var DeepState = /** @class */ (function () {
         listenerPath = this.cleanNotRecursivePath(listenerPath);
         var self = this;
         return function listenerCollectionMatch(path) {
-            if (isRecursive)
+            if (isRecursive) {
                 path = self.cutPath(path, listenerPath);
-            if (isWildcard && self.match(listenerPath, path))
+            }
+            else {
+                listenerPath = self.cutPath(listenerPath, path);
+            }
+            if (isWildcard && self.match(listenerPath, path, isRecursive))
                 return true;
             return listenerPath === path;
         };
@@ -820,6 +831,8 @@ var DeepState = /** @class */ (function () {
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
         var _loop_4 = function (listenerPath, listenersCollection) {
+            if (!listenersCollection.isRecursive)
+                return "continue";
             listeners[listenerPath] = { single: [], bulk: [] };
             var currentCutPath = this_4.cutPath(listenerPath, updatePath);
             if (this_4.match(currentCutPath, updatePath)) {

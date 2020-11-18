@@ -437,13 +437,19 @@
             this.updateQueue = [];
             this.jobsRunning = 0;
         }
-        match(first, second) {
+        match(first, second, nested = true) {
             if (this.is_match)
                 return this.is_match(first, second);
             if (first === second)
                 return true;
             if (first === this.options.wildcard || second === this.options.wildcard)
                 return true;
+            if (!nested &&
+                this.getIndicesCount(this.options.delimiter, first) <
+                    this.getIndicesCount(this.options.delimiter, second)) {
+                // first < second because first is a listener path and may be longer but not shorter
+                return false;
+            }
             return this.scan.match(first, second);
         }
         getIndicesOf(searchStr, str) {
@@ -613,9 +619,13 @@
             listenerPath = this.cleanNotRecursivePath(listenerPath);
             const self = this;
             return function listenerCollectionMatch(path) {
-                if (isRecursive)
+                if (isRecursive) {
                     path = self.cutPath(path, listenerPath);
-                if (isWildcard && self.match(listenerPath, path))
+                }
+                else {
+                    listenerPath = self.cutPath(listenerPath, path);
+                }
+                if (isWildcard && self.match(listenerPath, path, isRecursive))
                     return true;
                 return listenerPath === path;
             };
@@ -919,6 +929,8 @@
         getNestedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
             const listeners = {};
             for (let [listenerPath, listenersCollection] of this.listeners) {
+                if (!listenersCollection.isRecursive)
+                    continue;
                 listeners[listenerPath] = { single: [], bulk: [] };
                 const currentCutPath = this.cutPath(listenerPath, updatePath);
                 if (this.match(currentCutPath, updatePath)) {

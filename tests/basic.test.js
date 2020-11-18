@@ -1518,4 +1518,29 @@ describe('State', () => {
     });
     expect(values).toEqual([1, 2, 3, 4]);
   });
+
+  it('should not run nested listener even if it is a wildcard property', () => {
+    const state = new State({
+      nested: { value: { equals: { test: { x: 'x' } } } },
+    });
+    let values = [];
+    function first() {
+      values.push(1);
+    }
+    function second() {
+      values.push(2);
+    }
+    function third() {
+      values.push(3);
+    }
+
+    state.subscribe('nested.value.equals.*;', first);
+    state.subscribeAll(['nested.value.equals.*;'], second, {
+      bulk: true,
+    });
+    state.subscribe('nested.value.equals.test;', third);
+    expect(values).toEqual([1, 2, 3]);
+    state.update('nested.value.equals.test.x', 'z');
+    expect(values).toEqual([1, 2, 3]);
+  });
 });
