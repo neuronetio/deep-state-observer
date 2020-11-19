@@ -442,6 +442,9 @@ var DeepState = /** @class */ (function () {
             originalPath: listenerPath,
             path: hasParams ? paramsInfo.replaced : listenerPath
         };
+        if (!collCfg.isRecursive) {
+            collCfg.path = this.cleanNotRecursivePath(collCfg.path);
+        }
         var listenersCollection = this.getCleanListenersCollection(__assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
         this.id++;
         listenersCollection.listeners.set(this.id, listener);

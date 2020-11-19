@@ -525,6 +525,9 @@ class DeepState {
       originalPath: listenerPath,
       path: hasParams ? paramsInfo.replaced : listenerPath,
     };
+    if (!collCfg.isRecursive) {
+      collCfg.path = this.cleanNotRecursivePath(collCfg.path);
+    }
     let listenersCollection = this.getCleanListenersCollection({
       ...collCfg,
       match: this.getListenerCollectionMatch(
