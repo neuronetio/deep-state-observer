@@ -617,7 +617,7 @@ class DeepState {
                 path = self.cutPath(path, listenerPath);
             }
             else {
-                listenerPath = self.cutPath(listenerPath, path);
+                listenerPath = self.cutPath(self.cleanNotRecursivePath(listenerPath), path);
             }
             if (isWildcard && self.match(listenerPath, path, isRecursive))
                 return true;
