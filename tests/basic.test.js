@@ -1543,4 +1543,71 @@ describe('State', () => {
     state.update('nested.value.equals.test.x', 'z');
     expect(values).toEqual([1, 2, 3]);
   });
+
+  it('should run listeners in proper order #3', () => {
+    const state = new State({
+      config: {
+        list: {
+          rows: {
+            1: {
+              parentId: null,
+              expanded: false,
+            },
+          },
+        },
+        chart: {
+          items: {
+            1: { rowId: '1' },
+          },
+        },
+      },
+    });
+    const values = [];
+    const paths = [];
+    function full(val, info) {
+      values.push('full');
+      paths.push(info.path.listener);
+    }
+    function partialFull(val, info) {
+      values.push('partialFull');
+      paths.push(info.path.listener);
+    }
+    function partial(val, info) {
+      values.push('partial');
+      paths.push(info.path.listener);
+    }
+    state.subscribeAll(['config.chart.items;', 'config.list.rows;'], full);
+    state.subscribeAll(
+      ['config.list.rows.*;', 'config.list.rows.*.parentId'],
+      partialFull,
+      {
+        bulk: true,
+      }
+    );
+    state.subscribeAll(
+      ['config.chart.items.*.rowId', 'config.list.rows.*.expanded'],
+      partial,
+      {
+        bulk: true,
+      }
+    );
+    expect(values).toEqual([
+      'full',
+      'full',
+      'partialFull',
+      'partialFull',
+      'partial',
+      'partial',
+    ]);
+    values.length = 0;
+    paths.length = 0;
+    state.update('config.list.rows', {
+      2: {
+        parentId: null,
+        expanded: false,
+      },
+    });
+    expect(values).toEqual(['full', 'partialFull', 'partialFull', 'partial']);
+    //console.log(paths);
+  });
 });

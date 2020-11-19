@@ -880,8 +880,15 @@
                     const value = traverse ? () => this.get(cutPath) : () => newValue;
                     const bulkValue = [{ value, path: updatePath, params }];
                     for (const listener of listenersCollection.listeners.values()) {
-                        if (this.shouldIgnore(listener, updatePath))
+                        if (this.shouldIgnore(listener, updatePath)) {
+                            if (listener.options.debug) {
+                                console.log(`[getSubscribedListeners] Listener was not fired because it was ignored.`, {
+                                    listener,
+                                    listenersCollection,
+                                });
+                            }
                             continue;
+                        }
                         if (listener.options.bulk) {
                             listeners[listenerPath].bulk.push({
                                 listener,
@@ -916,6 +923,18 @@
                                     options,
                                 },
                                 value,
+                            });
+                        }
+                    }
+                }
+                else {
+                    // debug
+                    for (const listener of listenersCollection.listeners.values()) {
+                        if (listener.options.debug) {
+                            console.log(`[getSubscribedListeners] Listener was not fired because there was no match.`, {
+                                listener,
+                                listenersCollection,
+                                updatePath,
                             });
                         }
                     }
@@ -993,6 +1012,14 @@
                             eventInfo,
                             value: bulk,
                         });
+                    }
+                }
+                else {
+                    // debug
+                    for (const listener of listenersCollection.listeners.values()) {
+                        if (listener.options.debug) {
+                            console.log('[getNestedListeners] Listener was not fired because there was no match.', { listener, listenersCollection, currentCutPath, updatePath });
+                        }
                     }
                 }
             }
