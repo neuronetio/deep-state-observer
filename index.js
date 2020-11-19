@@ -85,6 +85,8 @@ function log(message, info) {
 function getDefaultOptions() {
     return {
         delimiter: ".",
+        debug: false,
+        extraDebug: false,
         useMute: true,
         notRecursive: ";",
         param: ":",
@@ -829,7 +831,7 @@ var DeepState = /** @class */ (function () {
                     finally { if (e_13) throw e_13.error; }
                 }
             }
-            else {
+            else if (this_3.options.extraDebug) {
                 // debug
                 var showMatch = false;
                 try {
@@ -965,7 +967,7 @@ var DeepState = /** @class */ (function () {
                     });
                 }
             }
-            else {
+            else if (this_4.options.extraDebug) {
                 try {
                     // debug
                     for (var _b = (e_16 = void 0, __values(listenersCollection.listeners.values())), _c = _b.next(); !_c.done; _c = _b.next()) {

@@ -25,6 +25,7 @@ export interface Options {
     maxQueueRuns?: number;
     log?: (message: string, info: any) => void;
     debug?: boolean;
+    extraDebug?: boolean;
     Promise?: Promise<unknown> | any;
 }
 export interface ListenerOptions {

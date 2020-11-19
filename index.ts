@@ -35,6 +35,7 @@ export interface Options {
   maxQueueRuns?: number;
   log?: (message: string, info: any) => void;
   debug?: boolean;
+  extraDebug?: boolean;
   Promise?: Promise<unknown> | any;
 }
 
@@ -149,6 +150,8 @@ function log(message: string, info: any) {
 function getDefaultOptions(): Options {
   return {
     delimiter: `.`,
+    debug: false,
+    extraDebug: false,
     useMute: true,
     notRecursive: `;`,
     param: `:`,
@@ -842,7 +845,7 @@ class DeepState {
             });
           }
         }
-      } else {
+      } else if (this.options.extraDebug) {
         // debug
         let showMatch = false;
         for (const listener of listenersCollection.listeners.values()) {
@@ -963,7 +966,7 @@ class DeepState {
             value: bulk,
           });
         }
-      } else {
+      } else if (this.options.extraDebug) {
         // debug
         for (const listener of listenersCollection.listeners.values()) {
           if (listener.options.debug) {

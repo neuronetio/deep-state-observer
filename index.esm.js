@@ -355,6 +355,8 @@ function log(message, info) {
 function getDefaultOptions() {
     return {
         delimiter: `.`,
+        debug: false,
+        extraDebug: false,
         useMute: true,
         notRecursive: `;`,
         param: `:`,
@@ -939,7 +941,7 @@ class DeepState {
                     }
                 }
             }
-            else {
+            else if (this.options.extraDebug) {
                 // debug
                 let showMatch = false;
                 for (const listener of listenersCollection.listeners.values()) {
@@ -1031,7 +1033,7 @@ class DeepState {
                     });
                 }
             }
-            else {
+            else if (this.options.extraDebug) {
                 // debug
                 for (const listener of listenersCollection.listeners.values()) {
                     if (listener.options.debug) {
