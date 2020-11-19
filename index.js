@@ -410,12 +410,21 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.getListenerCollectionMatch = function (listenerPath, isRecursive, isWildcard) {
         listenerPath = this.cleanNotRecursivePath(listenerPath);
         var self = this;
-        return function listenerCollectionMatch(path) {
+        return function listenerCollectionMatch(path, debug) {
+            if (debug === void 0) { debug = false; }
             if (isRecursive) {
                 path = self.cutPath(path, listenerPath);
             }
             else {
                 listenerPath = self.cutPath(self.cleanNotRecursivePath(listenerPath), path);
+            }
+            if (debug) {
+                console.log('[getListenerCollectionMatch]', {
+                    listenerPath: listenerPath,
+                    path: path,
+                    isRecursive: isRecursive,
+                    isWildcard: isWildcard
+                });
             }
             if (isWildcard && self.match(listenerPath, path, isRecursive))
                 return true;
@@ -814,11 +823,13 @@ var DeepState = /** @class */ (function () {
                 }
             }
             else {
+                // debug
+                var showMatch = false;
                 try {
-                    // debug
                     for (var _e = (e_14 = void 0, __values(listenersCollection.listeners.values())), _f = _e.next(); !_f.done; _f = _e.next()) {
                         var listener = _f.value;
                         if (listener.options.debug) {
+                            showMatch = true;
                             console.log("[getSubscribedListeners] Listener was not fired because there was no match.", {
                                 listener: listener,
                                 listenersCollection: listenersCollection,
@@ -833,6 +844,9 @@ var DeepState = /** @class */ (function () {
                         if (_f && !_f.done && (_b = _e["return"])) _b.call(_e);
                     }
                     finally { if (e_14) throw e_14.error; }
+                }
+                if (showMatch) {
+                    listenersCollection.match(updatePath, true);
                 }
             }
         };

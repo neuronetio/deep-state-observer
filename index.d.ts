@@ -12,7 +12,7 @@ export interface ListenerFunctionEventInfo {
     options: ListenerOptions | UpdateOptions | undefined;
 }
 export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
-export declare type Match = (path: string) => boolean;
+export declare type Match = (path: string, debug?: boolean) => boolean;
 export interface Options {
     delimiter?: string;
     useMute?: boolean;

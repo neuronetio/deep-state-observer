@@ -21,7 +21,7 @@ export type ListenerFunction = (
   value: any,
   eventInfo: ListenerFunctionEventInfo
 ) => void;
-export type Match = (path: string) => boolean;
+export type Match = (path: string, debug?: boolean) => boolean;
 
 export interface Options {
   delimiter?: string;
@@ -487,7 +487,7 @@ class DeepState {
   ) {
     listenerPath = this.cleanNotRecursivePath(listenerPath);
     const self = this;
-    return function listenerCollectionMatch(path) {
+    return function listenerCollectionMatch(path, debug = false) {
       if (isRecursive) {
         path = self.cutPath(path, listenerPath);
       } else {
@@ -495,6 +495,14 @@ class DeepState {
           self.cleanNotRecursivePath(listenerPath),
           path
         );
+      }
+      if (debug) {
+        console.log('[getListenerCollectionMatch]', {
+          listenerPath,
+          path,
+          isRecursive,
+          isWildcard,
+        });
       }
       if (isWildcard && self.match(listenerPath, path, isRecursive))
         return true;
@@ -830,8 +838,10 @@ class DeepState {
         }
       } else {
         // debug
+        let showMatch = false;
         for (const listener of listenersCollection.listeners.values()) {
           if (listener.options.debug) {
+            showMatch = true;
             console.log(
               `[getSubscribedListeners] Listener was not fired because there was no match.`,
               {
@@ -841,6 +851,9 @@ class DeepState {
               }
             );
           }
+        }
+        if (showMatch) {
+          listenersCollection.match(updatePath, true);
         }
       }
     }
