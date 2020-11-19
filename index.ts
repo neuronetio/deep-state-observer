@@ -489,10 +489,11 @@ class DeepState {
     listenerPath = this.cleanNotRecursivePath(listenerPath);
     const self = this;
     return function listenerCollectionMatch(path, debug = false) {
+      let scopedListenerPath = listenerPath;
       if (isRecursive) {
         path = self.cutPath(path, listenerPath);
       } else {
-        listenerPath = self.cutPath(
+        scopedListenerPath = self.cutPath(
           self.cleanNotRecursivePath(listenerPath),
           path
         );
@@ -500,14 +501,15 @@ class DeepState {
       if (debug) {
         console.log('[getListenerCollectionMatch]', {
           listenerPath,
+          scopedListenerPath,
           path,
           isRecursive,
           isWildcard,
         });
       }
-      if (isWildcard && self.match(listenerPath, path, isRecursive))
+      if (isWildcard && self.match(scopedListenerPath, path, isRecursive))
         return true;
-      return listenerPath === path;
+      return scopedListenerPath === path;
     };
   }
 
@@ -566,6 +568,9 @@ class DeepState {
       listenerPath,
       listener
     );
+    if (options.debug) {
+      console.log();
+    }
     listenersCollection.count++;
     const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
     if (!listenersCollection.isWildcard) {

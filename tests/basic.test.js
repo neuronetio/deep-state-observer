@@ -1610,4 +1610,14 @@ describe('State', () => {
     expect(values).toEqual(['full', 'partialFull', 'partialFull', 'partial']);
     //console.log(paths);
   });
+
+  it('it should properly clean not recursive path', () => {
+    const state = new State({});
+    expect(state.cleanNotRecursivePath('config.list.rows;')).toEqual(
+      'config.list.rows'
+    );
+    expect(state.cutPath('config.list.rows', 'config.list.rows')).toEqual(
+      'config.list.rows'
+    );
+  });
 });

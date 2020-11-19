@@ -414,23 +414,25 @@ var DeepState = /** @class */ (function () {
         var self = this;
         return function listenerCollectionMatch(path, debug) {
             if (debug === void 0) { debug = false; }
+            var scopedListenerPath = listenerPath;
             if (isRecursive) {
                 path = self.cutPath(path, listenerPath);
             }
             else {
-                listenerPath = self.cutPath(self.cleanNotRecursivePath(listenerPath), path);
+                scopedListenerPath = self.cutPath(self.cleanNotRecursivePath(listenerPath), path);
             }
             if (debug) {
                 console.log('[getListenerCollectionMatch]', {
                     listenerPath: listenerPath,
+                    scopedListenerPath: scopedListenerPath,
                     path: path,
                     isRecursive: isRecursive,
                     isWildcard: isWildcard
                 });
             }
-            if (isWildcard && self.match(listenerPath, path, isRecursive))
+            if (isWildcard && self.match(scopedListenerPath, path, isRecursive))
                 return true;
-            return listenerPath === path;
+            return scopedListenerPath === path;
         };
     };
     DeepState.prototype.getListenersCollection = function (listenerPath, listener) {
@@ -472,6 +474,9 @@ var DeepState = /** @class */ (function () {
         var listener = this.getCleanListener(fn, options);
         this.listenersIgnoreCache.set(listener, { truthy: [], falsy: [] });
         var listenersCollection = this.getListenersCollection(listenerPath, listener);
+        if (options.debug) {
+            console.log();
+        }
         listenersCollection.count++;
         var cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
         if (!listenersCollection.isWildcard) {
