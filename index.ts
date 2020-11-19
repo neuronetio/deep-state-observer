@@ -309,6 +309,7 @@ class DeepState {
   private cutPath(longer: string, shorter: string): string {
     longer = this.cleanNotRecursivePath(longer);
     shorter = this.cleanNotRecursivePath(shorter);
+    if (longer === shorter) return longer;
     const shorterPartsLen = this.getIndicesCount(
       this.options.delimiter,
       shorter

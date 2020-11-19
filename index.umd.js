@@ -479,6 +479,8 @@
         cutPath(longer, shorter) {
             longer = this.cleanNotRecursivePath(longer);
             shorter = this.cleanNotRecursivePath(shorter);
+            if (longer === shorter)
+                return longer;
             const shorterPartsLen = this.getIndicesCount(this.options.delimiter, shorter);
             const longerParts = this.getIndicesOf(this.options.delimiter, longer);
             return longer.substr(0, longerParts[shorterPartsLen]);
