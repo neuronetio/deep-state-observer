@@ -26,55 +26,51 @@ function __awaiter(thisArg, _arguments, P, generator) {
 }
 
 // forked from https://github.com/joonhocho/superwild
-function Matcher(pattern, wchar = '*') {
-    this.wchar = wchar;
-    this.pattern = pattern;
-    this.segments = [];
-    this.starCount = 0;
-    this.minLength = 0;
-    this.maxLength = 0;
-    this.segStartIndex = 0;
+function Match(pattern, match, wchar = '*') {
+    if (pattern === wchar) {
+        return true;
+    }
+    let segments = [];
+    let starCount = 0;
+    let minLength = 0;
+    let maxLength = 0;
+    let segStartIndex = 0;
     for (let i = 0, len = pattern.length; i < len; i += 1) {
         const char = pattern[i];
         if (char === wchar) {
-            this.starCount += 1;
-            if (i > this.segStartIndex) {
-                this.segments.push(pattern.substring(this.segStartIndex, i));
+            starCount += 1;
+            if (i > segStartIndex) {
+                segments.push(pattern.substring(segStartIndex, i));
             }
-            this.segments.push(char);
-            this.segStartIndex = i + 1;
+            segments.push(char);
+            segStartIndex = i + 1;
         }
     }
-    if (this.segStartIndex < pattern.length) {
-        this.segments.push(pattern.substring(this.segStartIndex));
+    if (segStartIndex < pattern.length) {
+        segments.push(pattern.substring(segStartIndex));
     }
-    if (this.starCount) {
-        this.minLength = pattern.length - this.starCount;
-        this.maxLength = Infinity;
+    if (starCount) {
+        minLength = pattern.length - starCount;
+        maxLength = Infinity;
     }
     else {
-        this.maxLength = this.minLength = pattern.length;
+        maxLength = minLength = pattern.length;
     }
-}
-Matcher.prototype.match = function match(match) {
-    if (this.pattern === this.wchar) {
-        return true;
+    if (segments.length === 0) {
+        return pattern === match;
     }
-    if (this.segments.length === 0) {
-        return this.pattern === match;
-    }
-    const { length } = match;
-    if (length < this.minLength || length > this.maxLength) {
+    const length = match.length;
+    if (length < minLength || length > maxLength) {
         return false;
     }
     let segLeftIndex = 0;
-    let segRightIndex = this.segments.length - 1;
+    let segRightIndex = segments.length - 1;
     let rightPos = match.length - 1;
     let rightIsStar = false;
     while (true) {
-        const segment = this.segments[segRightIndex];
+        const segment = segments[segRightIndex];
         segRightIndex -= 1;
-        if (segment === this.wchar) {
+        if (segment === wchar) {
             rightIsStar = true;
         }
         else {
@@ -99,7 +95,7 @@ Matcher.prototype.match = function match(match) {
         }
     }
     return true;
-};
+}
 
 function WildcardObject(obj, delimeter, wildcard, is_match = undefined) {
     this.obj = obj;
@@ -117,7 +113,8 @@ WildcardObject.prototype.simpleMatch = function simpleMatch(first, second) {
     const index = first.indexOf(this.wildcard);
     if (index > -1) {
         const end = first.substr(index + 1);
-        if (index === 0 || second.substring(0, index) === first.substring(0, index)) {
+        if (index === 0 ||
+            second.substring(0, index) === first.substring(0, index)) {
             const len = end.length;
             if (len > 0) {
                 return second.substr(-len) === end;
@@ -134,7 +131,7 @@ WildcardObject.prototype.match = function match(first, second) {
         first === this.wildcard ||
         second === this.wildcard ||
         this.simpleMatch(first, second) ||
-        new Matcher(first).match(second));
+        Match(first, second, this.wildcard));
 };
 WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr, partIndex, path, result = {}) {
     let nextPartIndex = wildcard.indexOf(this.delimeter, partIndex);
@@ -147,45 +144,50 @@ WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr
     let index = 0;
     for (const item of currentArr) {
         const key = index.toString();
-        const currentPath = path === "" ? key : path + this.delimeter + index;
+        const currentPath = path === '' ? key : path + this.delimeter + index;
         if (currentWildcardPath === this.wildcard ||
             currentWildcardPath === key ||
             this.simpleMatch(currentWildcardPath, key)) {
-            end ? (result[currentPath] = item) : this.goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
+            end
+                ? (result[currentPath] = item)
+                : this.goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
         }
         index++;
     }
     return result;
 };
-WildcardObject.prototype.handleObject = function handleObject(wildcard, currentObj, partIndex, path, result = {}) {
-    let nextPartIndex = wildcard.indexOf(this.delimeter, partIndex);
+WildcardObject.prototype.handleObject = function handleObject(wildcardPath, currentObj, partIndex, path, result = {}) {
+    let nextPartIndex = wildcardPath.indexOf(this.delimeter, partIndex);
     let end = false;
     if (nextPartIndex === -1) {
         end = true;
-        nextPartIndex = wildcard.length;
+        nextPartIndex = wildcardPath.length;
     }
-    const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
+    const currentWildcardPath = wildcardPath.substring(partIndex, nextPartIndex);
     for (let key in currentObj) {
         key = key.toString();
-        const currentPath = path === "" ? key : path + this.delimeter + key;
+        const currentPath = path === '' ? key : path + this.delimeter + key;
         if (currentWildcardPath === this.wildcard ||
             currentWildcardPath === key ||
             this.simpleMatch(currentWildcardPath, key)) {
-            end
-                ? (result[currentPath] = currentObj[key])
-                : this.goFurther(wildcard, currentObj[key], nextPartIndex + 1, currentPath, result);
+            if (end) {
+                result[currentPath] = currentObj[key];
+            }
+            else {
+                this.goFurther(wildcardPath, currentObj[key], nextPartIndex + 1, currentPath, result);
+            }
         }
     }
     return result;
 };
-WildcardObject.prototype.goFurther = function goFurther(wildcard, currentObj, partIndex, currentPath, result = {}) {
+WildcardObject.prototype.goFurther = function goFurther(path, currentObj, partIndex, currentPath, result = {}) {
     if (Array.isArray(currentObj)) {
-        return this.handleArray(wildcard, currentObj, partIndex, currentPath, result);
+        return this.handleArray(path, currentObj, partIndex, currentPath, result);
     }
-    return this.handleObject(wildcard, currentObj, partIndex, currentPath, result);
+    return this.handleObject(path, currentObj, partIndex, currentPath, result);
 };
-WildcardObject.prototype.get = function get(wildcard) {
-    return this.goFurther(wildcard, this.obj, 0, "");
+WildcardObject.prototype.get = function get(path) {
+    return this.goFurther(path, this.obj, 0, '');
 };
 
 class ObjectPath {
