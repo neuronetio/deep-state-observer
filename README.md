@@ -424,7 +424,8 @@ setTimeout(() => {
 
 ## group
 
-With subscribeAll you can group listeners to fire only once if one of the path is changed
+With subscribeAll you can group listeners to fire only once if one of the path is changed.
+Grouped listeners always are bulk listeners.
 
 ```javascript
 const state = new State({

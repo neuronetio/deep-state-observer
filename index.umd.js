@@ -383,6 +383,7 @@
         source: "",
         data: undefined,
         queue: false,
+        group: false,
     };
     const defaultUpdateOptions = {
         only: [],
@@ -603,9 +604,10 @@
             let index = 0;
             if (options.group) {
                 this.groupId++;
+                options.bulk = true;
             }
             for (const userPath of userPaths) {
-                unsubscribers.push(this.subscribe(userPath, fn, options, { all: userPaths, index, groupId: this.groupId }));
+                unsubscribers.push(this.subscribe(userPath, fn, options, { all: userPaths, index, groupId: options.group ? this.groupId : null }));
                 index++;
             }
             return function unsubscribe() {
@@ -693,10 +695,10 @@
                 console.log();
             }
             listenersCollection.count++;
-            const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
-            if (!listenersCollection.isWildcard) {
-                if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
-                    if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
+            if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
+                const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
+                if (!listenersCollection.isWildcard) {
+                    if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
                         fn(this.pathGet(this.split(cleanPath), this.data), {
                             type,
                             listener,
@@ -711,22 +713,20 @@
                         });
                     }
                 }
-            }
-            else {
-                const paths = this.scan.get(cleanPath);
-                if (options.bulk) {
-                    const bulkValue = [];
-                    for (const path in paths) {
-                        if (this.isMuted(path))
-                            continue;
-                        bulkValue.push({
-                            path,
-                            params: this.getParams(listenersCollection.paramsInfo, path),
-                            value: paths[path],
-                        });
-                    }
-                    if (!this.isMuted(fn)) {
-                        if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index))
+                else {
+                    const paths = this.scan.get(cleanPath);
+                    if (options.bulk) {
+                        const bulkValue = [];
+                        for (const path in paths) {
+                            if (this.isMuted(path))
+                                continue;
+                            bulkValue.push({
+                                path,
+                                params: this.getParams(listenersCollection.paramsInfo, path),
+                                value: paths[path],
+                            });
+                        }
+                        if (!this.isMuted(fn)) {
                             fn(bulkValue, {
                                 type,
                                 listener,
@@ -739,12 +739,11 @@
                                 options,
                                 params: undefined,
                             });
+                        }
                     }
-                }
-                else {
-                    for (const path in paths) {
-                        if (!this.isMuted(path) && !this.isMuted(fn)) {
-                            if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index))
+                    else {
+                        for (const path in paths) {
+                            if (!this.isMuted(path) && !this.isMuted(fn)) {
                                 fn(paths[path], {
                                     type,
                                     listener,
@@ -757,6 +756,7 @@
                                     params: this.getParams(listenersCollection.paramsInfo, path),
                                     options,
                                 });
+                            }
                         }
                     }
                 }
@@ -804,21 +804,26 @@
                 }
             }
         }
-        getQueueNotifyListeners(listeners, queue = []) {
-            for (const path in listeners) {
+        getQueueNotifyListeners(groupedListeners, queue = []) {
+            for (const path in groupedListeners) {
                 if (this.isMuted(path))
                     continue;
-                let { single, bulk } = listeners[path];
+                let { single, bulk } = groupedListeners[path];
                 for (const singleListener of single) {
                     let alreadyInQueue = false;
+                    let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                    if (!singleListener.eventInfo.path.resolved) {
+                        resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                    }
                     for (const excludedListener of queue) {
-                        if (excludedListener.id === singleListener.listener.id) {
+                        if (resolvedIdPath === excludedListener.resolvedIdPath) {
                             alreadyInQueue = true;
                             break;
                         }
                     }
-                    if (alreadyInQueue)
+                    if (alreadyInQueue) {
                         continue;
+                    }
                     const time = this.debugTime(singleListener);
                     if (!this.isMuted(singleListener.listener.fn)) {
                         if (singleListener.listener.options.queue && this.jobsRunning) {
@@ -827,8 +832,14 @@
                             });
                         }
                         else {
+                            let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                            if (!singleListener.eventInfo.path.resolved) {
+                                resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                            }
                             queue.push({
                                 id: singleListener.listener.id,
+                                resolvedPath: singleListener.eventInfo.path.resolved,
+                                resolvedIdPath,
                                 originalFn: singleListener.listener.fn,
                                 fn: () => {
                                     singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
@@ -866,8 +877,14 @@
                             });
                         }
                         else {
+                            let resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
+                            if (!bulkListener.eventInfo.path.resolved) {
+                                resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+                            }
                             queue.push({
                                 id: bulkListener.listener.id,
+                                resolvedPath: bulkListener.eventInfo.path.resolved,
+                                resolvedIdPath,
                                 originalFn: bulkListener.listener.fn,
                                 fn: () => {
                                     bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
@@ -1183,26 +1200,27 @@
             ++this.jobsRunning;
             options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
             const scanned = this.scan.get(updatePath);
-            const bulk = {};
+            const updated = {};
             for (const path in scanned) {
                 const split = this.split(path);
                 const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn);
                 if (!this.same(newValue, oldValue) || options.force) {
                     this.pathSet(split, newValue, this.data);
-                    bulk[path] = newValue;
+                    updated[path] = newValue;
                 }
             }
             const groupedListenersPack = [];
             const waitingPaths = [];
-            for (const path in bulk) {
-                const newValue = bulk[path];
+            for (const path in updated) {
+                const newValue = updated[path];
                 if (options.only.length) {
                     groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
                 }
                 else {
                     groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, "update", updatePath));
-                    this.canBeNested(newValue) &&
+                    if (this.canBeNested(newValue)) {
                         groupedListenersPack.push(this.getNestedListeners(path, newValue, options, "update", updatePath));
+                    }
                 }
                 options.debug && this.options.log("Wildcard update", { path, newValue });
                 waitingPaths.push(path);

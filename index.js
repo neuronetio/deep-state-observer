@@ -106,7 +106,8 @@ var defaultListenerOptions = {
     debug: false,
     source: "",
     data: undefined,
-    queue: false
+    queue: false,
+    group: false
 };
 var defaultUpdateOptions = {
     only: [],
@@ -372,11 +373,12 @@ var DeepState = /** @class */ (function () {
         var index = 0;
         if (options.group) {
             this.groupId++;
+            options.bulk = true;
         }
         try {
             for (var userPaths_2 = __values(userPaths), userPaths_2_1 = userPaths_2.next(); !userPaths_2_1.done; userPaths_2_1 = userPaths_2.next()) {
                 var userPath = userPaths_2_1.value;
-                unsubscribers.push(this.subscribe(userPath, fn, options, { all: userPaths, index: index, groupId: this.groupId }));
+                unsubscribers.push(this.subscribe(userPath, fn, options, { all: userPaths, index: index, groupId: options.group ? this.groupId : null }));
                 index++;
             }
         }
@@ -488,10 +490,10 @@ var DeepState = /** @class */ (function () {
             console.log();
         }
         listenersCollection.count++;
-        var cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
-        if (!listenersCollection.isWildcard) {
-            if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
-                if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
+        if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
+            var cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
+            if (!listenersCollection.isWildcard) {
+                if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
                     fn(this.pathGet(this.split(cleanPath), this.data), {
                         type: type,
                         listener: listener,
@@ -506,22 +508,20 @@ var DeepState = /** @class */ (function () {
                     });
                 }
             }
-        }
-        else {
-            var paths = this.scan.get(cleanPath);
-            if (options.bulk) {
-                var bulkValue = [];
-                for (var path in paths) {
-                    if (this.isMuted(path))
-                        continue;
-                    bulkValue.push({
-                        path: path,
-                        params: this.getParams(listenersCollection.paramsInfo, path),
-                        value: paths[path]
-                    });
-                }
-                if (!this.isMuted(fn)) {
-                    if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index))
+            else {
+                var paths = this.scan.get(cleanPath);
+                if (options.bulk) {
+                    var bulkValue = [];
+                    for (var path in paths) {
+                        if (this.isMuted(path))
+                            continue;
+                        bulkValue.push({
+                            path: path,
+                            params: this.getParams(listenersCollection.paramsInfo, path),
+                            value: paths[path]
+                        });
+                    }
+                    if (!this.isMuted(fn)) {
                         fn(bulkValue, {
                             type: type,
                             listener: listener,
@@ -534,12 +534,11 @@ var DeepState = /** @class */ (function () {
                             options: options,
                             params: undefined
                         });
+                    }
                 }
-            }
-            else {
-                for (var path in paths) {
-                    if (!this.isMuted(path) && !this.isMuted(fn)) {
-                        if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index))
+                else {
+                    for (var path in paths) {
+                        if (!this.isMuted(path) && !this.isMuted(fn)) {
                             fn(paths[path], {
                                 type: type,
                                 listener: listener,
@@ -552,6 +551,7 @@ var DeepState = /** @class */ (function () {
                                 params: this.getParams(listenersCollection.paramsInfo, path),
                                 options: options
                             });
+                        }
                     }
                 }
             }
@@ -599,21 +599,25 @@ var DeepState = /** @class */ (function () {
             }
         }
     };
-    DeepState.prototype.getQueueNotifyListeners = function (listeners, queue) {
+    DeepState.prototype.getQueueNotifyListeners = function (groupedListeners, queue) {
         var e_6, _a, e_7, _b;
         var _this = this;
         if (queue === void 0) { queue = []; }
-        for (var path in listeners) {
+        for (var path in groupedListeners) {
             if (this.isMuted(path))
                 continue;
-            var _c = listeners[path], single = _c.single, bulk = _c.bulk;
+            var _c = groupedListeners[path], single = _c.single, bulk = _c.bulk;
             var _loop_1 = function (singleListener) {
                 var e_8, _a;
                 var alreadyInQueue = false;
+                var resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                if (!singleListener.eventInfo.path.resolved) {
+                    resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                }
                 try {
                     for (var queue_1 = (e_8 = void 0, __values(queue)), queue_1_1 = queue_1.next(); !queue_1_1.done; queue_1_1 = queue_1.next()) {
                         var excludedListener = queue_1_1.value;
-                        if (excludedListener.id === singleListener.listener.id) {
+                        if (resolvedIdPath === excludedListener.resolvedIdPath) {
                             alreadyInQueue = true;
                             break;
                         }
@@ -626,8 +630,9 @@ var DeepState = /** @class */ (function () {
                     }
                     finally { if (e_8) throw e_8.error; }
                 }
-                if (alreadyInQueue)
+                if (alreadyInQueue) {
                     return "continue";
+                }
                 var time = this_1.debugTime(singleListener);
                 if (!this_1.isMuted(singleListener.listener.fn)) {
                     if (singleListener.listener.options.queue && this_1.jobsRunning) {
@@ -636,8 +641,14 @@ var DeepState = /** @class */ (function () {
                         });
                     }
                     else {
+                        var resolvedIdPath_1 = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                        if (!singleListener.eventInfo.path.resolved) {
+                            resolvedIdPath_1 = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                        }
                         queue.push({
                             id: singleListener.listener.id,
+                            resolvedPath: singleListener.eventInfo.path.resolved,
+                            resolvedIdPath: resolvedIdPath_1,
                             originalFn: singleListener.listener.fn,
                             fn: function () {
                                 singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
@@ -710,8 +721,14 @@ var DeepState = /** @class */ (function () {
                         });
                     }
                     else {
+                        var resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
+                        if (!bulkListener.eventInfo.path.resolved) {
+                            resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+                        }
                         queue.push({
                             id: bulkListener.listener.id,
+                            resolvedPath: bulkListener.eventInfo.path.resolved,
+                            resolvedIdPath: resolvedIdPath,
                             originalFn: bulkListener.listener.fn,
                             fn: function () {
                                 bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
@@ -1217,26 +1234,27 @@ var DeepState = /** @class */ (function () {
         ++this.jobsRunning;
         options = __assign(__assign({}, defaultUpdateOptions), options);
         var scanned = this.scan.get(updatePath);
-        var bulk = {};
+        var updated = {};
         for (var path in scanned) {
             var split = this.split(path);
             var _a = this.getUpdateValues(scanned[path], split, fn), oldValue = _a.oldValue, newValue = _a.newValue;
             if (!this.same(newValue, oldValue) || options.force) {
                 this.pathSet(split, newValue, this.data);
-                bulk[path] = newValue;
+                updated[path] = newValue;
             }
         }
         var groupedListenersPack = [];
         var waitingPaths = [];
-        for (var path in bulk) {
-            var newValue = bulk[path];
+        for (var path in updated) {
+            var newValue = updated[path];
             if (options.only.length) {
                 groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
             }
             else {
                 groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, "update", updatePath));
-                this.canBeNested(newValue) &&
+                if (this.canBeNested(newValue)) {
                     groupedListenersPack.push(this.getNestedListeners(path, newValue, options, "update", updatePath));
+                }
             }
             options.debug && this.options.log("Wildcard update", { path: path, newValue: newValue });
             waitingPaths.push(path);

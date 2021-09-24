@@ -1419,6 +1419,7 @@ describe("State", () => {
         },
       };
     });
+
     expect(values).toEqual([1, 2, 3, 4]);
   });
 

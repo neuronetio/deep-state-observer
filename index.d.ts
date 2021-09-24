@@ -53,6 +53,8 @@ export interface Listener {
 }
 export interface Queue {
     id: number;
+    resolvedPath: string;
+    resolvedIdPath: string;
     fn: () => void;
     originalFn: ListenerFunction;
     options: ListenerOptions;
