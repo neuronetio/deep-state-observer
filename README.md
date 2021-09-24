@@ -87,20 +87,20 @@ onDestroy(() => {
 ## Wildcards
 
 ```javascript
-import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const State = require('deep-state-observer');
+import { onDestroy } from "svelte";
+import State from "deep-state-observer"; // const State = require('deep-state-observer');
 
 // first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimiter :P )
 const state = new State({
   some: { thing: { test: 0 } },
-  someOther: { nested: { node: 'ok' } },
+  someOther: { nested: { node: "ok" } },
 });
 
 // store some unsubscribe methods
 let subscribers = [];
 
 subscribers.push(
-  state.subscribe('someOther.*.n*e', (value, eventInfo) => {
+  state.subscribe("someOther.*.n*e", (value, eventInfo) => {
     // fired only once with
     // value = 'ok'
     // eventInfo.path.resolved = 'someOther.nested.node'
@@ -108,7 +108,7 @@ subscribers.push(
 );
 
 // you can update wildcarded values too
-state.update('some.*.test', 'test');
+state.update("some.*.test", "test");
 
 onDestroy(() => {
   subscribers.forEach((unsubscribe) => unsubscribe());
@@ -118,8 +118,8 @@ onDestroy(() => {
 ## Named wildcards (parameters)
 
 ```javascript
-import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const State = require('deep-state-observer');
+import { onDestroy } from "svelte";
+import State from "deep-state-observer"; // const State = require('deep-state-observer');
 
 // first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimiter :P )
 const state = new State({
@@ -135,7 +135,7 @@ const state = new State({
 let subscribers = [];
 
 subscribers.push(
-  state.subscribe('items.:index.val', (value, eventInfo) => {
+  state.subscribe("items.:index.val", (value, eventInfo) => {
     // fired three times
     //
     // #1
@@ -156,7 +156,7 @@ subscribers.push(
 );
 
 subscribers.push(
-  state.subscribe('byId.:id.val', (value, eventInfo) => {
+  state.subscribe("byId.:id.val", (value, eventInfo) => {
     // fired three times
     //
     // #1
@@ -183,8 +183,8 @@ onDestroy(() => {
 ## Wildcard bulk operations (better performance)
 
 ```javascript
-import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const State = require('deep-state-observer');
+import { onDestroy } from "svelte";
+import State from "deep-state-observer"; // const State = require('deep-state-observer');
 
 // first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimiter :P )
 const state = new State({
@@ -200,7 +200,7 @@ let subscribers = [];
 
 subscribers.push(
   state.subscribe(
-    'byId.:id.val',
+    "byId.:id.val",
     (bulk, eventInfo) => {
       // fired only once where bulk = [
       //  {
@@ -226,7 +226,7 @@ subscribers.push(
 
 subscribers.push(
   state.subscribe(
-    'byId.*.val',
+    "byId.*.val",
     (bulk, eventInfo) => {
       // fired only once where bulk = [
       //  {
@@ -258,19 +258,19 @@ onDestroy(() => {
 ## Observe only chosen node changes (not recursive, not nested, for immutable data)
 
 ```javascript
-import { onDestroy } from 'svelte';
-import State from 'deep-state-observer'; // const State = require('deep-state-observer');
+import { onDestroy } from "svelte";
+import State from "deep-state-observer"; // const State = require('deep-state-observer');
 
 const state = new State({
-  some: 'value',
-  someOther: { nested: { node: 'ok' } },
+  some: "value",
+  someOther: { nested: { node: "ok" } },
 });
 
 // store some unsubscribe methods
 let subscribers = [];
 
 subscribers.push(
-  state.subscribe('someOther;', (value, eventInfo) => {
+  state.subscribe("someOther;", (value, eventInfo) => {
     // fired once
     //
     // #1 - immediately with
@@ -280,7 +280,7 @@ subscribers.push(
 );
 
 subscribers.push(
-  state.subscribe('someOther.nested;', (value, eventInfo) => {
+  state.subscribe("someOther.nested;", (value, eventInfo) => {
     // fired once
     //
     // #1 - immediately with
@@ -289,7 +289,7 @@ subscribers.push(
   })
 );
 
-state.update('someOther.nested.node', 'modified'); // subscribers aren't fired
+state.update("someOther.nested.node", "modified"); // subscribers aren't fired
 
 onDestroy(() => {
   subscribers.forEach((unsubscribe) => unsubscribe());
@@ -302,17 +302,17 @@ onDestroy(() => {
 const state = new State({
   one: { two: { three: { four: 4 } } },
 });
-state.subscribe('one.two', (val, eventInfo) => {
+state.subscribe("one.two", (val, eventInfo) => {
   // trigerred only once - immediately
   // because update have option 'only' wich will update only selected nested paths even i you are updating whole 'one.two' object
   // 'only' option works for object and arrays and it is usefull when you have changed only 'four'-th node of the object
   // and don't want to listeners from 'one.two' be notified (it is kind of performance improvement hack)
   // you can bypass those huge operation that is executed here because it is not needed (we are changing only one 'four'th leaf)
 });
-state.subscribe('one.two.three.four', (val, eventInfo) => {
+state.subscribe("one.two.three.four", (val, eventInfo) => {
   // trigerred two times immediately and after update
 });
-state.update('one.two', { three: { four: 44 } }, { only: ['*.four'] });
+state.update("one.two", { three: { four: 44 } }, { only: ["*.four"] });
 ```
 
 ## mute / unmute changes
@@ -320,56 +320,56 @@ state.update('one.two', { three: { four: 44 } }, { only: ['*.four'] });
 It will work with wildcards as update values, as muted paths or both.
 
 ```javascript
-const state = new State({ x: { z: 'z', i: { o: 'o' } }, y: 'y' });
+const state = new State({ x: { z: "z", i: { o: "o" } }, y: "y" });
 const values = [];
-state.subscribe('x.i.o', (val) => {
+state.subscribe("x.i.o", (val) => {
   values.push(val);
 });
 // values.length === 1
-state.mute('x.*.o');
-state.update('x.i.o', 'oo');
+state.mute("x.*.o");
+state.update("x.i.o", "oo");
 // values.length === 1 (x.i.o listener was not fired)
-state.unmute('x.*.o');
-state.update('x.i.o', 'ooo');
+state.unmute("x.*.o");
+state.update("x.i.o", "ooo");
 // values.length === 2 (x.i.o listener was fired)
 
-state.mute('x');
-state.update('x.i.o', 'oooo');
+state.mute("x");
+state.update("x.i.o", "oooo");
 // values.length === 2 (x.i.o listener was not fired)
 
-state.unmute('x');
-state.mute('x;'); // mute only x (not nested)
-state.update('x.i.o', 'oooo');
+state.unmute("x");
+state.mute("x;"); // mute only x (not nested)
+state.update("x.i.o", "oooo");
 // values.length === 3 (x.i.o listener was fired)
 ```
 
 You can also mute specific listeners (functions)
 
 ```javascript
-const state = new State({ x: { z: 'z', i: { o: 'o' } }, y: 'y' });
+const state = new State({ x: { z: "z", i: { o: "o" } }, y: "y" });
 const values = [];
 
 function listener1() {
-  values.push('1');
+  values.push("1");
 }
 function listener2() {
-  values.push('2');
+  values.push("2");
 }
 
-state.subscribe('x.i.o', listener1);
-state.subscribe('x.i.o', listener2);
+state.subscribe("x.i.o", listener1);
+state.subscribe("x.i.o", listener2);
 // values = ['1', '2']
 
 state.mute(listener2); // from now on listener2 will not fire
 
 values.length = 0;
-state.update('x.i.o', 'oo');
+state.update("x.i.o", "oo");
 // values = ['1']
 
 state.unmute(listener2);
 
 values.length = 0;
-state.update('x.i.o', 'oo');
+state.update("x.i.o", "oo");
 // values = ['1','2']
 ```
 
@@ -383,22 +383,22 @@ const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
 const values = [];
 
 state.subscribe(
-  'one.two.three',
+  "one.two.three",
   (val) => {
     values.push(val);
   },
-  { ignore: ['one.two.three.four'] }
+  { ignore: ["one.two.three.four"] }
 );
 // values.length === 1 & values[0] === { four: { five: 0 } }
-state.update('one.two.three.four.five', 1);
+state.update("one.two.three.four.five", 1);
 // values.length === 1 because all nodes after four was ignored
-state.update('one.two.three.*.five', 1);
+state.update("one.two.three.*.five", 1);
 // values.length === 1 because all nodes after four was ignored
-state.update('one.two.three.four', 1);
+state.update("one.two.three.four", 1);
 // values.length === 1 because all nodes after four was ignored
-state.update('one.two.*.four', 2);
+state.update("one.two.*.four", 2);
 // values.length === 1 because all nodes after four was ignored
-state.update('one.two.three', 1);
+state.update("one.two.three", 1);
 // values.length === 1 & values[1] === 1
 ```
 
@@ -407,14 +407,14 @@ state.update('one.two.three', 1);
 You can wait with update untill all other tasks are finished.
 
 ```javascript
-const state = new State({ test: 1, other: 'x' });
+const state = new State({ test: 1, other: "x" });
 const values = [];
-state.subscribe('test', (value) => {
-  state.update('other', 'xx', { queue: true });
+state.subscribe("test", (value) => {
+  state.update("other", "xx", { queue: true });
   values.push(value);
 });
 // values.length === 1 & values[0] === 1
-state.update('test', 2);
+state.update("test", 2);
 // values.length ===2 & values[1] === 2
 // state.get('other') === 'x'
 setTimeout(() => {
@@ -422,17 +422,50 @@ setTimeout(() => {
 }, 100);
 ```
 
+## group
+
+With subscribeAll you can group listeners to fire only once if one of the path is changed
+
+```javascript
+const state = new State({
+  "n-1": {
+    "n-1-1": {
+      id: "1-1",
+      val: "v1-1",
+    },
+    "n-1-2": {
+      id: "1-2",
+      val: "v1-2",
+    },
+  },
+});
+const results = [];
+function fn(bulk, eventInfo) {
+  results.push(eventInfo.path);
+}
+state.subscribeAll(["n-1.n-1-1.id", "n-1.n-1-2.val"], fn, {
+  group: true,
+});
+// results.length = 1
+state.subscribeAll(["n-1"], fn);
+// results.length = 2  // not 3
+state.update("n-1.*.id", "new id");
+// results.length = 4 // not 6
+state.update("n-1.*.id", "new id 2");
+// results.length = 6 // not 9
+```
+
 ## Debug
 
 ```javascript
 // you can debug listeners and updates with 'debug' and 'source' options
-state.subscribe('something', () => {}, {
+state.subscribe("something", () => {}, {
   debug: true,
-  source: 'your.component.name.or.something',
+  source: "your.component.name.or.something",
 });
-state.update('something', 'someValue', {
+state.update("something", "someValue", {
   debug: true,
-  source: 'your.component.name.or.something',
+  source: "your.component.name.or.something",
 });
 ```
 

@@ -35,6 +35,7 @@ export interface ListenerOptions {
     data?: any;
     queue?: boolean;
     ignore?: string[];
+    group?: boolean;
 }
 export interface UpdateOptions {
     only?: string[];
@@ -48,11 +49,14 @@ export interface Listener {
     fn: ListenerFunction;
     options: ListenerOptions;
     id?: number;
+    groupId: number | null;
 }
 export interface Queue {
     id: number;
     fn: () => void;
     originalFn: ListenerFunction;
+    options: ListenerOptions;
+    groupId: number;
 }
 export interface GroupedListener {
     listener: Listener;
@@ -112,6 +116,11 @@ export interface ParamsInfo {
     replaced: string;
     original: string;
 }
+export interface SubscribeAllOptions {
+    all: string[];
+    index: number;
+    groupId: number;
+}
 declare class DeepState {
     private listeners;
     private waitingListeners;
@@ -131,6 +140,7 @@ declare class DeepState {
     private resolved;
     private muted;
     private mutedListeners;
+    private groupId;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
@@ -155,7 +165,7 @@ declare class DeepState {
     private getCleanListener;
     private getListenerCollectionMatch;
     private getListenersCollection;
-    subscribe(listenerPath: string, fn: ListenerFunction, options?: ListenerOptions, type?: string): () => void;
+    subscribe(listenerPath: string, fn: ListenerFunction, options?: ListenerOptions, subscribeAllOptions?: SubscribeAllOptions): () => void;
     private unsubscribe;
     private runQueuedListeners;
     private getQueueNotifyListeners;
@@ -176,7 +186,10 @@ declare class DeepState {
     private updateNotifyOnly;
     update(updatePath: string, fnOrValue: Updater | any, options?: UpdateOptions, multi?: boolean): any;
     multi(): {
-        update(updatePath: string, fn: any, options?: UpdateOptions): any;
+        update(updatePath: string, fn: Updater | any, options?: UpdateOptions): any;
+        done(): void;
+    } | {
+        update(): void;
         done(): void;
     };
     get(userPath?: string | undefined): any;

@@ -1,6 +1,7 @@
 "use strict";
 // forked from https://github.com/joonhocho/superwild
 exports.__esModule = true;
+exports.Match = void 0;
 function Matcher(pattern, wchar) {
     if (wchar === void 0) { wchar = '*'; }
     this.wchar = wchar;

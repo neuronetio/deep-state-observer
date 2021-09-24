@@ -1,22 +1,22 @@
 (function (global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
     typeof define === 'function' && define.amd ? define(factory) :
-    (global = global || self, global.DeepStateObserver = factory());
-}(this, (function () { 'use strict';
+    (global = typeof globalThis !== 'undefined' ? globalThis : global || self, global.DeepStateObserver = factory());
+})(this, (function () { 'use strict';
 
     /*! *****************************************************************************
-    Copyright (c) Microsoft Corporation. All rights reserved.
-    Licensed under the Apache License, Version 2.0 (the "License"); you may not use
-    this file except in compliance with the License. You may obtain a copy of the
-    License at http://www.apache.org/licenses/LICENSE-2.0
+    Copyright (c) Microsoft Corporation.
 
-    THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-    KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
-    WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
-    MERCHANTABLITY OR NON-INFRINGEMENT.
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted.
 
-    See the Apache Version 2.0 License for specific language governing permissions
-    and limitations under the License.
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+    REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+    AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+    INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+    LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+    OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+    PERFORMANCE OF THIS SOFTWARE.
     ***************************************************************************** */
 
     function __awaiter(thisArg, _arguments, P, generator) {
@@ -380,13 +380,13 @@
     const defaultListenerOptions = {
         bulk: false,
         debug: false,
-        source: '',
+        source: "",
         data: undefined,
         queue: false,
     };
     const defaultUpdateOptions = {
         only: [],
-        source: '',
+        source: "",
         debug: false,
         data: undefined,
         queue: false,
@@ -400,11 +400,12 @@
             this.listenersIgnoreCache = new WeakMap();
             this.destroyed = false;
             this.queueRuns = 0;
+            this.groupId = 0;
             this.lastExecs = new WeakMap();
             this.listeners = new Map();
             this.waitingListeners = new Map();
             this.data = data;
-            this.options = Object.assign({}, getDefaultOptions(), options);
+            this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
             this.id = 0;
             this.pathGet = ObjectPath.get;
             this.pathSet = ObjectPath.set;
@@ -427,8 +428,7 @@
             });
         }
         same(newValue, oldValue) {
-            return ((['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) ||
-                newValue === null) &&
+            return ((["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
                 oldValue === newValue);
         }
         getListeners() {
@@ -449,8 +449,7 @@
             if (first === this.options.wildcard || second === this.options.wildcard)
                 return true;
             if (!nested &&
-                this.getIndicesCount(this.options.delimiter, first) <
-                    this.getIndicesCount(this.options.delimiter, second)) {
+                this.getIndicesCount(this.options.delimiter, first) < this.getIndicesCount(this.options.delimiter, second)) {
                 // first < second because first is a listener path and may be longer but not shorter
                 return false;
             }
@@ -497,7 +496,7 @@
             return path;
         }
         split(path) {
-            return path === '' ? [] : path.split(this.options.delimiter);
+            return path === "" ? [] : path.split(this.options.delimiter);
         }
         isWildcard(path) {
             return path.includes(this.options.wildcard) || this.hasParams(path);
@@ -506,24 +505,22 @@
             return path.endsWith(this.options.notRecursive);
         }
         cleanNotRecursivePath(path) {
-            return this.isNotRecursive(path)
-                ? path.substring(0, path.length - 1)
-                : path;
+            return this.isNotRecursive(path) ? path.substring(0, path.length - 1) : path;
         }
         hasParams(path) {
             return path.includes(this.options.param);
         }
         getParamsInfo(path) {
-            let paramsInfo = { replaced: '', original: path, params: {} };
+            let paramsInfo = { replaced: "", original: path, params: {} };
             let partIndex = 0;
             let fullReplaced = [];
             for (const part of this.split(path)) {
                 paramsInfo.params[partIndex] = {
                     original: part,
-                    replaced: '',
-                    name: '',
+                    replaced: "",
+                    name: "",
                 };
-                const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimiter}\\${this.options.param}]+)`, 'g');
+                const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimiter}\\${this.options.param}]+)`, "g");
                 let param = reg.exec(part);
                 if (param) {
                     paramsInfo.params[partIndex].name = param[1];
@@ -603,8 +600,13 @@
             if (this.destroyed)
                 return () => { };
             let unsubscribers = [];
+            let index = 0;
+            if (options.group) {
+                this.groupId++;
+            }
             for (const userPath of userPaths) {
-                unsubscribers.push(this.subscribe(userPath, fn, options));
+                unsubscribers.push(this.subscribe(userPath, fn, options, { all: userPaths, index, groupId: this.groupId }));
+                index++;
             }
             return function unsubscribe() {
                 for (const unsubscribe of unsubscribers) {
@@ -618,7 +620,8 @@
         getCleanListener(fn, options = defaultListenerOptions) {
             return {
                 fn,
-                options: Object.assign({}, defaultListenerOptions, options),
+                options: Object.assign(Object.assign({}, defaultListenerOptions), options),
+                groupId: null,
             };
         }
         getListenerCollectionMatch(listenerPath, isRecursive, isWildcard) {
@@ -633,7 +636,7 @@
                     scopedListenerPath = self.cutPath(self.cleanNotRecursivePath(listenerPath), path);
                 }
                 if (debug) {
-                    console.log('[getListenerCollectionMatch]', {
+                    console.log("[getListenerCollectionMatch]", {
                         listenerPath,
                         scopedListenerPath,
                         path,
@@ -669,18 +672,21 @@
             if (!collCfg.isRecursive) {
                 collCfg.path = this.cleanNotRecursivePath(collCfg.path);
             }
-            let listenersCollection = this.getCleanListenersCollection(Object.assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
+            let listenersCollection = this.getCleanListenersCollection(Object.assign(Object.assign({}, collCfg), { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
             this.id++;
             listenersCollection.listeners.set(this.id, listener);
             listener.id = this.id;
             this.listeners.set(collCfg.originalPath, listenersCollection);
             return listenersCollection;
         }
-        subscribe(listenerPath, fn, options = defaultListenerOptions, type = 'subscribe') {
+        subscribe(listenerPath, fn, options = defaultListenerOptions, subscribeAllOptions = { all: [listenerPath], index: 0, groupId: this.groupId }) {
             if (this.destroyed)
                 return () => { };
             this.jobsRunning++;
+            const type = "subscribe";
             let listener = this.getCleanListener(fn, options);
+            if (options.group)
+                listener.groupId = subscribeAllOptions.groupId;
             this.listenersIgnoreCache.set(listener, { truthy: [], falsy: [] });
             const listenersCollection = this.getListenersCollection(listenerPath, listener);
             if (options.debug) {
@@ -690,18 +696,20 @@
             const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
             if (!listenersCollection.isWildcard) {
                 if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
-                    fn(this.pathGet(this.split(cleanPath), this.data), {
-                        type,
-                        listener,
-                        listenersCollection,
-                        path: {
-                            listener: listenerPath,
-                            update: undefined,
-                            resolved: this.cleanNotRecursivePath(listenerPath),
-                        },
-                        params: this.getParams(listenersCollection.paramsInfo, cleanPath),
-                        options,
-                    });
+                    if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
+                        fn(this.pathGet(this.split(cleanPath), this.data), {
+                            type,
+                            listener,
+                            listenersCollection,
+                            path: {
+                                listener: listenerPath,
+                                update: undefined,
+                                resolved: this.cleanNotRecursivePath(listenerPath),
+                            },
+                            params: this.getParams(listenersCollection.paramsInfo, cleanPath),
+                            options,
+                        });
+                    }
                 }
             }
             else {
@@ -718,35 +726,37 @@
                         });
                     }
                     if (!this.isMuted(fn)) {
-                        fn(bulkValue, {
-                            type,
-                            listener,
-                            listenersCollection,
-                            path: {
-                                listener: listenerPath,
-                                update: undefined,
-                                resolved: undefined,
-                            },
-                            options,
-                            params: undefined,
-                        });
-                    }
-                }
-                else {
-                    for (const path in paths) {
-                        if (!this.isMuted(path) && !this.isMuted(fn)) {
-                            fn(paths[path], {
+                        if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index))
+                            fn(bulkValue, {
                                 type,
                                 listener,
                                 listenersCollection,
                                 path: {
                                     listener: listenerPath,
                                     update: undefined,
-                                    resolved: this.cleanNotRecursivePath(path),
+                                    resolved: undefined,
                                 },
-                                params: this.getParams(listenersCollection.paramsInfo, path),
                                 options,
+                                params: undefined,
                             });
+                    }
+                }
+                else {
+                    for (const path in paths) {
+                        if (!this.isMuted(path) && !this.isMuted(fn)) {
+                            if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index))
+                                fn(paths[path], {
+                                    type,
+                                    listener,
+                                    listenersCollection,
+                                    path: {
+                                        listener: listenerPath,
+                                        update: undefined,
+                                        resolved: this.cleanNotRecursivePath(path),
+                                    },
+                                    params: this.getParams(listenersCollection.paramsInfo, path),
+                                    options,
+                                });
                         }
                     }
                 }
@@ -783,7 +793,7 @@
                 this.queueRuns++;
                 if (this.queueRuns >= this.options.maxQueueRuns) {
                     this.queueRuns = 0;
-                    throw new Error('Maximal number of queue runs exhausted.');
+                    throw new Error("Maximal number of queue runs exhausted.");
                 }
                 else {
                     Promise.resolve()
@@ -823,6 +833,8 @@
                                 fn: () => {
                                     singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
                                 },
+                                options: singleListener.listener.options,
+                                groupId: singleListener.listener.groupId,
                             });
                         }
                     }
@@ -841,7 +853,7 @@
                     const time = this.debugTime(bulkListener);
                     const bulkValue = [];
                     for (const bulk of bulkListener.value) {
-                        bulkValue.push(Object.assign({}, bulk, { value: bulk.value() }));
+                        bulkValue.push(Object.assign(Object.assign({}, bulk), { value: bulk.value() }));
                     }
                     if (!this.isMuted(bulkListener.listener.fn)) {
                         if (bulkListener.listener.options.queue && this.jobsRunning) {
@@ -860,6 +872,8 @@
                                 fn: () => {
                                     bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
                                 },
+                                options: bulkListener.listener.options,
+                                groupId: bulkListener.listener.groupId,
                             });
                         }
                     }
@@ -888,8 +902,8 @@
             }
             return false;
         }
-        getSubscribedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
-            options = Object.assign({}, defaultUpdateOptions, options);
+        getSubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
+            options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
             const listeners = {};
             for (let [listenerPath, listenersCollection] of this.listeners) {
                 listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
@@ -969,10 +983,10 @@
             }
             return listeners;
         }
-        notifySubscribedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
+        notifySubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
             return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
         }
-        getNestedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
+        getNestedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
             const listeners = {};
             for (let [listenerPath, listenersCollection] of this.listeners) {
                 if (!listenersCollection.isRecursive)
@@ -1045,21 +1059,26 @@
                     // debug
                     for (const listener of listenersCollection.listeners.values()) {
                         if (listener.options.debug) {
-                            console.log('[getNestedListeners] Listener was not fired because there was no match.', { listener, listenersCollection, currentCutPath, updatePath });
+                            console.log("[getNestedListeners] Listener was not fired because there was no match.", {
+                                listener,
+                                listenersCollection,
+                                currentCutPath,
+                                updatePath,
+                            });
                         }
                     }
                 }
             }
             return listeners;
         }
-        notifyNestedListeners(updatePath, newValue, options, type = 'update', queue, originalPath = null) {
+        notifyNestedListeners(updatePath, newValue, options, type = "update", queue, originalPath = null) {
             return this.getQueueNotifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), queue);
         }
-        getNotifyOnlyListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
+        getNotifyOnlyListeners(updatePath, newValue, options, type = "update", originalPath = null) {
             const listeners = {};
-            if (typeof options.only !== 'object' ||
+            if (typeof options.only !== "object" ||
                 !Array.isArray(options.only) ||
-                typeof options.only[0] === 'undefined' ||
+                typeof options.only[0] === "undefined" ||
                 !this.canBeNested(newValue)) {
                 return listeners;
             }
@@ -1122,20 +1141,29 @@
             if (this.options.debug) {
                 console.log(`[deep-state-observer] queue for ${path}`, queue);
             }
+            const firedGroups = [];
             for (const q of queue) {
-                q.fn();
+                if (q.options.group) {
+                    if (!firedGroups.includes(q.groupId)) {
+                        q.fn();
+                        firedGroups.push(q.groupId);
+                    }
+                }
+                else {
+                    q.fn();
+                }
             }
         }
-        notifyOnly(updatePath, newValue, options, type = 'update', originalPath = '') {
+        notifyOnly(updatePath, newValue, options, type = "update", originalPath = "") {
             const queue = this.getQueueNotifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath));
             this.sortAndRunQueue(queue, updatePath);
         }
         canBeNested(newValue) {
-            return typeof newValue === 'object' && newValue !== null;
+            return typeof newValue === "object" && newValue !== null;
         }
         getUpdateValues(oldValue, split, fn) {
             let newValue = fn;
-            if (typeof fn === 'function') {
+            if (typeof fn === "function") {
                 newValue = fn(this.pathGet(split, this.data));
             }
             return { newValue, oldValue };
@@ -1153,7 +1181,7 @@
         }
         wildcardUpdate(updatePath, fn, options = defaultUpdateOptions, multi = false) {
             ++this.jobsRunning;
-            options = Object.assign({}, defaultUpdateOptions, options);
+            options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
             const scanned = this.scan.get(updatePath);
             const bulk = {};
             for (const path in scanned) {
@@ -1169,14 +1197,14 @@
             for (const path in bulk) {
                 const newValue = bulk[path];
                 if (options.only.length) {
-                    groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, 'update', updatePath));
+                    groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
                 }
                 else {
-                    groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, 'update', updatePath));
+                    groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, "update", updatePath));
                     this.canBeNested(newValue) &&
-                        groupedListenersPack.push(this.getNestedListeners(path, newValue, options, 'update', updatePath));
+                        groupedListenersPack.push(this.getNestedListeners(path, newValue, options, "update", updatePath));
                 }
-                options.debug && this.options.log('Wildcard update', { path, newValue });
+                options.debug && this.options.log("Wildcard update", { path, newValue });
                 waitingPaths.push(path);
             }
             if (multi) {
@@ -1192,8 +1220,7 @@
         runUpdateQueue() {
             if (this.destroyed)
                 return;
-            while (this.updateQueue.length &&
-                this.updateQueue.length < this.options.maxSimultaneousJobs) {
+            while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
                 const params = this.updateQueue.shift();
                 params.options.queue = false; // prevent infinite loop
                 this.update(params.updatePath, params.fnOrValue, params.options, params.multi);
@@ -1202,7 +1229,7 @@
         updateNotify(updatePath, newValue, options) {
             const queue = this.notifySubscribedListeners(updatePath, newValue, options);
             if (this.canBeNested(newValue)) {
-                this.notifyNestedListeners(updatePath, newValue, options, 'update', queue);
+                this.notifyNestedListeners(updatePath, newValue, options, "update", queue);
             }
             this.sortAndRunQueue(queue, updatePath);
             this.executeWaitingListeners(updatePath);
@@ -1217,7 +1244,7 @@
             const jobsRunning = this.jobsRunning;
             if ((this.options.queue || options.queue) && jobsRunning) {
                 if (jobsRunning > this.options.maxSimultaneousJobs) {
-                    throw new Error('Maximal simultaneous jobs limit reached.');
+                    throw new Error("Maximal simultaneous jobs limit reached.");
                 }
                 this.updateQueue.push({ updatePath, fnOrValue, options, multi });
                 const result = Promise.resolve().then(() => {
@@ -1237,7 +1264,7 @@
             const split = this.split(updatePath);
             const { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fnOrValue);
             if (options.debug) {
-                this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ''}`, {
+                this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ""}`, {
                     oldValue,
                     newValue,
                 });
@@ -1251,7 +1278,7 @@
                 return newValue;
             }
             this.pathSet(split, newValue, this.data);
-            options = Object.assign({}, defaultUpdateOptions, options);
+            options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
             if (options.only === null) {
                 --this.jobsRunning;
                 if (multi)
@@ -1302,7 +1329,7 @@
         get(userPath = undefined) {
             if (this.destroyed)
                 return;
-            if (typeof userPath === 'undefined' || userPath === '') {
+            if (typeof userPath === "undefined" || userPath === "") {
                 return this.data;
             }
             return this.pathGet(this.split(userPath), this.data);
@@ -1324,7 +1351,7 @@
         isMuted(pathOrListenerFunction) {
             if (!this.options.useMute)
                 return false;
-            if (typeof pathOrListenerFunction === 'function') {
+            if (typeof pathOrListenerFunction === "function") {
                 return this.isMutedListener(pathOrListenerFunction);
             }
             for (const mutedPath of this.muted) {
@@ -1348,20 +1375,20 @@
             return this.mutedListeners.has(listenerFunc);
         }
         mute(pathOrListenerFunction) {
-            if (typeof pathOrListenerFunction === 'function') {
+            if (typeof pathOrListenerFunction === "function") {
                 return this.mutedListeners.add(pathOrListenerFunction);
             }
             this.muted.add(pathOrListenerFunction);
         }
         unmute(pathOrListenerFunction) {
-            if (typeof pathOrListenerFunction === 'function') {
+            if (typeof pathOrListenerFunction === "function") {
                 return this.mutedListeners.delete(pathOrListenerFunction);
             }
             this.muted.delete(pathOrListenerFunction);
         }
         debugSubscribe(listener, listenersCollection, listenerPath) {
             if (listener.options.debug) {
-                this.options.log('listener subscribed', {
+                this.options.log("listener subscribed", {
                     listenerPath,
                     listener,
                     listenersCollection,
@@ -1369,22 +1396,18 @@
             }
         }
         debugListener(time, groupedListener) {
-            if (groupedListener.eventInfo.options.debug ||
-                groupedListener.listener.options.debug) {
-                this.options.log('Listener fired', {
+            if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
+                this.options.log("Listener fired", {
                     time: Date.now() - time,
                     info: groupedListener,
                 });
             }
         }
         debugTime(groupedListener) {
-            return groupedListener.listener.options.debug ||
-                groupedListener.eventInfo.options.debug
-                ? Date.now()
-                : 0;
+            return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
         }
     }
 
     return DeepState;
 
-})));
+}));
