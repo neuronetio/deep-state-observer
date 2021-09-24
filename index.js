@@ -130,6 +130,7 @@ var DeepState = /** @class */ (function () {
         this.groupId = 0;
         this.traceId = 0;
         this.traceMap = new Map();
+        this.tracing = [];
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -1298,12 +1299,12 @@ var DeepState = /** @class */ (function () {
         if (multi === void 0) { multi = false; }
         if (this.destroyed)
             return;
-        this.traceMap.forEach(function (trace) {
-            if (trace.listening) {
-                trace.changed.push({ updatePath: updatePath, fnOrValue: fnOrValue, options: options });
-                _this.traceMap.set(trace.id, trace);
-            }
-        });
+        if (this.tracing.length) {
+            var traceId = this.tracing[this.tracing.length - 1];
+            var trace = this.traceMap.get(traceId);
+            trace.changed.push({ traceId: traceId, updatePath: updatePath, fnOrValue: fnOrValue, options: options });
+            this.traceMap.set(traceId, trace);
+        }
         var jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
             if (jobsRunning > this.options.maxSimultaneousJobs) {
@@ -1483,13 +1484,16 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.debugTime = function (groupedListener) {
         return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
     };
-    DeepState.prototype.startTrace = function () {
+    DeepState.prototype.startTrace = function (name) {
         this.traceId++;
-        this.traceMap.set(this.traceId, { id: this.traceId, listening: true, changed: [] });
-        return this.traceId;
+        var id = this.traceId + ":" + name;
+        this.traceMap.set(id, { id: id, changed: [] });
+        this.tracing.push(id);
+        return id;
     };
     DeepState.prototype.stopTrace = function (id) {
         var result = this.traceMap.get(id);
+        this.tracing.pop();
         this.traceMap["delete"](id);
         if (result.changed)
             return result.changed;

@@ -124,8 +124,7 @@ export interface SubscribeAllOptions {
     groupId: number;
 }
 export interface TraceValue {
-    id: number;
-    listening: boolean;
+    id: string;
     changed: any[];
 }
 declare class DeepState {
@@ -150,6 +149,7 @@ declare class DeepState {
     private groupId;
     private traceId;
     private traceMap;
+    private tracing;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
@@ -211,7 +211,7 @@ declare class DeepState {
     private debugSubscribe;
     private debugListener;
     private debugTime;
-    startTrace(): number;
-    stopTrace(id: number): any[];
+    startTrace(name: string): string;
+    stopTrace(id: string): any[];
 }
 export default DeepState;

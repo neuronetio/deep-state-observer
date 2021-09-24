@@ -404,6 +404,7 @@
             this.groupId = 0;
             this.traceId = 0;
             this.traceMap = new Map();
+            this.tracing = [];
             this.lastExecs = new WeakMap();
             this.listeners = new Map();
             this.waitingListeners = new Map();
@@ -1261,12 +1262,12 @@
         update(updatePath, fnOrValue, options = Object.assign({}, defaultUpdateOptions), multi = false) {
             if (this.destroyed)
                 return;
-            this.traceMap.forEach((trace) => {
-                if (trace.listening) {
-                    trace.changed.push({ updatePath, fnOrValue, options });
-                    this.traceMap.set(trace.id, trace);
-                }
-            });
+            if (this.tracing.length) {
+                const traceId = this.tracing[this.tracing.length - 1];
+                const trace = this.traceMap.get(traceId);
+                trace.changed.push({ traceId, updatePath, fnOrValue, options });
+                this.traceMap.set(traceId, trace);
+            }
             const jobsRunning = this.jobsRunning;
             if ((this.options.queue || options.queue) && jobsRunning) {
                 if (jobsRunning > this.options.maxSimultaneousJobs) {
@@ -1432,13 +1433,16 @@
         debugTime(groupedListener) {
             return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
         }
-        startTrace() {
+        startTrace(name) {
             this.traceId++;
-            this.traceMap.set(this.traceId, { id: this.traceId, listening: true, changed: [] });
-            return this.traceId;
+            const id = this.traceId + ":" + name;
+            this.traceMap.set(id, { id, changed: [] });
+            this.tracing.push(id);
+            return id;
         }
         stopTrace(id) {
             const result = this.traceMap.get(id);
+            this.tracing.pop();
             this.traceMap.delete(id);
             if (result.changed)
                 return result.changed;
