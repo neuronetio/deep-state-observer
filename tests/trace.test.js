@@ -26,6 +26,6 @@ describe("Trace", () => {
     state.update("n-1.n-1-2.id", "new id 2");
     state.update("n-1.*.id", "new id x");
     const traceResult = state.stopTrace(traceId);
-    expect(traceResult.length).toEqual(3);
+    expect(traceResult.changed.length).toEqual(3);
   });
 });

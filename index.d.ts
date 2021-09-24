@@ -213,6 +213,6 @@ declare class DeepState {
     private debugListener;
     private debugTime;
     startTrace(name: string): string;
-    stopTrace(id: string): any[];
+    stopTrace(id: string): TraceValue;
 }
 export default DeepState;

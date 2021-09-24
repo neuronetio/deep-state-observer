@@ -1362,8 +1362,7 @@ class DeepState {
     const result = this.traceMap.get(id);
     this.tracing.pop();
     this.traceMap.delete(id);
-    if (result.changed) return result.changed;
-    return null;
+    return result;
   }
 }
 export default DeepState;
