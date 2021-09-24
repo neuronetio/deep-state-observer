@@ -128,6 +128,8 @@ var DeepState = /** @class */ (function () {
         this.destroyed = false;
         this.queueRuns = 0;
         this.groupId = 0;
+        this.traceId = 0;
+        this.traceMap = new Map();
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -1296,6 +1298,12 @@ var DeepState = /** @class */ (function () {
         if (multi === void 0) { multi = false; }
         if (this.destroyed)
             return;
+        this.traceMap.forEach(function (trace) {
+            if (trace.listening) {
+                trace.changed.push({ updatePath: updatePath, fnOrValue: fnOrValue, options: options });
+                _this.traceMap.set(trace.id, trace);
+            }
+        });
         var jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
             if (jobsRunning > this.options.maxSimultaneousJobs) {
@@ -1474,6 +1482,18 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.debugTime = function (groupedListener) {
         return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
+    };
+    DeepState.prototype.startTrace = function () {
+        this.traceId++;
+        this.traceMap.set(this.traceId, { id: this.traceId, listening: true, changed: [] });
+        return this.traceId;
+    };
+    DeepState.prototype.stopTrace = function (id) {
+        var result = this.traceMap.get(id);
+        this.traceMap["delete"](id);
+        if (result.changed)
+            return result.changed;
+        return null;
     };
     return DeepState;
 }());

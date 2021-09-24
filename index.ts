@@ -152,6 +152,12 @@ export interface SubscribeAllOptions {
   groupId: number;
 }
 
+export interface TraceValue {
+  id: number;
+  listening: boolean;
+  changed: any[];
+}
+
 function log(message: string, info: any) {
   console.debug(message, info);
 }
@@ -212,6 +218,8 @@ class DeepState {
   private muted: Set<string>;
   private mutedListeners: Set<ListenerFunction>;
   private groupId: number = 0;
+  private traceId: number = 0;
+  private traceMap: Map<number, TraceValue> = new Map();
 
   constructor(data = {}, options: Options = {}) {
     this.listeners = new Map();
@@ -1164,6 +1172,12 @@ class DeepState {
     multi = false
   ) {
     if (this.destroyed) return;
+    this.traceMap.forEach((trace) => {
+      if (trace.listening) {
+        trace.changed.push({ updatePath, fnOrValue, options });
+        this.traceMap.set(trace.id, trace);
+      }
+    });
     const jobsRunning = this.jobsRunning;
     if ((this.options.queue || options.queue) && jobsRunning) {
       if (jobsRunning > this.options.maxSimultaneousJobs) {
@@ -1333,6 +1347,19 @@ class DeepState {
 
   private debugTime(groupedListener: GroupedListener): number {
     return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
+  }
+
+  public startTrace() {
+    this.traceId++;
+    this.traceMap.set(this.traceId, { id: this.traceId, listening: true, changed: [] });
+    return this.traceId;
+  }
+
+  public stopTrace(id: number) {
+    const result = this.traceMap.get(id);
+    this.traceMap.delete(id);
+    if (result.changed) return result.changed;
+    return null;
   }
 }
 export default DeepState;
