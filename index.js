@@ -1487,7 +1487,7 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.startTrace = function (name) {
         this.traceId++;
         var id = this.traceId + ":" + name;
-        this.traceMap.set(id, { id: id, changed: [] });
+        this.traceMap.set(id, { id: id, stack: this.tracing.map(function (i) { return i; }), changed: [] });
         this.tracing.push(id);
         return id;
     };

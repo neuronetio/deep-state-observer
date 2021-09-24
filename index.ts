@@ -154,6 +154,7 @@ export interface SubscribeAllOptions {
 
 export interface TraceValue {
   id: string;
+  stack: string[];
   changed: any[];
 }
 
@@ -1352,7 +1353,7 @@ class DeepState {
   public startTrace(name: string) {
     this.traceId++;
     const id = this.traceId + ":" + name;
-    this.traceMap.set(id, { id, changed: [] });
+    this.traceMap.set(id, { id, stack: this.tracing.map((i) => i), changed: [] });
     this.tracing.push(id);
     return id;
   }

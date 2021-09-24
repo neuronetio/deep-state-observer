@@ -125,6 +125,7 @@ export interface SubscribeAllOptions {
 }
 export interface TraceValue {
     id: string;
+    stack: string[];
     changed: any[];
 }
 declare class DeepState {
