@@ -131,6 +131,7 @@ var DeepState = /** @class */ (function () {
         this.traceId = 0;
         this.traceMap = new Map();
         this.tracing = [];
+        this.savedTrace = [];
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -1496,6 +1497,18 @@ var DeepState = /** @class */ (function () {
         this.tracing.pop();
         this.traceMap["delete"](id);
         return result;
+    };
+    DeepState.prototype.saveTrace = function (id) {
+        var result = this.traceMap.get(id);
+        this.tracing.pop();
+        this.traceMap["delete"](id);
+        this.savedTrace.push(result);
+        return result;
+    };
+    DeepState.prototype.getSavedTraces = function () {
+        var savedTrace = this.savedTrace.map(function (trace) { return trace; });
+        this.savedTrace = [];
+        return savedTrace;
     };
     return DeepState;
 }());

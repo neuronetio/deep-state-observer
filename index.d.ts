@@ -151,6 +151,7 @@ declare class DeepState {
     private traceId;
     private traceMap;
     private tracing;
+    private savedTrace;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
@@ -214,5 +215,7 @@ declare class DeepState {
     private debugTime;
     startTrace(name: string): string;
     stopTrace(id: string): TraceValue;
+    saveTrace(id: string): TraceValue;
+    getSavedTraces(): TraceValue[];
 }
 export default DeepState;

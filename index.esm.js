@@ -399,6 +399,7 @@ class DeepState {
         this.traceId = 0;
         this.traceMap = new Map();
         this.tracing = [];
+        this.savedTrace = [];
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -1439,6 +1440,18 @@ class DeepState {
         this.tracing.pop();
         this.traceMap.delete(id);
         return result;
+    }
+    saveTrace(id) {
+        const result = this.traceMap.get(id);
+        this.tracing.pop();
+        this.traceMap.delete(id);
+        this.savedTrace.push(result);
+        return result;
+    }
+    getSavedTraces() {
+        const savedTrace = this.savedTrace.map((trace) => trace);
+        this.savedTrace = [];
+        return savedTrace;
     }
 }
 

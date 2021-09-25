@@ -221,6 +221,7 @@ class DeepState {
   private traceId: number = 0;
   private traceMap: Map<string, TraceValue> = new Map();
   private tracing: string[] = [];
+  private savedTrace: TraceValue[] = [];
 
   constructor(data = {}, options: Options = {}) {
     this.listeners = new Map();
@@ -1363,6 +1364,20 @@ class DeepState {
     this.tracing.pop();
     this.traceMap.delete(id);
     return result;
+  }
+
+  public saveTrace(id: string) {
+    const result = this.traceMap.get(id);
+    this.tracing.pop();
+    this.traceMap.delete(id);
+    this.savedTrace.push(result);
+    return result;
+  }
+
+  public getSavedTraces() {
+    const savedTrace = this.savedTrace.map((trace) => trace);
+    this.savedTrace = [];
+    return savedTrace;
   }
 }
 export default DeepState;

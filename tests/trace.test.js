@@ -28,4 +28,26 @@ describe("Trace", () => {
     const traceResult = state.stopTrace(traceId);
     expect(traceResult.changed.length).toEqual(3);
   });
+
+  fit("should save all traces", () => {
+    const state = new State({
+      p1: "p1v",
+      p2: "p2v",
+      x1: "x1v",
+      x2: "x2v",
+    });
+    state.subscribe("p1", () => {
+      const trackId = state.startTrace("p1");
+      state.update("p2", "p2v-");
+      state.saveTrace(trackId);
+    });
+    state.subscribe("p2", () => {
+      const trackId = state.startTrace("p2");
+      state.update("x2", "x2v-");
+      state.saveTrace(trackId);
+    });
+    const result = state.getSavedTraces();
+    //result.forEach((trace) => console.log(trace.changed));
+    expect(result.length).toEqual(2);
+  });
 });
