@@ -1400,6 +1400,7 @@ var DeepState = /** @class */ (function () {
         return newValue;
     };
     DeepState.prototype.multi = function (grouped) {
+        if (grouped === void 0) { grouped = false; }
         if (this.destroyed)
             return { update: function () { }, done: function () { } };
         var self = this;

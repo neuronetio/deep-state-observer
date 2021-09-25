@@ -1351,7 +1351,7 @@
             --this.jobsRunning;
             return newValue;
         }
-        multi(grouped) {
+        multi(grouped = false) {
             if (this.destroyed)
                 return { update() { }, done() { } };
             const self = this;

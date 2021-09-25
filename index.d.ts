@@ -204,7 +204,7 @@ declare class DeepState {
     private updateNotifyAll;
     private updateNotifyOnly;
     update(updatePath: string, fnOrValue: Updater | any, options?: UpdateOptions, multi?: boolean): any;
-    multi(grouped: false): {
+    multi(grouped?: boolean): {
         update(updatePath: string, fn: Updater | any, options?: UpdateOptions): any;
         done(): void;
         getStack(): UpdateStack[];

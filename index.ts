@@ -1273,7 +1273,7 @@ class DeepState {
     return newValue;
   }
 
-  public multi(grouped: false) {
+  public multi(grouped: boolean = false) {
     if (this.destroyed) return { update() {}, done() {} };
     const self = this;
     const updateStack: UpdateStack[] = [];
