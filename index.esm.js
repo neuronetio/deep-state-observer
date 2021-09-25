@@ -1345,18 +1345,31 @@ class DeepState {
         --this.jobsRunning;
         return newValue;
     }
-    multi() {
+    multi(grouped) {
         if (this.destroyed)
             return { update() { }, done() { } };
         const self = this;
         const updateStack = [];
+        const notifiers = [];
         const multiObject = {
             update(updatePath, fn, options = defaultUpdateOptions) {
-                updateStack.push({ updatePath, newValue: fn, options });
+                if (grouped) {
+                    updateStack.push({ updatePath, newValue: fn, options });
+                }
+                else {
+                    notifiers.push(self.update(updatePath, fn, options, true));
+                }
                 return this;
             },
             done() {
-                self.updateNotifyAll(updateStack);
+                if (grouped) {
+                    self.updateNotifyAll(updateStack);
+                }
+                else {
+                    for (const current of notifiers) {
+                        current();
+                    }
+                }
                 updateStack.length = 0;
             },
             getStack() {

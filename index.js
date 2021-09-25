@@ -1399,19 +1399,43 @@ var DeepState = /** @class */ (function () {
         --this.jobsRunning;
         return newValue;
     };
-    DeepState.prototype.multi = function () {
+    DeepState.prototype.multi = function (grouped) {
         if (this.destroyed)
             return { update: function () { }, done: function () { } };
         var self = this;
         var updateStack = [];
+        var notifiers = [];
         var multiObject = {
             update: function (updatePath, fn, options) {
                 if (options === void 0) { options = defaultUpdateOptions; }
-                updateStack.push({ updatePath: updatePath, newValue: fn, options: options });
+                if (grouped) {
+                    updateStack.push({ updatePath: updatePath, newValue: fn, options: options });
+                }
+                else {
+                    notifiers.push(self.update(updatePath, fn, options, true));
+                }
                 return this;
             },
             done: function () {
-                self.updateNotifyAll(updateStack);
+                var e_25, _a;
+                if (grouped) {
+                    self.updateNotifyAll(updateStack);
+                }
+                else {
+                    try {
+                        for (var notifiers_1 = __values(notifiers), notifiers_1_1 = notifiers_1.next(); !notifiers_1_1.done; notifiers_1_1 = notifiers_1.next()) {
+                            var current = notifiers_1_1.value;
+                            current();
+                        }
+                    }
+                    catch (e_25_1) { e_25 = { error: e_25_1 }; }
+                    finally {
+                        try {
+                            if (notifiers_1_1 && !notifiers_1_1.done && (_a = notifiers_1["return"])) _a.call(notifiers_1);
+                        }
+                        finally { if (e_25) throw e_25.error; }
+                    }
+                }
                 updateStack.length = 0;
             },
             getStack: function () {
@@ -1445,7 +1469,7 @@ var DeepState = /** @class */ (function () {
         });
     };
     DeepState.prototype.isMuted = function (pathOrListenerFunction) {
-        var e_25, _a;
+        var e_26, _a;
         if (!this.options.useMute)
             return false;
         if (typeof pathOrListenerFunction === "function") {
@@ -1469,12 +1493,12 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_25_1) { e_25 = { error: e_25_1 }; }
+        catch (e_26_1) { e_26 = { error: e_26_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_25) throw e_25.error; }
+            finally { if (e_26) throw e_26.error; }
         }
         return false;
     };

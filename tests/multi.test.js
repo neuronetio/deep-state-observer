@@ -48,7 +48,7 @@ describe("Multi", () => {
     expect(values[1]).toEqual(2);
     expect(group).toEqual(1);
     const multi = state
-      .multi()
+      .multi(true)
       .update("test1", 11)
       .update("test2", (current) => {
         expect(values.length).toEqual(2);
@@ -82,7 +82,7 @@ describe("Multi", () => {
     expect(values[1]).toEqual(2);
     expect(group).toEqual(1);
     const multi = state
-      .multi()
+      .multi(true)
       .update("test1", 11)
       .update("test2", (current) => {
         expect(values.length).toEqual(2);

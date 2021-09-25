@@ -1273,17 +1273,28 @@ class DeepState {
     return newValue;
   }
 
-  public multi() {
+  public multi(grouped: false) {
     if (this.destroyed) return { update() {}, done() {} };
     const self = this;
     const updateStack: UpdateStack[] = [];
+    const notifiers = [];
     const multiObject = {
       update(updatePath: string, fn: Updater | any, options: UpdateOptions = defaultUpdateOptions) {
-        updateStack.push({ updatePath, newValue: fn, options });
+        if (grouped) {
+          updateStack.push({ updatePath, newValue: fn, options });
+        } else {
+          notifiers.push(self.update(updatePath, fn, options, true));
+        }
         return this;
       },
       done() {
-        self.updateNotifyAll(updateStack);
+        if (grouped) {
+          self.updateNotifyAll(updateStack);
+        } else {
+          for (const current of notifiers) {
+            current();
+          }
+        }
         updateStack.length = 0;
       },
       getStack() {
