@@ -1489,7 +1489,7 @@ var DeepState = /** @class */ (function () {
         if (additionalData === void 0) { additionalData = null; }
         this.traceId++;
         var id = this.traceId + ":" + name;
-        this.traceMap.set(id, { id: id, stack: this.tracing.map(function (i) { return i; }), additionalData: additionalData, changed: [] });
+        this.traceMap.set(id, { id: id, sort: this.traceId, stack: this.tracing.map(function (i) { return i; }), additionalData: additionalData, changed: [] });
         this.tracing.push(id);
         return id;
     };
@@ -1508,6 +1508,11 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.getSavedTraces = function () {
         var savedTrace = this.savedTrace.map(function (trace) { return trace; });
+        savedTrace.sort(function (a, b) {
+            if (a.sort > b.sort)
+                return 1;
+            return 0;
+        });
         this.savedTrace = [];
         return savedTrace;
     };

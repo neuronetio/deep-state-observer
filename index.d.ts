@@ -125,6 +125,7 @@ export interface SubscribeAllOptions {
 }
 export interface TraceValue {
     id: string;
+    sort: number;
     stack: string[];
     additionalData: any;
     changed: any[];

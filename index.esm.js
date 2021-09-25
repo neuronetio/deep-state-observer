@@ -1431,7 +1431,7 @@ class DeepState {
     startTrace(name, additionalData = null) {
         this.traceId++;
         const id = this.traceId + ":" + name;
-        this.traceMap.set(id, { id, stack: this.tracing.map((i) => i), additionalData, changed: [] });
+        this.traceMap.set(id, { id, sort: this.traceId, stack: this.tracing.map((i) => i), additionalData, changed: [] });
         this.tracing.push(id);
         return id;
     }
@@ -1450,6 +1450,11 @@ class DeepState {
     }
     getSavedTraces() {
         const savedTrace = this.savedTrace.map((trace) => trace);
+        savedTrace.sort((a, b) => {
+            if (a.sort > b.sort)
+                return 1;
+            return 0;
+        });
         this.savedTrace = [];
         return savedTrace;
     }

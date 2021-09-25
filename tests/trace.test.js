@@ -71,7 +71,8 @@ describe("Trace", () => {
     const result = state.getSavedTraces();
     //result.forEach((trace) => console.log(trace.changed));
     expect(result.length).toEqual(2);
-    //console.log(result[0]);
+    //console.log(result);
     expect(typeof result[0].additionalData.path).toEqual("object");
+    expect(result[1].sort).toEqual(2);
   });
 });
