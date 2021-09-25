@@ -1290,6 +1290,33 @@ var DeepState = /** @class */ (function () {
         this.sortAndRunQueue(queue, updatePath);
         this.executeWaitingListeners(updatePath);
     };
+    DeepState.prototype.updateNotifyAll = function (updateStack) {
+        var e_24, _a;
+        var queue = [];
+        try {
+            for (var updateStack_1 = __values(updateStack), updateStack_1_1 = updateStack_1.next(); !updateStack_1_1.done; updateStack_1_1 = updateStack_1.next()) {
+                var current = updateStack_1_1.value;
+                var split = this.split(current.updatePath);
+                var value = current.newValue;
+                if (typeof value === "function") {
+                    value = value(this.pathGet(split, this.data));
+                }
+                this.pathSet(split, value, this.data);
+                queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
+                if (this.canBeNested(current.newValue)) {
+                    this.notifyNestedListeners(current.updatePath, value, current.options, "update", queue);
+                }
+            }
+        }
+        catch (e_24_1) { e_24 = { error: e_24_1 }; }
+        finally {
+            try {
+                if (updateStack_1_1 && !updateStack_1_1.done && (_a = updateStack_1["return"])) _a.call(updateStack_1);
+            }
+            finally { if (e_24) throw e_24.error; }
+        }
+        this.sortAndRunQueue(queue, "multi");
+    };
     DeepState.prototype.updateNotifyOnly = function (updatePath, newValue, options) {
         this.notifyOnly(updatePath, newValue, options);
         this.executeWaitingListeners(updatePath);
@@ -1364,7 +1391,7 @@ var DeepState = /** @class */ (function () {
         if (multi) {
             --this.jobsRunning;
             var self_3 = this;
-            return function () {
+            return function multiUpdate() {
                 return self_3.updateNotify(updatePath, newValue, options);
             };
         }
@@ -1376,18 +1403,19 @@ var DeepState = /** @class */ (function () {
         if (this.destroyed)
             return { update: function () { }, done: function () { } };
         var self = this;
-        var notifiers = [];
+        var updateStack = [];
         var multiObject = {
             update: function (updatePath, fn, options) {
                 if (options === void 0) { options = defaultUpdateOptions; }
-                notifiers.push(self.update(updatePath, fn, options, true));
+                updateStack.push({ updatePath: updatePath, newValue: fn, options: options });
                 return this;
             },
             done: function () {
-                for (var i = 0, len = notifiers.length; i < len; i++) {
-                    notifiers[i]();
-                }
-                notifiers.length = 0;
+                self.updateNotifyAll(updateStack);
+                updateStack.length = 0;
+            },
+            getStack: function () {
+                return updateStack;
             }
         };
         return multiObject;
@@ -1417,7 +1445,7 @@ var DeepState = /** @class */ (function () {
         });
     };
     DeepState.prototype.isMuted = function (pathOrListenerFunction) {
-        var e_24, _a;
+        var e_25, _a;
         if (!this.options.useMute)
             return false;
         if (typeof pathOrListenerFunction === "function") {
@@ -1441,12 +1469,12 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_24_1) { e_24 = { error: e_24_1 }; }
+        catch (e_25_1) { e_25 = { error: e_25_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_24) throw e_24.error; }
+            finally { if (e_25) throw e_25.error; }
         }
         return false;
     };

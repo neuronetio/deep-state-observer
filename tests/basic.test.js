@@ -986,29 +986,6 @@ describe("State", () => {
     }, 100);
   });
 
-  it("should fire couple of udates without notify and at the end of all should notify all", () => {
-    const state = new State({ test1: 1, test2: 2 });
-    const values = [];
-    state.subscribe("test1", (value) => {
-      values.push(value);
-    });
-    state.subscribe("test2", (value) => {
-      values.push(value);
-    });
-    expect(values.length).toEqual(2);
-    expect(values[1]).toEqual(2);
-    state
-      .multi()
-      .update("test1", 11)
-      .update("test2", () => {
-        expect(values.length).toEqual(2);
-        return 22;
-      })
-      .done();
-    expect(values.length).toEqual(4);
-    expect(values[3]).toEqual(22);
-  });
-
   it("should ignore ignored changes", () => {
     const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
     const values = [];

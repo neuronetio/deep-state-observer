@@ -130,6 +130,11 @@ export interface TraceValue {
     additionalData: any;
     changed: any[];
 }
+export interface UpdateStack {
+    updatePath: string;
+    newValue: unknown;
+    options: UpdateOptions;
+}
 declare class DeepState {
     private listeners;
     private waitingListeners;
@@ -196,11 +201,13 @@ declare class DeepState {
     private wildcardUpdate;
     private runUpdateQueue;
     private updateNotify;
+    private updateNotifyAll;
     private updateNotifyOnly;
     update(updatePath: string, fnOrValue: Updater | any, options?: UpdateOptions, multi?: boolean): any;
     multi(): {
         update(updatePath: string, fn: Updater | any, options?: UpdateOptions): any;
         done(): void;
+        getStack(): UpdateStack[];
     } | {
         update(): void;
         done(): void;

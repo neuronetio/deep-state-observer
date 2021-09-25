@@ -1250,6 +1250,22 @@ class DeepState {
         this.sortAndRunQueue(queue, updatePath);
         this.executeWaitingListeners(updatePath);
     }
+    updateNotifyAll(updateStack) {
+        let queue = [];
+        for (const current of updateStack) {
+            const split = this.split(current.updatePath);
+            let value = current.newValue;
+            if (typeof value === "function") {
+                value = value(this.pathGet(split, this.data));
+            }
+            this.pathSet(split, value, this.data);
+            queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
+            if (this.canBeNested(current.newValue)) {
+                this.notifyNestedListeners(current.updatePath, value, current.options, "update", queue);
+            }
+        }
+        this.sortAndRunQueue(queue, "multi");
+    }
     updateNotifyOnly(updatePath, newValue, options) {
         this.notifyOnly(updatePath, newValue, options);
         this.executeWaitingListeners(updatePath);
@@ -1321,7 +1337,7 @@ class DeepState {
         if (multi) {
             --this.jobsRunning;
             const self = this;
-            return function () {
+            return function multiUpdate() {
                 return self.updateNotify(updatePath, newValue, options);
             };
         }
@@ -1333,17 +1349,18 @@ class DeepState {
         if (this.destroyed)
             return { update() { }, done() { } };
         const self = this;
-        const notifiers = [];
+        const updateStack = [];
         const multiObject = {
             update(updatePath, fn, options = defaultUpdateOptions) {
-                notifiers.push(self.update(updatePath, fn, options, true));
+                updateStack.push({ updatePath, newValue: fn, options });
                 return this;
             },
             done() {
-                for (let i = 0, len = notifiers.length; i < len; i++) {
-                    notifiers[i]();
-                }
-                notifiers.length = 0;
+                self.updateNotifyAll(updateStack);
+                updateStack.length = 0;
+            },
+            getStack() {
+                return updateStack;
             },
         };
         return multiObject;
