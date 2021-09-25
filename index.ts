@@ -1379,8 +1379,7 @@ class DeepState {
   public getSavedTraces() {
     const savedTrace = this.savedTrace.map((trace) => trace);
     savedTrace.sort((a, b) => {
-      if (a.sort > b.sort) return 1;
-      return 0;
+      return a.sort - b.sort;
     });
     this.savedTrace = [];
     return savedTrace;

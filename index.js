@@ -1509,9 +1509,7 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.getSavedTraces = function () {
         var savedTrace = this.savedTrace.map(function (trace) { return trace; });
         savedTrace.sort(function (a, b) {
-            if (a.sort > b.sort)
-                return 1;
-            return 0;
+            return a.sort - b.sort;
         });
         this.savedTrace = [];
         return savedTrace;
