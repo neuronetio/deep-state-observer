@@ -456,6 +456,39 @@ state.update("n-1.*.id", "new id 2");
 // results.length = 6 // not 9
 ```
 
+## Trace
+
+You can easily track traces
+
+`state.startTrace(name: string, additionalData: any = null): string` start tracing
+
+`state.stopTrace(id:string): Trace` get current trace
+
+`state.saveTrace(id:string):Trace` save trace on the stack
+
+`state.getSavedTraces(): Trace[]` get all traces from the stack
+
+```javascript
+const state = new State({
+  p1: "p1v",
+  p2: "p2v",
+  x1: "x1v",
+  x2: "x2v",
+});
+state.subscribe("p1", (val, eventInfo) => {
+  const trackId = state.startTrace("p1", eventInfo);
+  state.update("p2", "p2v-");
+  state.saveTrace(trackId);
+});
+state.subscribe("p2", (val, eventInfo) => {
+  const trackId = state.startTrace("p2", eventInfo);
+  state.update("x2", "x2v-");
+  state.saveTrace(trackId);
+});
+const result = state.getSavedTraces();
+console.log(result);
+```
+
 ## Debug
 
 ```javascript
