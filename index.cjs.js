@@ -1261,6 +1261,12 @@ class DeepState {
                 value = value(this.pathGet(split, this.data));
             }
             this.pathSet(split, value, this.data);
+            if (this.tracing.length) {
+                const traceId = this.tracing[this.tracing.length - 1];
+                const trace = this.traceMap.get(traceId);
+                trace.changed.push({ traceId, updatePath: current.updatePath, fnOrValue: value, options: current.options });
+                this.traceMap.set(traceId, trace);
+            }
             queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
             if (this.canBeNested(current.newValue)) {
                 this.notifyNestedListeners(current.updatePath, value, current.options, "update", queue);
