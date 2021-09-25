@@ -1485,10 +1485,11 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.debugTime = function (groupedListener) {
         return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
     };
-    DeepState.prototype.startTrace = function (name) {
+    DeepState.prototype.startTrace = function (name, additionalData) {
+        if (additionalData === void 0) { additionalData = null; }
         this.traceId++;
         var id = this.traceId + ":" + name;
-        this.traceMap.set(id, { id: id, stack: this.tracing.map(function (i) { return i; }), changed: [] });
+        this.traceMap.set(id, { id: id, stack: this.tracing.map(function (i) { return i; }), additionalData: additionalData, changed: [] });
         this.tracing.push(id);
         return id;
     };

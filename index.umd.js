@@ -1434,10 +1434,10 @@
         debugTime(groupedListener) {
             return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
         }
-        startTrace(name) {
+        startTrace(name, additionalData = null) {
             this.traceId++;
             const id = this.traceId + ":" + name;
-            this.traceMap.set(id, { id, stack: this.tracing.map((i) => i), changed: [] });
+            this.traceMap.set(id, { id, stack: this.tracing.map((i) => i), additionalData, changed: [] });
             this.tracing.push(id);
             return id;
         }

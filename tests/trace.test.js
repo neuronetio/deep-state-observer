@@ -29,7 +29,7 @@ describe("Trace", () => {
     expect(traceResult.changed.length).toEqual(3);
   });
 
-  fit("should save all traces", () => {
+  it("should save all traces", () => {
     const state = new State({
       p1: "p1v",
       p2: "p2v",
@@ -49,5 +49,29 @@ describe("Trace", () => {
     const result = state.getSavedTraces();
     //result.forEach((trace) => console.log(trace.changed));
     expect(result.length).toEqual(2);
+  });
+
+  it("should save all traces with additional data", () => {
+    const state = new State({
+      p1: "p1v",
+      p2: "p2v",
+      x1: "x1v",
+      x2: "x2v",
+    });
+    state.subscribe("p1", (val, eventInfo) => {
+      const trackId = state.startTrace("p1", eventInfo);
+      state.update("p2", "p2v-");
+      state.saveTrace(trackId);
+    });
+    state.subscribe("p2", (val, eventInfo) => {
+      const trackId = state.startTrace("p2", eventInfo);
+      state.update("x2", "x2v-");
+      state.saveTrace(trackId);
+    });
+    const result = state.getSavedTraces();
+    //result.forEach((trace) => console.log(trace.changed));
+    expect(result.length).toEqual(2);
+    //console.log(result[0]);
+    expect(typeof result[0].additionalData.path).toEqual("object");
   });
 });

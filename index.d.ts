@@ -126,6 +126,7 @@ export interface SubscribeAllOptions {
 export interface TraceValue {
     id: string;
     stack: string[];
+    additionalData: any;
     changed: any[];
 }
 declare class DeepState {
@@ -213,7 +214,7 @@ declare class DeepState {
     private debugSubscribe;
     private debugListener;
     private debugTime;
-    startTrace(name: string): string;
+    startTrace(name: string, additionalData?: any): string;
     stopTrace(id: string): TraceValue;
     saveTrace(id: string): TraceValue;
     getSavedTraces(): TraceValue[];

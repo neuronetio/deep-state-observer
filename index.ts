@@ -155,6 +155,7 @@ export interface SubscribeAllOptions {
 export interface TraceValue {
   id: string;
   stack: string[];
+  additionalData: any;
   changed: any[];
 }
 
@@ -1351,10 +1352,10 @@ class DeepState {
     return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
   }
 
-  public startTrace(name: string) {
+  public startTrace(name: string, additionalData: any = null) {
     this.traceId++;
     const id = this.traceId + ":" + name;
-    this.traceMap.set(id, { id, stack: this.tracing.map((i) => i), changed: [] });
+    this.traceMap.set(id, { id, stack: this.tracing.map((i) => i), additionalData, changed: [] });
     this.tracing.push(id);
     return id;
   }
