@@ -1438,6 +1438,9 @@ var DeepState = /** @class */ (function () {
             },
             done: function () {
                 var e_25, _a;
+                if (self.collections !== 0) {
+                    return;
+                }
                 if (grouped) {
                     self.updateNotifyAll(updateStack);
                 }
@@ -1473,10 +1476,13 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.executeCollected = function () {
         this.collections--;
-        if (this.collections === 0) {
+        if (this.collections === 0 && this.collection) {
             this.collection.done();
             this.collection = null;
         }
+    };
+    DeepState.prototype.getCollectedCount = function () {
+        return this.collections;
     };
     DeepState.prototype.get = function (userPath) {
         if (userPath === void 0) { userPath = undefined; }

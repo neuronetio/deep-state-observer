@@ -214,6 +214,7 @@ declare class DeepState {
     multi(grouped?: boolean): Multi;
     collect(): Multi;
     executeCollected(): void;
+    getCollectedCount(): number;
     get(userPath?: string | undefined): any;
     private lastExecs;
     last(callback: () => void): void;

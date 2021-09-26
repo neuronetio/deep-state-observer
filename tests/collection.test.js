@@ -93,4 +93,40 @@ describe("Collection", () => {
     expect(values[2]).toEqual("bb");
     expect(values[3]).toEqual("all");
   });
+
+  it("should execute collection at the end of all collections with multi", () => {
+    const state = new State({
+      x: { y: { z: { a: { b: "b" } } } },
+      c: { d: { e: "e" } },
+    });
+    const values = [];
+    state.subscribe("x.y.z.a.b", (val, eventInfo) => {
+      values.push(val);
+    });
+    state.subscribeAll(
+      ["x.y.*.a.b", "c.d.e"],
+      (val, eventInfo) => {
+        values.push("all");
+      },
+      { group: true }
+    );
+    expect(values.length).toEqual(2);
+    expect(values[0]).toEqual("b");
+    expect(values[1]).toEqual("all");
+
+    state.collect();
+    state.collect();
+
+    state.multi(true).update("x.y.z.a.b", "bb").update("c.d.e", "ee").done();
+
+    expect(values.length).toEqual(2);
+    state.executeCollected(); // not executed yet because of two collect methods
+
+    expect(values.length).toEqual(2);
+
+    state.executeCollected(); // now you can execute
+    expect(values.length).toEqual(4);
+    expect(values[2]).toEqual("bb");
+    expect(values[3]).toEqual("all");
+  });
 });

@@ -1381,6 +1381,9 @@ class DeepState {
                 return this;
             },
             done() {
+                if (self.collections !== 0) {
+                    return;
+                }
                 if (grouped) {
                     self.updateNotifyAll(updateStack);
                 }
@@ -1406,10 +1409,13 @@ class DeepState {
     }
     executeCollected() {
         this.collections--;
-        if (this.collections === 0) {
+        if (this.collections === 0 && this.collection) {
             this.collection.done();
             this.collection = null;
         }
+    }
+    getCollectedCount() {
+        return this.collections;
     }
     get(userPath = undefined) {
         if (this.destroyed)
