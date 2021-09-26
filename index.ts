@@ -237,6 +237,7 @@ class DeepState {
   private tracing: string[] = [];
   private savedTrace: TraceValue[] = [];
   private collection: Multi = null;
+  private collections: number = 0;
 
   constructor(data = {}, options: Options = {}) {
     this.listeners = new Map();
@@ -1329,6 +1330,7 @@ class DeepState {
   }
 
   public collect() {
+    this.collections++;
     if (!this.collection) {
       this.collection = this.multi(true);
     }
@@ -1336,8 +1338,11 @@ class DeepState {
   }
 
   public executeCollected() {
-    this.collection.done();
-    this.collection = null;
+    this.collections--;
+    if (this.collections === 0) {
+      this.collection.done();
+      this.collection = null;
+    }
   }
 
   public get(userPath: string | undefined = undefined) {

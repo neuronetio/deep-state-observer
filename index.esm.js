@@ -401,6 +401,7 @@ class DeepState {
         this.tracing = [];
         this.savedTrace = [];
         this.collection = null;
+        this.collections = 0;
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -1397,14 +1398,18 @@ class DeepState {
         return multiObject;
     }
     collect() {
+        this.collections++;
         if (!this.collection) {
             this.collection = this.multi(true);
         }
         return this.collection;
     }
     executeCollected() {
-        this.collection.done();
-        this.collection = null;
+        this.collections--;
+        if (this.collections === 0) {
+            this.collection.done();
+            this.collection = null;
+        }
     }
     get(userPath = undefined) {
         if (this.destroyed)

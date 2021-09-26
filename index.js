@@ -133,6 +133,7 @@ var DeepState = /** @class */ (function () {
         this.tracing = [];
         this.savedTrace = [];
         this.collection = null;
+        this.collections = 0;
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -1464,14 +1465,18 @@ var DeepState = /** @class */ (function () {
         return multiObject;
     };
     DeepState.prototype.collect = function () {
+        this.collections++;
         if (!this.collection) {
             this.collection = this.multi(true);
         }
         return this.collection;
     };
     DeepState.prototype.executeCollected = function () {
-        this.collection.done();
-        this.collection = null;
+        this.collections--;
+        if (this.collections === 0) {
+            this.collection.done();
+            this.collection = null;
+        }
     };
     DeepState.prototype.get = function (userPath) {
         if (userPath === void 0) { userPath = undefined; }

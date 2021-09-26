@@ -165,6 +165,7 @@ declare class DeepState {
     private tracing;
     private savedTrace;
     private collection;
+    private collections;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
