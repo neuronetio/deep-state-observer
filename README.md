@@ -456,6 +456,41 @@ state.update("n-1.*.id", "new id 2");
 // results.length = 6 // not 9
 ```
 
+## collect
+
+You can start collecting changes and execute it as multi later - performance optimization for groups.
+
+```javascript
+const state = new State({
+  x: { y: { z: { a: { b: "b" } } } },
+  c: { d: { e: "e" } },
+});
+const values = [];
+state.subscribe("x.y.z.a.b", (val, eventInfo) => {
+  values.push(val);
+});
+state.subscribeAll(
+  ["x.y.*.a.b", "c.d.e"],
+  (val, eventInfo) => {
+    values.push("all");
+  },
+  { group: true }
+);
+// values.length === 2
+// values[0] = 'b'
+// values[1] = 'all'
+
+state.collect(); // from now on collect updates but do not notify any listener yet
+state.update("x.y.z.a.b", "bb");
+state.update("c.d.e", "ee");
+// values.length === 2
+
+state.executeCollected(); // notify all listeners about updates - fire only once grouped listeners
+// values.length === 4
+// values[2] === 'bb'
+// values[3] === 'all'
+```
+
 ## Trace
 
 You can easily track traces

@@ -132,6 +132,7 @@ var DeepState = /** @class */ (function () {
         this.traceMap = new Map();
         this.tracing = [];
         this.savedTrace = [];
+        this.collection = null;
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -1333,6 +1334,9 @@ var DeepState = /** @class */ (function () {
         if (multi === void 0) { multi = false; }
         if (this.destroyed)
             return;
+        if (this.collection) {
+            return this.collection.update(updatePath, fnOrValue, options);
+        }
         if (this.tracing.length) {
             var traceId = this.tracing[this.tracing.length - 1];
             var trace = this.traceMap.get(traceId);
@@ -1408,7 +1412,9 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.multi = function (grouped) {
         if (grouped === void 0) { grouped = false; }
         if (this.destroyed)
-            return { update: function () { }, done: function () { } };
+            return { update: function () { }, done: function () { }, getStack: function () { } };
+        if (this.collection)
+            return this.collection;
         var self = this;
         var updateStack = [];
         var notifiers = [];
@@ -1450,6 +1456,16 @@ var DeepState = /** @class */ (function () {
             }
         };
         return multiObject;
+    };
+    DeepState.prototype.collect = function () {
+        if (!this.collection) {
+            this.collection = this.multi(true);
+        }
+        return this.collection;
+    };
+    DeepState.prototype.executeCollected = function () {
+        this.collection.done();
+        this.collection = null;
     };
     DeepState.prototype.get = function (userPath) {
         if (userPath === void 0) { userPath = undefined; }

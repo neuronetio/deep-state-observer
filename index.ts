@@ -166,6 +166,12 @@ export interface UpdateStack {
   options: UpdateOptions;
 }
 
+export interface Multi {
+  update: (updatePath: string, fn: Updater | any, options: UpdateOptions) => Multi | void;
+  done: () => void;
+  getStack: () => UpdateStack[] | void;
+}
+
 function log(message: string, info: any) {
   console.debug(message, info);
 }
@@ -230,6 +236,7 @@ class DeepState {
   private traceMap: Map<string, TraceValue> = new Map();
   private tracing: string[] = [];
   private savedTrace: TraceValue[] = [];
+  private collection: Multi = null;
 
   constructor(data = {}, options: Options = {}) {
     this.listeners = new Map();
@@ -1205,6 +1212,9 @@ class DeepState {
     multi = false
   ) {
     if (this.destroyed) return;
+    if (this.collection) {
+      return this.collection.update(updatePath, fnOrValue, options);
+    }
     if (this.tracing.length) {
       const traceId = this.tracing[this.tracing.length - 1];
       const trace = this.traceMap.get(traceId);
@@ -1279,12 +1289,13 @@ class DeepState {
     return newValue;
   }
 
-  public multi(grouped: boolean = false) {
-    if (this.destroyed) return { update() {}, done() {} };
+  public multi(grouped: boolean = false): Multi {
+    if (this.destroyed) return { update() {}, done() {}, getStack() {} };
+    if (this.collection) return this.collection;
     const self = this;
     const updateStack: UpdateStack[] = [];
     const notifiers = [];
-    const multiObject = {
+    const multiObject: Multi = {
       update(updatePath: string, fn: Updater | any, options: UpdateOptions = defaultUpdateOptions) {
         if (grouped) {
           updateStack.push({ updatePath, newValue: fn, options });
@@ -1308,6 +1319,18 @@ class DeepState {
       },
     };
     return multiObject;
+  }
+
+  public collect() {
+    if (!this.collection) {
+      this.collection = this.multi(true);
+    }
+    return this.collection;
+  }
+
+  public executeCollected() {
+    this.collection.done();
+    this.collection = null;
   }
 
   public get(userPath: string | undefined = undefined) {

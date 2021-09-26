@@ -135,6 +135,11 @@ export interface UpdateStack {
     newValue: unknown;
     options: UpdateOptions;
 }
+export interface Multi {
+    update: (updatePath: string, fn: Updater | any, options: UpdateOptions) => Multi | void;
+    done: () => void;
+    getStack: () => UpdateStack[] | void;
+}
 declare class DeepState {
     private listeners;
     private waitingListeners;
@@ -159,6 +164,7 @@ declare class DeepState {
     private traceMap;
     private tracing;
     private savedTrace;
+    private collection;
     constructor(data?: {}, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
@@ -204,14 +210,9 @@ declare class DeepState {
     private updateNotifyAll;
     private updateNotifyOnly;
     update(updatePath: string, fnOrValue: Updater | any, options?: UpdateOptions, multi?: boolean): any;
-    multi(grouped?: boolean): {
-        update(updatePath: string, fn: Updater | any, options?: UpdateOptions): any;
-        done(): void;
-        getStack(): UpdateStack[];
-    } | {
-        update(): void;
-        done(): void;
-    };
+    multi(grouped?: boolean): Multi;
+    collect(): Multi;
+    executeCollected(): void;
     get(userPath?: string | undefined): any;
     private lastExecs;
     last(callback: () => void): void;

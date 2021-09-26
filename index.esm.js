@@ -400,6 +400,7 @@ class DeepState {
         this.traceMap = new Map();
         this.tracing = [];
         this.savedTrace = [];
+        this.collection = null;
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -1279,6 +1280,9 @@ class DeepState {
     update(updatePath, fnOrValue, options = Object.assign({}, defaultUpdateOptions), multi = false) {
         if (this.destroyed)
             return;
+        if (this.collection) {
+            return this.collection.update(updatePath, fnOrValue, options);
+        }
         if (this.tracing.length) {
             const traceId = this.tracing[this.tracing.length - 1];
             const trace = this.traceMap.get(traceId);
@@ -1353,7 +1357,9 @@ class DeepState {
     }
     multi(grouped = false) {
         if (this.destroyed)
-            return { update() { }, done() { } };
+            return { update() { }, done() { }, getStack() { } };
+        if (this.collection)
+            return this.collection;
         const self = this;
         const updateStack = [];
         const notifiers = [];
@@ -1383,6 +1389,16 @@ class DeepState {
             },
         };
         return multiObject;
+    }
+    collect() {
+        if (!this.collection) {
+            this.collection = this.multi(true);
+        }
+        return this.collection;
+    }
+    executeCollected() {
+        this.collection.done();
+        this.collection = null;
     }
     get(userPath = undefined) {
         if (this.destroyed)
