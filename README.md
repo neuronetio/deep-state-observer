@@ -495,6 +495,7 @@ state.update("n-1.*.id", "new id 2");
 ## collect
 
 You can start collecting changes and execute it as multi later - performance optimization for groups.
+It is just global multi.
 
 ```javascript
 const state = new State({
