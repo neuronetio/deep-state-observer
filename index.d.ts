@@ -200,6 +200,7 @@ declare class DeepState {
     private getNestedListeners;
     private notifyNestedListeners;
     private getNotifyOnlyListeners;
+    private runQueue;
     private sortAndRunQueue;
     private notifyOnly;
     private canBeNested;

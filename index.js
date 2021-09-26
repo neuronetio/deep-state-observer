@@ -1155,14 +1155,8 @@ var DeepState = /** @class */ (function () {
         }
         return listeners;
     };
-    DeepState.prototype.sortAndRunQueue = function (queue, path) {
+    DeepState.prototype.runQueue = function (queue) {
         var e_21, _a;
-        queue.sort(function (a, b) {
-            return a.id - b.id;
-        });
-        if (this.options.debug) {
-            console.log("[deep-state-observer] queue for " + path, queue);
-        }
         var firedGroups = [];
         try {
             for (var queue_3 = __values(queue), queue_3_1 = queue_3.next(); !queue_3_1.done; queue_3_1 = queue_3.next()) {
@@ -1185,6 +1179,15 @@ var DeepState = /** @class */ (function () {
             }
             finally { if (e_21) throw e_21.error; }
         }
+    };
+    DeepState.prototype.sortAndRunQueue = function (queue, path) {
+        queue.sort(function (a, b) {
+            return a.id - b.id;
+        });
+        if (this.options.debug) {
+            console.log("[deep-state-observer] queue for " + path, queue);
+        }
+        this.runQueue(queue);
     };
     DeepState.prototype.notifyOnly = function (updatePath, newValue, options, type, originalPath) {
         if (type === void 0) { type = "update"; }
@@ -1323,7 +1326,7 @@ var DeepState = /** @class */ (function () {
             }
             finally { if (e_24) throw e_24.error; }
         }
-        this.sortAndRunQueue(queue, "multi");
+        this.runQueue(queue);
     };
     DeepState.prototype.updateNotifyOnly = function (updatePath, newValue, options) {
         this.notifyOnly(updatePath, newValue, options);

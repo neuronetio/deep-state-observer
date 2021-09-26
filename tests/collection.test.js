@@ -117,16 +117,24 @@ describe("Collection", () => {
     state.collect();
     state.collect();
 
-    state.multi(true).update("x.y.z.a.b", "bb").update("c.d.e", "ee").done();
+    const multi1 = state.multi(true);
+    multi1.update("x.y.z.a.b", "bb").update("c.d.e", "ee");
+    multi1.done();
+    const multi2 = state.multi(true);
+    multi2.update("x.y.z.a.b", "bbb");
+    multi2.done();
+    //console.log(state.getCollectedStack().slice());
+    //console.log(multi1 === multi2, multi2.getStack(), multi1.getStack());
 
     expect(values.length).toEqual(2);
     state.executeCollected(); // not executed yet because of two collect methods
 
     expect(values.length).toEqual(2);
-
     state.executeCollected(); // now you can execute
-    expect(values.length).toEqual(4);
-    expect(values[2]).toEqual("bb");
+    //console.log(values);
+    expect(values.length).toEqual(5);
+    expect(values[2]).toEqual("bbb");
     expect(values[3]).toEqual("all");
+    expect(values[2]).toEqual("bbb");
   });
 });

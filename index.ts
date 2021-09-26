@@ -1058,13 +1058,7 @@ class DeepState {
     return listeners;
   }
 
-  private sortAndRunQueue(queue: Queue[], path: string) {
-    queue.sort(function (a, b) {
-      return a.id - b.id;
-    });
-    if (this.options.debug) {
-      console.log(`[deep-state-observer] queue for ${path}`, queue);
-    }
+  private runQueue(queue: Queue[]) {
     const firedGroups = [];
     for (const q of queue) {
       if (q.options.group) {
@@ -1076,6 +1070,16 @@ class DeepState {
         q.fn();
       }
     }
+  }
+
+  private sortAndRunQueue(queue: Queue[], path: string) {
+    queue.sort(function (a, b) {
+      return a.id - b.id;
+    });
+    if (this.options.debug) {
+      console.log(`[deep-state-observer] queue for ${path}`, queue);
+    }
+    this.runQueue(queue);
   }
 
   private notifyOnly(
@@ -1198,7 +1202,7 @@ class DeepState {
         this.notifyNestedListeners(current.updatePath, value, current.options, "update", queue);
       }
     }
-    this.sortAndRunQueue(queue, "multi");
+    this.runQueue(queue);
   }
 
   private updateNotifyOnly(updatePath, newValue, options) {
