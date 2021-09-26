@@ -422,6 +422,42 @@ setTimeout(() => {
 }, 100);
 ```
 
+## multi
+
+You can collect updates and execute them at once later - useful when used with groups.
+
+```javascript
+const state = new State({
+  x: { y: { z: { a: { b: "b" } } } },
+  c: { d: { e: "e" } },
+});
+const values = [];
+state.subscribe("x.y.z.a.b", (val, eventInfo) => {
+  values.push(val);
+});
+state.subscribeAll(
+  ["x.y.*.a.b", "c.d.e"],
+  (val, eventInfo) => {
+    values.push("all");
+  },
+  { group: true }
+);
+// values.length === 2
+// values[0] = 'b'
+// values[1] = 'all'
+
+const multi = state.multi(true); // true if you want to execute all changes for specific group only once otherwise each update will cause group to be fired
+// from now on collect updates but do not notify any listener yet
+multi.update("x.y.z.a.b", "bb");
+multi.update("c.d.e", "ee");
+// values.length === 2
+
+multi.done(); // notify all listeners about updates - fire only once grouped listeners
+// values.length === 4
+// values[2] === 'bb'
+// values[3] === 'all'
+```
+
 ## group
 
 With subscribeAll you can group listeners to fire only once if one of the path is changed.
