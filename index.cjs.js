@@ -1365,7 +1365,9 @@ class DeepState {
                     return this;
                 },
                 done() { },
-                getStack() { },
+                getStack() {
+                    return [];
+                },
             };
         if (this.collection)
             return this.collection;
@@ -1418,6 +1420,11 @@ class DeepState {
     }
     getCollectedCount() {
         return this.collections;
+    }
+    getCollectedStack() {
+        if (!this.collection)
+            return [];
+        return this.collection.getStack();
     }
     get(userPath = undefined) {
         if (this.destroyed)

@@ -138,7 +138,7 @@ export interface UpdateStack {
 export interface Multi {
     update: (updatePath: string, fn: Updater | any, options?: UpdateOptions) => Multi;
     done: () => void;
-    getStack: () => UpdateStack[] | void;
+    getStack: () => UpdateStack[];
 }
 declare class DeepState {
     private listeners;
@@ -215,6 +215,7 @@ declare class DeepState {
     collect(): Multi;
     executeCollected(): void;
     getCollectedCount(): number;
+    getCollectedStack(): UpdateStack[];
     get(userPath?: string | undefined): any;
     private lastExecs;
     last(callback: () => void): void;

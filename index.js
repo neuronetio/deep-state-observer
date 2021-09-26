@@ -1418,7 +1418,9 @@ var DeepState = /** @class */ (function () {
                     return this;
                 },
                 done: function () { },
-                getStack: function () { }
+                getStack: function () {
+                    return [];
+                }
             };
         if (this.collection)
             return this.collection;
@@ -1483,6 +1485,11 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.getCollectedCount = function () {
         return this.collections;
+    };
+    DeepState.prototype.getCollectedStack = function () {
+        if (!this.collection)
+            return [];
+        return this.collection.getStack();
     };
     DeepState.prototype.get = function (userPath) {
         if (userPath === void 0) { userPath = undefined; }

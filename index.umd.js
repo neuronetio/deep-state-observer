@@ -1369,7 +1369,9 @@
                         return this;
                     },
                     done() { },
-                    getStack() { },
+                    getStack() {
+                        return [];
+                    },
                 };
             if (this.collection)
                 return this.collection;
@@ -1422,6 +1424,11 @@
         }
         getCollectedCount() {
             return this.collections;
+        }
+        getCollectedStack() {
+            if (!this.collection)
+                return [];
+            return this.collection.getStack();
         }
         get(userPath = undefined) {
             if (this.destroyed)
