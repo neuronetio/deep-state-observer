@@ -404,7 +404,7 @@ state.update("one.two.three", 1);
 
 ## queue
 
-You can wait with update untill all other tasks are finished.
+You can wait with update until all other tasks are finished.
 
 ```javascript
 const state = new State({ test: 1, other: "x" });
