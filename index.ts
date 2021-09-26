@@ -176,7 +176,7 @@ const defaultUpdateOptions: UpdateOptions = {
 };
 
 export interface Multi {
-  update: (updatePath: string, fn: Updater | any, options?: UpdateOptions) => Multi | void;
+  update: (updatePath: string, fn: Updater | any, options?: UpdateOptions) => Multi;
   done: () => void;
   getStack: () => UpdateStack[] | void;
 }
@@ -1290,7 +1290,14 @@ class DeepState {
   }
 
   public multi(grouped: boolean = false): Multi {
-    if (this.destroyed) return { update() {}, done() {}, getStack() {} };
+    if (this.destroyed)
+      return {
+        update() {
+          return this;
+        },
+        done() {},
+        getStack() {},
+      };
     if (this.collection) return this.collection;
     const self = this;
     const updateStack: UpdateStack[] = [];

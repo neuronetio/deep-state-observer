@@ -1412,7 +1412,13 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.multi = function (grouped) {
         if (grouped === void 0) { grouped = false; }
         if (this.destroyed)
-            return { update: function () { }, done: function () { }, getStack: function () { } };
+            return {
+                update: function () {
+                    return this;
+                },
+                done: function () { },
+                getStack: function () { }
+            };
         if (this.collection)
             return this.collection;
         var self = this;

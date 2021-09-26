@@ -1363,7 +1363,13 @@
         }
         multi(grouped = false) {
             if (this.destroyed)
-                return { update() { }, done() { }, getStack() { } };
+                return {
+                    update() {
+                        return this;
+                    },
+                    done() { },
+                    getStack() { },
+                };
             if (this.collection)
                 return this.collection;
             const self = this;
