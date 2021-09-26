@@ -1417,8 +1417,9 @@ class DeepState {
     executeCollected() {
         this.collections--;
         if (this.collections === 0 && this.collection) {
-            this.collection.done();
+            const collection = this.collection;
             this.collection = null;
+            collection.done();
         }
     }
     getCollectedCount() {

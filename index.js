@@ -1482,8 +1482,9 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.executeCollected = function () {
         this.collections--;
         if (this.collections === 0 && this.collection) {
-            this.collection.done();
+            var collection = this.collection;
             this.collection = null;
+            collection.done();
         }
     };
     DeepState.prototype.getCollectedCount = function () {
