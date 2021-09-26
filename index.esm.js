@@ -1258,12 +1258,7 @@ class DeepState {
     updateNotifyAll(updateStack) {
         let queue = [];
         for (const current of updateStack) {
-            const split = this.split(current.updatePath);
-            let value = current.newValue;
-            if (typeof value === "function") {
-                value = value(this.pathGet(split, this.data));
-            }
-            this.pathSet(split, value, this.data);
+            const value = current.newValue;
             if (this.tracing.length) {
                 const traceId = this.tracing[this.tracing.length - 1];
                 const trace = this.traceMap.get(traceId);
@@ -1376,12 +1371,18 @@ class DeepState {
         const updateStack = [];
         const notifiers = [];
         const multiObject = {
-            update(updatePath, fn, options = defaultUpdateOptions) {
+            update(updatePath, fnOrValue, options = defaultUpdateOptions) {
                 if (grouped) {
-                    updateStack.push({ updatePath, newValue: fn, options });
+                    const split = self.split(updatePath);
+                    let value = fnOrValue;
+                    if (typeof value === "function") {
+                        value = value(self.pathGet(split, self.data));
+                    }
+                    self.pathSet(split, value, self.data);
+                    updateStack.push({ updatePath, newValue: value, options });
                 }
                 else {
-                    notifiers.push(self.update(updatePath, fn, options, true));
+                    notifiers.push(self.update(updatePath, fnOrValue, options, true));
                 }
                 return this;
             },

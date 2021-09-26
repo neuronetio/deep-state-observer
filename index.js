@@ -1301,12 +1301,7 @@ var DeepState = /** @class */ (function () {
         try {
             for (var updateStack_1 = __values(updateStack), updateStack_1_1 = updateStack_1.next(); !updateStack_1_1.done; updateStack_1_1 = updateStack_1.next()) {
                 var current = updateStack_1_1.value;
-                var split = this.split(current.updatePath);
                 var value = current.newValue;
-                if (typeof value === "function") {
-                    value = value(this.pathGet(split, this.data));
-                }
-                this.pathSet(split, value, this.data);
                 if (this.tracing.length) {
                     var traceId = this.tracing[this.tracing.length - 1];
                     var trace = this.traceMap.get(traceId);
@@ -1431,13 +1426,19 @@ var DeepState = /** @class */ (function () {
         var updateStack = [];
         var notifiers = [];
         var multiObject = {
-            update: function (updatePath, fn, options) {
+            update: function (updatePath, fnOrValue, options) {
                 if (options === void 0) { options = defaultUpdateOptions; }
                 if (grouped) {
-                    updateStack.push({ updatePath: updatePath, newValue: fn, options: options });
+                    var split = self.split(updatePath);
+                    var value = fnOrValue;
+                    if (typeof value === "function") {
+                        value = value(self.pathGet(split, self.data));
+                    }
+                    self.pathSet(split, value, self.data);
+                    updateStack.push({ updatePath: updatePath, newValue: value, options: options });
                 }
                 else {
-                    notifiers.push(self.update(updatePath, fn, options, true));
+                    notifiers.push(self.update(updatePath, fnOrValue, options, true));
                 }
                 return this;
             },
