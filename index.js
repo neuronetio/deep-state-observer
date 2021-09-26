@@ -81,6 +81,14 @@ exports.__esModule = true;
 var wildcard_object_scan_1 = require("./wildcard-object-scan");
 var ObjectPath_1 = require("./ObjectPath");
 var wildcard_matcher_js_1 = require("./wildcard_matcher.js");
+var defaultUpdateOptions = {
+    only: [],
+    source: "",
+    debug: false,
+    data: undefined,
+    queue: false,
+    force: false
+};
 function log(message, info) {
     console.debug(message, info);
 }
@@ -108,14 +116,6 @@ var defaultListenerOptions = {
     data: undefined,
     queue: false,
     group: false
-};
-var defaultUpdateOptions = {
-    only: [],
-    source: "",
-    debug: false,
-    data: undefined,
-    queue: false,
-    force: false
 };
 var DeepState = /** @class */ (function () {
     function DeepState(data, options) {

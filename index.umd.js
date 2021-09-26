@@ -357,6 +357,14 @@
       return wasm;
     }
 
+    const defaultUpdateOptions = {
+        only: [],
+        source: "",
+        debug: false,
+        data: undefined,
+        queue: false,
+        force: false,
+    };
     function log(message, info) {
         console.debug(message, info);
     }
@@ -384,14 +392,6 @@
         data: undefined,
         queue: false,
         group: false,
-    };
-    const defaultUpdateOptions = {
-        only: [],
-        source: "",
-        debug: false,
-        data: undefined,
-        queue: false,
-        force: false,
     };
     class DeepState {
         constructor(data = {}, options = {}) {

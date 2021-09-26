@@ -166,8 +166,17 @@ export interface UpdateStack {
   options: UpdateOptions;
 }
 
+const defaultUpdateOptions: UpdateOptions = {
+  only: [],
+  source: "",
+  debug: false,
+  data: undefined,
+  queue: false,
+  force: false,
+};
+
 export interface Multi {
-  update: (updatePath: string, fn: Updater | any, options: UpdateOptions) => Multi | void;
+  update: (updatePath: string, fn: Updater | any, options?: UpdateOptions) => Multi | void;
   done: () => void;
   getStack: () => UpdateStack[] | void;
 }
@@ -201,15 +210,6 @@ const defaultListenerOptions: ListenerOptions = {
   data: undefined,
   queue: false,
   group: false,
-};
-
-const defaultUpdateOptions: UpdateOptions = {
-  only: [],
-  source: "",
-  debug: false,
-  data: undefined,
-  queue: false,
-  force: false,
 };
 
 class DeepState {

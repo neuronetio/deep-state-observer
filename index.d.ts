@@ -136,7 +136,7 @@ export interface UpdateStack {
     options: UpdateOptions;
 }
 export interface Multi {
-    update: (updatePath: string, fn: Updater | any, options: UpdateOptions) => Multi | void;
+    update: (updatePath: string, fn: Updater | any, options?: UpdateOptions) => Multi | void;
     done: () => void;
     getStack: () => UpdateStack[] | void;
 }
