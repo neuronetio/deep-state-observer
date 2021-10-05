@@ -137,4 +137,64 @@ describe("Collection", () => {
     expect(values[3]).toEqual("all");
     expect(values[2]).toEqual("bbb");
   });
+
+  it("should not fire muted listeners", () => {
+    const state = new State({ test: 1 });
+    const values = [];
+    function muted() {
+      values.push(state.get("test"));
+    }
+    state.subscribe("test", muted);
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+
+    state.mute(muted);
+    state.collect();
+    state.update("test", 2);
+    state.executeCollected();
+
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+
+    state.unmute(muted);
+
+    state.collect();
+    state.update("test", 3);
+    state.executeCollected();
+
+    expect(values.length).toEqual(2);
+    expect(values[1]).toEqual(3);
+    expect(state.get("test")).toEqual(3);
+  });
+
+  it("should not fire muted listeners (group)", () => {
+    const state = new State({ test: 1 });
+    const values = [];
+    function muted() {
+      values.push(state.get("test"));
+    }
+    state.subscribeAll(["test"], muted, { group: true });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+
+    state.mute(muted);
+
+    state.collect();
+    state.update("test", 2);
+    state.executeCollected();
+
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+    expect(state.get("test")).toEqual(2);
+
+    state.unmute(muted);
+
+    state.collect();
+    state.update("test", 3);
+    state.executeCollected();
+
+    expect(values.length).toEqual(2);
+    expect(values[1]).toEqual(3);
+    expect(state.get("test")).toEqual(3);
+  });
 });
