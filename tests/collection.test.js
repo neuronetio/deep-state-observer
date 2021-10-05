@@ -197,4 +197,67 @@ describe("Collection", () => {
     expect(values[1]).toEqual(3);
     expect(state.get("test")).toEqual(3);
   });
+
+  it("should not fire muted listeners (multi & group)", () => {
+    const state = new State({ test: 1 });
+    const values = [];
+    function muted() {
+      values.push(state.get("test"));
+    }
+    state.subscribeAll(["test"], muted, { group: true });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+
+    state.mute(muted);
+
+    state.collect();
+    state.multi().update("test", 2).done();
+    state.executeCollected();
+
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+    expect(state.get("test")).toEqual(2);
+
+    state.unmute(muted);
+
+    state.collect();
+    state.multi().update("test", 3).done();
+    state.executeCollected();
+
+    expect(values.length).toEqual(2);
+    expect(values[1]).toEqual(3);
+    expect(state.get("test")).toEqual(3);
+  });
+
+  it("should not fire muted listeners (multi & group 2)", () => {
+    const state = new State({ test: 1 });
+    const values = [];
+    function muted() {
+      values.push(state.get("test"));
+    }
+    state.subscribeAll(["test"], muted, { group: true });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+
+    state.mute(muted);
+
+    state.collect();
+    state.multi(true).update("test", 2).done();
+    state.executeCollected();
+
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(1);
+    expect(state.get("test")).toEqual(2);
+
+    state.unmute(muted);
+
+    state.collect();
+    state.multi(true).update("test", 3).done();
+    expect(values.length).toEqual(1);
+    state.executeCollected();
+
+    expect(values.length).toEqual(2);
+    expect(values[1]).toEqual(3);
+    expect(state.get("test")).toEqual(3);
+  });
 });
