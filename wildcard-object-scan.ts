@@ -9,14 +9,14 @@ export interface wildcardResult {
   [key: string]: any;
 }
 
-function WildcardObject(
-  obj: object,
-  delimeter: string,
+function WildcardObject<T>(
+  obj: T | object,
+  delimiter: string,
   wildcard: string,
   is_match: (first: string, second: string) => boolean = undefined
 ) {
   this.obj = obj;
-  this.delimeter = delimeter;
+  this.delimiter = delimiter;
   this.wildcard = wildcard;
   this.is_match = is_match;
 }
@@ -63,7 +63,7 @@ WildcardObject.prototype.handleArray = function handleArray(
   path: string,
   result = {}
 ) {
-  let nextPartIndex = wildcard.indexOf(this.delimeter, partIndex);
+  let nextPartIndex = wildcard.indexOf(this.delimiter, partIndex);
   let end = false;
   if (nextPartIndex === -1) {
     end = true;
@@ -73,7 +73,7 @@ WildcardObject.prototype.handleArray = function handleArray(
   let index = 0;
   for (const item of currentArr) {
     const key = index.toString();
-    const currentPath = path === '' ? key : path + this.delimeter + index;
+    const currentPath = path === '' ? key : path + this.delimiter + index;
     if (
       currentWildcardPath === this.wildcard ||
       currentWildcardPath === key ||
@@ -101,7 +101,7 @@ WildcardObject.prototype.handleObject = function handleObject(
   path: string,
   result = {}
 ) {
-  let nextPartIndex = wildcardPath.indexOf(this.delimeter, partIndex);
+  let nextPartIndex = wildcardPath.indexOf(this.delimiter, partIndex);
   let end = false;
   if (nextPartIndex === -1) {
     end = true;
@@ -110,7 +110,7 @@ WildcardObject.prototype.handleObject = function handleObject(
   const currentWildcardPath = wildcardPath.substring(partIndex, nextPartIndex);
   for (let key in currentObj) {
     key = key.toString();
-    const currentPath = path === '' ? key : path + this.delimeter + key;
+    const currentPath = path === '' ? key : path + this.delimiter + key;
     if (
       currentWildcardPath === this.wildcard ||
       currentWildcardPath === key ||

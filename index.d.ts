@@ -140,7 +140,7 @@ export interface Multi {
     done: () => void;
     getStack: () => UpdateStack[];
 }
-declare class DeepState {
+declare class DeepState<T> {
     private listeners;
     private waitingListeners;
     private data;
@@ -166,7 +166,8 @@ declare class DeepState {
     private savedTrace;
     private collection;
     private collections;
-    constructor(data?: {}, options?: Options);
+    proxy: any;
+    constructor(data?: T | object, options?: Options);
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
     getListeners(): Listeners;

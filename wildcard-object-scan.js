@@ -1,21 +1,20 @@
 "use strict";
-var __values = (this && this.__values) || function(o) {
-    var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
+var __values = (this && this.__values) || function (o) {
+    var m = typeof Symbol === "function" && o[Symbol.iterator], i = 0;
     if (m) return m.call(o);
-    if (o && typeof o.length === "number") return {
+    return {
         next: function () {
             if (o && i >= o.length) o = void 0;
             return { value: o && o[i++], done: !o };
         }
     };
-    throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
 };
 exports.__esModule = true;
 var stringMatcher_1 = require("./stringMatcher");
-function WildcardObject(obj, delimeter, wildcard, is_match) {
+function WildcardObject(obj, delimiter, wildcard, is_match) {
     if (is_match === void 0) { is_match = undefined; }
     this.obj = obj;
-    this.delimeter = delimeter;
+    this.delimiter = delimiter;
     this.wildcard = wildcard;
     this.is_match = is_match;
 }
@@ -52,7 +51,7 @@ WildcardObject.prototype.match = function match(first, second) {
 WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr, partIndex, path, result) {
     var e_1, _a;
     if (result === void 0) { result = {}; }
-    var nextPartIndex = wildcard.indexOf(this.delimeter, partIndex);
+    var nextPartIndex = wildcard.indexOf(this.delimiter, partIndex);
     var end = false;
     if (nextPartIndex === -1) {
         end = true;
@@ -64,7 +63,7 @@ WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr
         for (var currentArr_1 = __values(currentArr), currentArr_1_1 = currentArr_1.next(); !currentArr_1_1.done; currentArr_1_1 = currentArr_1.next()) {
             var item = currentArr_1_1.value;
             var key = index.toString();
-            var currentPath = path === '' ? key : path + this.delimeter + index;
+            var currentPath = path === '' ? key : path + this.delimiter + index;
             if (currentWildcardPath === this.wildcard ||
                 currentWildcardPath === key ||
                 this.simpleMatch(currentWildcardPath, key)) {
@@ -86,7 +85,7 @@ WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr
 };
 WildcardObject.prototype.handleObject = function handleObject(wildcardPath, currentObj, partIndex, path, result) {
     if (result === void 0) { result = {}; }
-    var nextPartIndex = wildcardPath.indexOf(this.delimeter, partIndex);
+    var nextPartIndex = wildcardPath.indexOf(this.delimiter, partIndex);
     var end = false;
     if (nextPartIndex === -1) {
         end = true;
@@ -95,7 +94,7 @@ WildcardObject.prototype.handleObject = function handleObject(wildcardPath, curr
     var currentWildcardPath = wildcardPath.substring(partIndex, nextPartIndex);
     for (var key in currentObj) {
         key = key.toString();
-        var currentPath = path === '' ? key : path + this.delimeter + key;
+        var currentPath = path === '' ? key : path + this.delimiter + key;
         if (currentWildcardPath === this.wildcard ||
             currentWildcardPath === key ||
             this.simpleMatch(currentWildcardPath, key)) {

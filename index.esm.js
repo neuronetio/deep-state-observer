@@ -1,16 +1,16 @@
 /*! *****************************************************************************
-Copyright (c) Microsoft Corporation.
+Copyright (c) Microsoft Corporation. All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at http://www.apache.org/licenses/LICENSE-2.0
 
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
+THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
+WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+MERCHANTABLITY OR NON-INFRINGEMENT.
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
+See the Apache Version 2.0 License for specific language governing permissions
+and limitations under the License.
 ***************************************************************************** */
 
 function __awaiter(thisArg, _arguments, P, generator) {
@@ -95,9 +95,9 @@ function Match(pattern, match, wchar = '*') {
     return true;
 }
 
-function WildcardObject(obj, delimeter, wildcard, is_match = undefined) {
+function WildcardObject(obj, delimiter, wildcard, is_match = undefined) {
     this.obj = obj;
-    this.delimeter = delimeter;
+    this.delimiter = delimiter;
     this.wildcard = wildcard;
     this.is_match = is_match;
 }
@@ -132,7 +132,7 @@ WildcardObject.prototype.match = function match(first, second) {
         Match(first, second, this.wildcard));
 };
 WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr, partIndex, path, result = {}) {
-    let nextPartIndex = wildcard.indexOf(this.delimeter, partIndex);
+    let nextPartIndex = wildcard.indexOf(this.delimiter, partIndex);
     let end = false;
     if (nextPartIndex === -1) {
         end = true;
@@ -142,7 +142,7 @@ WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr
     let index = 0;
     for (const item of currentArr) {
         const key = index.toString();
-        const currentPath = path === '' ? key : path + this.delimeter + index;
+        const currentPath = path === '' ? key : path + this.delimiter + index;
         if (currentWildcardPath === this.wildcard ||
             currentWildcardPath === key ||
             this.simpleMatch(currentWildcardPath, key)) {
@@ -155,7 +155,7 @@ WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr
     return result;
 };
 WildcardObject.prototype.handleObject = function handleObject(wildcardPath, currentObj, partIndex, path, result = {}) {
-    let nextPartIndex = wildcardPath.indexOf(this.delimeter, partIndex);
+    let nextPartIndex = wildcardPath.indexOf(this.delimiter, partIndex);
     let end = false;
     if (nextPartIndex === -1) {
         end = true;
@@ -164,7 +164,7 @@ WildcardObject.prototype.handleObject = function handleObject(wildcardPath, curr
     const currentWildcardPath = wildcardPath.substring(partIndex, nextPartIndex);
     for (let key in currentObj) {
         key = key.toString();
-        const currentPath = path === '' ? key : path + this.delimeter + key;
+        const currentPath = path === '' ? key : path + this.delimiter + key;
         if (currentWildcardPath === this.wildcard ||
             currentWildcardPath === key ||
             this.simpleMatch(currentWildcardPath, key)) {
@@ -353,7 +353,7 @@ async function init(input) {
 
 const defaultUpdateOptions = {
     only: [],
-    source: "",
+    source: '',
     debug: false,
     data: undefined,
     queue: false,
@@ -382,10 +382,16 @@ function getDefaultOptions() {
 const defaultListenerOptions = {
     bulk: false,
     debug: false,
-    source: "",
+    source: '',
     data: undefined,
     queue: false,
     group: false,
+};
+const handler = {
+    get(obj, prop) { },
+    set(obj, prop, value) {
+        return true;
+    },
 };
 class DeepState {
     constructor(data = {}, options = {}) {
@@ -406,7 +412,8 @@ class DeepState {
         this.listeners = new Map();
         this.waitingListeners = new Map();
         this.data = data;
-        this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
+        this.proxy = new Proxy(this.data, handler);
+        this.options = Object.assign({}, getDefaultOptions(), options);
         this.id = 0;
         this.pathGet = ObjectPath.get;
         this.pathSet = ObjectPath.set;
@@ -429,7 +436,8 @@ class DeepState {
         });
     }
     same(newValue, oldValue) {
-        return ((["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
+        return ((['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) ||
+            newValue === null) &&
             oldValue === newValue);
     }
     getListeners() {
@@ -450,7 +458,8 @@ class DeepState {
         if (first === this.options.wildcard || second === this.options.wildcard)
             return true;
         if (!nested &&
-            this.getIndicesCount(this.options.delimiter, first) < this.getIndicesCount(this.options.delimiter, second)) {
+            this.getIndicesCount(this.options.delimiter, first) <
+                this.getIndicesCount(this.options.delimiter, second)) {
             // first < second because first is a listener path and may be longer but not shorter
             return false;
         }
@@ -497,7 +506,7 @@ class DeepState {
         return path;
     }
     split(path) {
-        return path === "" ? [] : path.split(this.options.delimiter);
+        return path === '' ? [] : path.split(this.options.delimiter);
     }
     isWildcard(path) {
         return path.includes(this.options.wildcard) || this.hasParams(path);
@@ -506,22 +515,24 @@ class DeepState {
         return path.endsWith(this.options.notRecursive);
     }
     cleanNotRecursivePath(path) {
-        return this.isNotRecursive(path) ? path.substring(0, path.length - 1) : path;
+        return this.isNotRecursive(path)
+            ? path.substring(0, path.length - 1)
+            : path;
     }
     hasParams(path) {
         return path.includes(this.options.param);
     }
     getParamsInfo(path) {
-        let paramsInfo = { replaced: "", original: path, params: {} };
+        let paramsInfo = { replaced: '', original: path, params: {} };
         let partIndex = 0;
         let fullReplaced = [];
         for (const part of this.split(path)) {
             paramsInfo.params[partIndex] = {
                 original: part,
-                replaced: "",
-                name: "",
+                replaced: '',
+                name: '',
             };
-            const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimiter}\\${this.options.param}]+)`, "g");
+            const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimiter}\\${this.options.param}]+)`, 'g');
             let param = reg.exec(part);
             if (param) {
                 paramsInfo.params[partIndex].name = param[1];
@@ -607,7 +618,11 @@ class DeepState {
             options.bulk = true;
         }
         for (const userPath of userPaths) {
-            unsubscribers.push(this.subscribe(userPath, fn, options, { all: userPaths, index, groupId: options.group ? this.groupId : null }));
+            unsubscribers.push(this.subscribe(userPath, fn, options, {
+                all: userPaths,
+                index,
+                groupId: options.group ? this.groupId : null,
+            }));
             index++;
         }
         return function unsubscribe() {
@@ -622,7 +637,7 @@ class DeepState {
     getCleanListener(fn, options = defaultListenerOptions) {
         return {
             fn,
-            options: Object.assign(Object.assign({}, defaultListenerOptions), options),
+            options: Object.assign({}, defaultListenerOptions, options),
             groupId: null,
         };
     }
@@ -638,7 +653,7 @@ class DeepState {
                 scopedListenerPath = self.cutPath(self.cleanNotRecursivePath(listenerPath), path);
             }
             if (debug) {
-                console.log("[getListenerCollectionMatch]", {
+                console.log('[getListenerCollectionMatch]', {
                     listenerPath,
                     scopedListenerPath,
                     path,
@@ -674,18 +689,22 @@ class DeepState {
         if (!collCfg.isRecursive) {
             collCfg.path = this.cleanNotRecursivePath(collCfg.path);
         }
-        let listenersCollection = this.getCleanListenersCollection(Object.assign(Object.assign({}, collCfg), { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
+        let listenersCollection = this.getCleanListenersCollection(Object.assign({}, collCfg, { match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard) }));
         this.id++;
         listenersCollection.listeners.set(this.id, listener);
         listener.id = this.id;
         this.listeners.set(collCfg.originalPath, listenersCollection);
         return listenersCollection;
     }
-    subscribe(listenerPath, fn, options = defaultListenerOptions, subscribeAllOptions = { all: [listenerPath], index: 0, groupId: this.groupId }) {
+    subscribe(listenerPath, fn, options = defaultListenerOptions, subscribeAllOptions = {
+        all: [listenerPath],
+        index: 0,
+        groupId: this.groupId,
+    }) {
         if (this.destroyed)
             return () => { };
         this.jobsRunning++;
-        const type = "subscribe";
+        const type = 'subscribe';
         let listener = this.getCleanListener(fn, options);
         if (options.group)
             listener.groupId = subscribeAllOptions.groupId;
@@ -695,7 +714,9 @@ class DeepState {
             console.log();
         }
         listenersCollection.count++;
-        if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
+        if (!options.group ||
+            (options.group &&
+                subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
             const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
             if (!listenersCollection.isWildcard) {
                 if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
@@ -793,7 +814,7 @@ class DeepState {
             this.queueRuns++;
             if (this.queueRuns >= this.options.maxQueueRuns) {
                 this.queueRuns = 0;
-                throw new Error("Maximal number of queue runs exhausted.");
+                throw new Error('Maximal number of queue runs exhausted.');
             }
             else {
                 Promise.resolve()
@@ -811,9 +832,14 @@ class DeepState {
             let { single, bulk } = groupedListeners[path];
             for (const singleListener of single) {
                 let alreadyInQueue = false;
-                let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                let resolvedIdPath = singleListener.listener.id +
+                    ':' +
+                    singleListener.eventInfo.path.resolved;
                 if (!singleListener.eventInfo.path.resolved) {
-                    resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                    resolvedIdPath =
+                        singleListener.listener.id +
+                            ':' +
+                            singleListener.eventInfo.path.listener;
                 }
                 for (const excludedListener of queue) {
                     if (resolvedIdPath === excludedListener.resolvedIdPath) {
@@ -832,9 +858,14 @@ class DeepState {
                         });
                     }
                     else {
-                        let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                        let resolvedIdPath = singleListener.listener.id +
+                            ':' +
+                            singleListener.eventInfo.path.resolved;
                         if (!singleListener.eventInfo.path.resolved) {
-                            resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                            resolvedIdPath =
+                                singleListener.listener.id +
+                                    ':' +
+                                    singleListener.eventInfo.path.listener;
                         }
                         queue.push({
                             id: singleListener.listener.id,
@@ -864,7 +895,7 @@ class DeepState {
                 const time = this.debugTime(bulkListener);
                 const bulkValue = [];
                 for (const bulk of bulkListener.value) {
-                    bulkValue.push(Object.assign(Object.assign({}, bulk), { value: bulk.value() }));
+                    bulkValue.push(Object.assign({}, bulk, { value: bulk.value() }));
                 }
                 if (!this.isMuted(bulkListener.listener.fn)) {
                     if (bulkListener.listener.options.queue && this.jobsRunning) {
@@ -877,9 +908,14 @@ class DeepState {
                         });
                     }
                     else {
-                        let resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
+                        let resolvedIdPath = bulkListener.listener.id +
+                            ':' +
+                            bulkListener.eventInfo.path.resolved;
                         if (!bulkListener.eventInfo.path.resolved) {
-                            resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+                            resolvedIdPath =
+                                bulkListener.listener.id +
+                                    ':' +
+                                    bulkListener.eventInfo.path.listener;
                         }
                         queue.push({
                             id: bulkListener.listener.id,
@@ -919,8 +955,8 @@ class DeepState {
         }
         return false;
     }
-    getSubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
-        options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
+    getSubscribedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
+        options = Object.assign({}, defaultUpdateOptions, options);
         const listeners = {};
         for (let [listenerPath, listenersCollection] of this.listeners) {
             listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
@@ -1000,10 +1036,10 @@ class DeepState {
         }
         return listeners;
     }
-    notifySubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
+    notifySubscribedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
         return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
     }
-    getNestedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
+    getNestedListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
         const listeners = {};
         for (let [listenerPath, listenersCollection] of this.listeners) {
             if (!listenersCollection.isRecursive)
@@ -1076,7 +1112,7 @@ class DeepState {
                 // debug
                 for (const listener of listenersCollection.listeners.values()) {
                     if (listener.options.debug) {
-                        console.log("[getNestedListeners] Listener was not fired because there was no match.", {
+                        console.log('[getNestedListeners] Listener was not fired because there was no match.', {
                             listener,
                             listenersCollection,
                             currentCutPath,
@@ -1088,14 +1124,14 @@ class DeepState {
         }
         return listeners;
     }
-    notifyNestedListeners(updatePath, newValue, options, type = "update", queue, originalPath = null) {
+    notifyNestedListeners(updatePath, newValue, options, type = 'update', queue, originalPath = null) {
         return this.getQueueNotifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), queue);
     }
-    getNotifyOnlyListeners(updatePath, newValue, options, type = "update", originalPath = null) {
+    getNotifyOnlyListeners(updatePath, newValue, options, type = 'update', originalPath = null) {
         const listeners = {};
-        if (typeof options.only !== "object" ||
+        if (typeof options.only !== 'object' ||
             !Array.isArray(options.only) ||
-            typeof options.only[0] === "undefined" ||
+            typeof options.only[0] === 'undefined' ||
             !this.canBeNested(newValue)) {
             return listeners;
         }
@@ -1174,16 +1210,16 @@ class DeepState {
         }
         this.runQueue(queue);
     }
-    notifyOnly(updatePath, newValue, options, type = "update", originalPath = "") {
+    notifyOnly(updatePath, newValue, options, type = 'update', originalPath = '') {
         const queue = this.getQueueNotifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath));
         this.sortAndRunQueue(queue, updatePath);
     }
     canBeNested(newValue) {
-        return typeof newValue === "object" && newValue !== null;
+        return typeof newValue === 'object' && newValue !== null;
     }
     getUpdateValues(oldValue, split, fn) {
         let newValue = fn;
-        if (typeof fn === "function") {
+        if (typeof fn === 'function') {
             newValue = fn(this.pathGet(split, this.data));
         }
         return { newValue, oldValue };
@@ -1201,7 +1237,7 @@ class DeepState {
     }
     wildcardUpdate(updatePath, fn, options = defaultUpdateOptions, multi = false) {
         ++this.jobsRunning;
-        options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
+        options = Object.assign({}, defaultUpdateOptions, options);
         const scanned = this.scan.get(updatePath);
         const updated = {};
         for (const path in scanned) {
@@ -1217,15 +1253,15 @@ class DeepState {
         for (const path in updated) {
             const newValue = updated[path];
             if (options.only.length) {
-                groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
+                groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, 'update', updatePath));
             }
             else {
-                groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, "update", updatePath));
+                groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, 'update', updatePath));
                 if (this.canBeNested(newValue)) {
-                    groupedListenersPack.push(this.getNestedListeners(path, newValue, options, "update", updatePath));
+                    groupedListenersPack.push(this.getNestedListeners(path, newValue, options, 'update', updatePath));
                 }
             }
-            options.debug && this.options.log("Wildcard update", { path, newValue });
+            options.debug && this.options.log('Wildcard update', { path, newValue });
             waitingPaths.push(path);
         }
         if (multi) {
@@ -1241,7 +1277,8 @@ class DeepState {
     runUpdateQueue() {
         if (this.destroyed)
             return;
-        while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
+        while (this.updateQueue.length &&
+            this.updateQueue.length < this.options.maxSimultaneousJobs) {
             const params = this.updateQueue.shift();
             params.options.queue = false; // prevent infinite loop
             this.update(params.updatePath, params.fnOrValue, params.options, params.multi);
@@ -1250,7 +1287,7 @@ class DeepState {
     updateNotify(updatePath, newValue, options) {
         const queue = this.notifySubscribedListeners(updatePath, newValue, options);
         if (this.canBeNested(newValue)) {
-            this.notifyNestedListeners(updatePath, newValue, options, "update", queue);
+            this.notifyNestedListeners(updatePath, newValue, options, 'update', queue);
         }
         this.sortAndRunQueue(queue, updatePath);
         this.executeWaitingListeners(updatePath);
@@ -1262,12 +1299,17 @@ class DeepState {
             if (this.tracing.length) {
                 const traceId = this.tracing[this.tracing.length - 1];
                 const trace = this.traceMap.get(traceId);
-                trace.changed.push({ traceId, updatePath: current.updatePath, fnOrValue: value, options: current.options });
+                trace.changed.push({
+                    traceId,
+                    updatePath: current.updatePath,
+                    fnOrValue: value,
+                    options: current.options,
+                });
                 this.traceMap.set(traceId, trace);
             }
             queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
             if (this.canBeNested(current.newValue)) {
-                this.notifyNestedListeners(current.updatePath, value, current.options, "update", queue);
+                this.notifyNestedListeners(current.updatePath, value, current.options, 'update', queue);
             }
         }
         this.runQueue(queue);
@@ -1291,7 +1333,7 @@ class DeepState {
         const jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
             if (jobsRunning > this.options.maxSimultaneousJobs) {
-                throw new Error("Maximal simultaneous jobs limit reached.");
+                throw new Error('Maximal simultaneous jobs limit reached.');
             }
             this.updateQueue.push({ updatePath, fnOrValue, options, multi });
             const result = Promise.resolve().then(() => {
@@ -1311,7 +1353,7 @@ class DeepState {
         const split = this.split(updatePath);
         const { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fnOrValue);
         if (options.debug) {
-            this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ""}`, {
+            this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ''}`, {
                 oldValue,
                 newValue,
             });
@@ -1325,7 +1367,7 @@ class DeepState {
             return newValue;
         }
         this.pathSet(split, newValue, this.data);
-        options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
+        options = Object.assign({}, defaultUpdateOptions, options);
         if (options.only === null) {
             --this.jobsRunning;
             if (multi)
@@ -1375,7 +1417,7 @@ class DeepState {
                 if (grouped) {
                     const split = self.split(updatePath);
                     let value = fnOrValue;
-                    if (typeof value === "function") {
+                    if (typeof value === 'function') {
                         value = value(self.pathGet(split, self.data));
                     }
                     self.pathSet(split, value, self.data);
@@ -1432,7 +1474,7 @@ class DeepState {
     get(userPath = undefined) {
         if (this.destroyed)
             return;
-        if (typeof userPath === "undefined" || userPath === "") {
+        if (typeof userPath === 'undefined' || userPath === '') {
             return this.data;
         }
         return this.pathGet(this.split(userPath), this.data);
@@ -1454,7 +1496,7 @@ class DeepState {
     isMuted(pathOrListenerFunction) {
         if (!this.options.useMute)
             return false;
-        if (typeof pathOrListenerFunction === "function") {
+        if (typeof pathOrListenerFunction === 'function') {
             return this.isMutedListener(pathOrListenerFunction);
         }
         for (const mutedPath of this.muted) {
@@ -1478,20 +1520,20 @@ class DeepState {
         return this.mutedListeners.has(listenerFunc);
     }
     mute(pathOrListenerFunction) {
-        if (typeof pathOrListenerFunction === "function") {
+        if (typeof pathOrListenerFunction === 'function') {
             return this.mutedListeners.add(pathOrListenerFunction);
         }
         this.muted.add(pathOrListenerFunction);
     }
     unmute(pathOrListenerFunction) {
-        if (typeof pathOrListenerFunction === "function") {
+        if (typeof pathOrListenerFunction === 'function') {
             return this.mutedListeners.delete(pathOrListenerFunction);
         }
         this.muted.delete(pathOrListenerFunction);
     }
     debugSubscribe(listener, listenersCollection, listenerPath) {
         if (listener.options.debug) {
-            this.options.log("listener subscribed", {
+            this.options.log('listener subscribed', {
                 listenerPath,
                 listener,
                 listenersCollection,
@@ -1499,20 +1541,30 @@ class DeepState {
         }
     }
     debugListener(time, groupedListener) {
-        if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
-            this.options.log("Listener fired", {
+        if (groupedListener.eventInfo.options.debug ||
+            groupedListener.listener.options.debug) {
+            this.options.log('Listener fired', {
                 time: Date.now() - time,
                 info: groupedListener,
             });
         }
     }
     debugTime(groupedListener) {
-        return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
+        return groupedListener.listener.options.debug ||
+            groupedListener.eventInfo.options.debug
+            ? Date.now()
+            : 0;
     }
     startTrace(name, additionalData = null) {
         this.traceId++;
-        const id = this.traceId + ":" + name;
-        this.traceMap.set(id, { id, sort: this.traceId, stack: this.tracing.map((i) => i), additionalData, changed: [] });
+        const id = this.traceId + ':' + name;
+        this.traceMap.set(id, {
+            id,
+            sort: this.traceId,
+            stack: this.tracing.map((i) => i),
+            additionalData,
+            changed: [],
+        });
         this.tracing.push(id);
         return id;
     }
@@ -1539,4 +1591,4 @@ class DeepState {
     }
 }
 
-export { DeepState as default };
+export default DeepState;
