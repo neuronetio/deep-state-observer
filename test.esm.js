@@ -1531,4 +1531,22 @@ class DeepState {
     }
 }
 
-export { DeepState as default };
+const someState = {
+    x: 10,
+    y: {
+        a: 1,
+        b: "2",
+        c: {
+            d: 3,
+            e: "4",
+        },
+    },
+};
+const state = new DeepState(someState);
+state.$$$.y.c.d = 33;
+if (state.get("y.c.d") !== 33) {
+    console.error("wrong");
+}
+else {
+    console.log("ok");
+}

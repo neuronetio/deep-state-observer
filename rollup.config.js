@@ -45,4 +45,18 @@ export default [
       commonjs({ extensions: [".js", ".ts"] }),
     ],
   },
+  {
+    input: "test.ts",
+    output: {
+      file: "test.esm.js",
+      format: "esm",
+    },
+    plugins: [
+      typescript(),
+      resolve({
+        browser: true,
+      }),
+      commonjs({ extensions: [".js", ".ts"] }),
+    ],
+  },
 ];

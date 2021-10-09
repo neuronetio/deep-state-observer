@@ -20,7 +20,6 @@ export interface Options {
     param?: string;
     wildcard?: string;
     experimentalMatch?: boolean;
-    queue?: boolean;
     maxSimultaneousJobs?: number;
     maxQueueRuns?: number;
     log?: (message: string, info: any) => void;
@@ -33,7 +32,6 @@ export interface ListenerOptions {
     debug?: boolean;
     source?: string;
     data?: any;
-    queue?: boolean;
     ignore?: string[];
     group?: boolean;
 }
@@ -140,22 +138,21 @@ export interface Multi {
     done: () => void;
     getStack: () => UpdateStack[];
 }
+export interface UnknownObject {
+    [key: string]: unknown;
+}
 declare class DeepState<T> {
     private listeners;
-    private waitingListeners;
     private data;
     private options;
     private id;
     private pathGet;
     private pathSet;
     private scan;
-    private jobsRunning;
-    private updateQueue;
     private subscribeQueue;
     private listenersIgnoreCache;
     private is_match;
     private destroyed;
-    private queueRuns;
     private resolved;
     private muted;
     private mutedListeners;
@@ -166,8 +163,15 @@ declare class DeepState<T> {
     private savedTrace;
     private collection;
     private collections;
-    proxy: any;
+    private proxyPath;
+    private handler;
+    proxy: T;
+    /**
+     * @property $$$ proxy shorthand
+     */
+    $$$: T;
     constructor(data?: T | object, options?: Options);
+    private mergeDeepProxy;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
     getListeners(): Listeners;
@@ -184,8 +188,6 @@ declare class DeepState<T> {
     private hasParams;
     private getParamsInfo;
     private getParams;
-    waitForAll(userPaths: string[], fn: WaitingListenerFunction): () => void;
-    private executeWaitingListeners;
     subscribeAll(userPaths: string[], fn: ListenerFunction | WaitingListenerFunction, options?: ListenerOptions): () => void;
     private getCleanListenersCollection;
     private getCleanListener;
@@ -208,7 +210,6 @@ declare class DeepState<T> {
     private getUpdateValues;
     private wildcardNotify;
     private wildcardUpdate;
-    private runUpdateQueue;
     private updateNotify;
     private updateNotifyAll;
     private updateNotifyOnly;

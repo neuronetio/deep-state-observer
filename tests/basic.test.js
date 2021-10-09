@@ -892,100 +892,6 @@ describe("State", () => {
     expect(state.listeners.get("one.two;").count).toEqual(1);
   });
 
-  it("should execute listeners only when all values where changed", () => {
-    const state = new State({
-      first: { one: 1 },
-      second: { two: 2 },
-      third: { three: 3 },
-    });
-    const values = [];
-    state.waitForAll(["first", "second", "third"], (paths) => {
-      const value = {};
-      for (const path in paths) {
-        value[path] = state.get(path);
-      }
-      values.push(value);
-    });
-    expect(values.length).toEqual(1);
-    expect(values[0]).toEqual({
-      first: { one: 1 },
-      second: { two: 2 },
-      third: { three: 3 },
-    });
-    state.update("first.one", 11);
-    expect(values.length).toEqual(1);
-    expect(state.get("")).toEqual({
-      first: { one: 11 },
-      second: { two: 2 },
-      third: { three: 3 },
-    });
-    state.update("second.two", 22);
-    expect(values.length).toEqual(1);
-    expect(state.get("")).toEqual({
-      first: { one: 11 },
-      second: { two: 22 },
-      third: { three: 3 },
-    });
-    state.update("third.three", 33);
-    expect(values.length).toEqual(2);
-    expect(state.get("")).toEqual({
-      first: { one: 11 },
-      second: { two: 22 },
-      third: { three: 33 },
-    });
-    expect(values[1]).toEqual({
-      first: { one: 11 },
-      second: { two: 22 },
-      third: { three: 33 },
-    });
-  });
-
-  it("should work with wait option", () => {
-    const state = new State({ test: 1 }, { queue: true });
-    const values = [];
-    state.subscribe("test", (value) => {
-      values.push(value);
-    });
-    expect(values.length).toEqual(1);
-    expect(values[0]).toEqual(1);
-    state.update("test", 2);
-    expect(values[1]).toEqual(2);
-  });
-
-  it("should wait until all jobs are finished", () => {
-    const state = new State({ test: 1, other: "x" }, { queue: true });
-    const values = [];
-    state.subscribe("test", (value) => {
-      state.update("other", "xx");
-      values.push(value);
-    });
-    expect(values.length).toEqual(1);
-    expect(values[0]).toEqual(1);
-    state.update("test", 2);
-    expect(values[1]).toEqual(2);
-    expect(state.get("other")).toEqual("x");
-    setTimeout(() => {
-      expect(state.get("other")).toEqual("xx");
-    }, 100);
-  });
-
-  it("should wait until all jobs are finished with update:queue options", () => {
-    const state = new State({ test: 1, other: "x" });
-    const values = [];
-    state.subscribe("test", (value) => {
-      state.update("other", "xx", { queue: true });
-      values.push(value);
-    });
-    expect(values.length).toEqual(1);
-    expect(values[0]).toEqual(1);
-    state.update("test", 2);
-    expect(values[1]).toEqual(2);
-    expect(state.get("other")).toEqual("x");
-    setTimeout(() => {
-      expect(state.get("other")).toEqual("xx");
-    }, 100);
-  });
-
   it("should ignore ignored changes", () => {
     const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
     const values = [];
@@ -1216,6 +1122,7 @@ describe("State", () => {
 
     state.mute("x;");
     state.update("x.*.o", "oo");
+
     expect(values.length).toEqual(2);
     expect(values[1]).toEqual("oo");
     expect(values2.length).toEqual(1);

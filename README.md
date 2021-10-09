@@ -84,6 +84,35 @@ onDestroy(() => {
 });
 ```
 
+## Update and proxy
+
+You can use proxy instead of `state.update` function.
+Proxy is better because values are linted;
+
+```js
+const state = new State({ x: { y: { z: 10 } } });
+
+state.update("x.y.z", 20);
+// is equivalent of
+state.proxy.x.y.z = 20;
+// is equivalent of (state.$$$ is just shorthand for state.proxy)
+state.$$$.x.y.z = 20;
+
+// and with function
+
+state.update("x.y.z", (value) => {
+  return value + 10;
+});
+// is equivalent of
+state.proxy.x.y.z = (value) => {
+  return value + 10;
+};
+// is equivalent of
+state.$$$.x.y.z = (value) => {
+  return value + 10;
+};
+```
+
 ## Wildcards
 
 ```javascript
@@ -400,26 +429,6 @@ state.update("one.two.*.four", 2);
 // values.length === 1 because all nodes after four was ignored
 state.update("one.two.three", 1);
 // values.length === 1 & values[1] === 1
-```
-
-## queue
-
-You can wait with update until all other tasks are finished.
-
-```javascript
-const state = new State({ test: 1, other: "x" });
-const values = [];
-state.subscribe("test", (value) => {
-  state.update("other", "xx", { queue: true });
-  values.push(value);
-});
-// values.length === 1 & values[0] === 1
-state.update("test", 2);
-// values.length ===2 & values[1] === 2
-// state.get('other') === 'x'
-setTimeout(() => {
-  // state.get('other') === 'xx' because updating 'other' was waiting for 'test' listener to end
-}, 100);
 ```
 
 ## multi
