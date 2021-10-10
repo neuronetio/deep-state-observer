@@ -88,7 +88,7 @@ var ObjectPath_1 = require("./ObjectPath");
 var wildcard_matcher_js_1 = require("./wildcard_matcher.js");
 var defaultUpdateOptions = {
     only: [],
-    source: "",
+    source: '',
     debug: false,
     data: undefined,
     force: false
@@ -103,7 +103,11 @@ function log(message, info) {
  * @returns {boolean}
  */
 function isObject(item) {
-    return item && typeof item === "object" && item !== null && item.constructor && item.constructor.name === "Object";
+    return (item &&
+        typeof item === 'object' &&
+        item !== null &&
+        item.constructor &&
+        item.constructor.name === 'Object');
 }
 function getDefaultOptions() {
     return {
@@ -124,7 +128,7 @@ function getDefaultOptions() {
 var defaultListenerOptions = {
     bulk: false,
     debug: false,
-    source: "",
+    source: '',
     data: undefined,
     group: false
 };
@@ -144,29 +148,34 @@ var DeepState = /** @class */ (function () {
         this.collection = null;
         this.collections = 0;
         this.silent = false;
-        this.proxyProperty = "___deep_state_observer___";
+        this.proxyProperty = '___deep_state_observer___';
         this.handler = {
-            set: function (obj, prop, value) {
-                var path = _this.fixPath(obj[_this.proxyProperty] + _this.options.delimiter + prop);
-                if (typeof value === "function") {
-                    value = value(_this.pathGet(_this.split(path), _this.data));
-                }
-                var final = value;
-                if ((isObject(value) || Array.isArray(value)) && typeof value[_this.proxyProperty] === "undefined") {
-                    if (isObject(value)) {
-                        final = _this.mergeDeepProxy({}, value, path);
+            set: function (obj, prop, value, proxy) {
+                if (prop === _this.proxyProperty)
+                    return true;
+                if (!proxy[_this.proxyProperty].saving) {
+                    var path = obj[_this.proxyProperty]
+                        ? obj[_this.proxyProperty].path
+                            ? obj[_this.proxyProperty].path + _this.options.delimiter + prop
+                            : prop
+                        : prop;
+                    if (typeof value === 'function') {
+                        value = value(obj[prop]);
                     }
-                    else if (Array.isArray(value)) {
-                        final = _this.mergeDeepProxy([], value, path);
+                    if (isObject(value) || Array.isArray(value)) {
+                        value = _this.makeObservable(value, path);
                     }
-                }
-                if (_this.silent) {
-                    _this.pathSet(_this.split(path), value, _this.data);
+                    if (!_this.silent) {
+                        _this.update(path, value);
+                    }
+                    else {
+                        obj[prop] = value;
+                    }
                 }
                 else {
-                    _this.update(path, value);
+                    obj[prop] = value;
                 }
-                obj[prop] = final;
+                proxy[_this.proxyProperty].saving = false;
                 return true;
             }
         };
@@ -174,8 +183,9 @@ var DeepState = /** @class */ (function () {
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
         this.options = __assign(__assign({}, getDefaultOptions()), options);
-        this.data = data;
-        this.proxy = this.mergeDeepProxy({}, data, "");
+        //this.data = this.mergeDeepProxy({}, data, '');
+        this.data = this.makeObservable(data, '');
+        this.proxy = this.data;
         this.$$$ = this.proxy;
         this.id = 0;
         this.pathGet = ObjectPath_1["default"].get;
@@ -192,29 +202,78 @@ var DeepState = /** @class */ (function () {
         this.destroyed = false;
     }
     DeepState.prototype.fixPath = function (path) {
-        if (path === ".")
-            return "";
+        if (path === '.')
+            return '';
         if (path[0] === this.options.delimiter)
             path = path.substr(1);
         if (path[path.length - 1] === this.options.delimiter)
             path = path.substring(0, -1);
         return path;
     };
+    DeepState.prototype.getParent = function (path) {
+        if (path) {
+            var split = this.split(path);
+            split.pop();
+            if (!split.length)
+                return this.data;
+            return this.pathGet(split, this.data);
+        }
+    };
+    DeepState.prototype.setProxy = function (target, data) {
+        if (typeof target[this.proxyProperty] === 'undefined') {
+            Object.defineProperty(target, this.proxyProperty, {
+                enumerable: false,
+                value: data
+            });
+            return new Proxy(target, this.handler);
+        }
+        else {
+            for (var key in data) {
+                target[this.proxyProperty][key] = data[key];
+            }
+        }
+        return target;
+    };
+    DeepState.prototype.makeObservable = function (target, path) {
+        if (isObject(target) || Array.isArray(target)) {
+            if (isObject(target)) {
+                for (var key in target) {
+                    if (key === this.proxyProperty)
+                        continue;
+                    if (isObject(target[key]) || Array.isArray(target[key])) {
+                        target[key] = this.makeObservable(target[key], "" + (path ? path + this.options.delimiter : '') + key);
+                    }
+                }
+            }
+            else {
+                for (var key = 0, len = target.length; key < len; key++) {
+                    if (isObject(target[key]) || Array.isArray(target[key])) {
+                        target[key] = this.makeObservable(target[key], "" + (path ? path + this.options.delimiter : '') + key);
+                    }
+                }
+            }
+            target = this.setProxy(target, { path: path, saving: false });
+        }
+        return target;
+    };
     DeepState.prototype.mergeDeepProxy = function (target, source, path) {
         var e_1, _a;
         path = this.fixPath(path);
         if (isObject(target) && isObject(source)) {
-            var targetValMain = {};
-            Object.defineProperty(targetValMain, this.proxyProperty, { enumerable: false, value: path });
+            if (typeof target[this.proxyProperty] === 'undefined')
+                Object.defineProperty(target, this.proxyProperty, {
+                    enumerable: false,
+                    value: path
+                });
             for (var key in source) {
                 if (key === this.proxyProperty)
                     continue;
                 if (isObject(source[key])) {
-                    targetValMain[key] = this.mergeDeepProxy({}, source[key], "" + path + this.options.delimiter + key);
+                    target[key] = this.mergeDeepProxy({}, source[key], "" + path + this.options.delimiter + key);
                 }
                 else if (Array.isArray(source[key])) {
-                    var targetVal = new Array(source[key].length);
-                    Object.defineProperty(targetVal, this.proxyProperty, {
+                    target[key] = new Array(source[key].length);
+                    Object.defineProperty(target[key], this.proxyProperty, {
                         enumerable: false,
                         value: "" + path + this.proxyProperty + key
                     });
@@ -222,11 +281,14 @@ var DeepState = /** @class */ (function () {
                     try {
                         for (var _b = (e_1 = void 0, __values(source[key])), _c = _b.next(); !_c.done; _c = _b.next()) {
                             var item = _c.value;
-                            if (isObject(item) || Array.isArray(item)) {
-                                targetVal[index] = this.mergeDeepProxy({}, item, "" + path + this.options.delimiter + key + this.options.delimiter + index);
+                            if (isObject(item)) {
+                                target[key][index] = this.mergeDeepProxy({}, item, "" + path + this.options.delimiter + key + this.options.delimiter + index);
+                            }
+                            else if (Array.isArray(item)) {
+                                target[key][index] = this.mergeDeepProxy([], item, "" + path + this.options.delimiter + key + this.options.delimiter + index);
                             }
                             else {
-                                targetVal[index] = item;
+                                target[key][index] = item;
                             }
                             index++;
                         }
@@ -238,28 +300,32 @@ var DeepState = /** @class */ (function () {
                         }
                         finally { if (e_1) throw e_1.error; }
                     }
-                    targetValMain[key] = new Proxy(targetVal, this.handler);
                 }
                 else {
-                    targetValMain[key] = source[key];
+                    target[key] = source[key];
                 }
             }
-            return new Proxy(targetValMain, this.handler);
         }
         else if (Array.isArray(source)) {
-            var targetVal = new Array(source.length);
-            Object.defineProperty(targetVal, this.proxyProperty, { enumerable: false, value: path });
+            target.length = source.length;
+            if (typeof target[this.proxyProperty] === 'undefined')
+                Object.defineProperty(target, this.proxyProperty, {
+                    enumerable: false,
+                    value: path
+                });
             for (var i = 0, len = source.length; i < len; i++) {
-                if (isObject(source[i]) || Array.isArray(source[i])) {
-                    targetVal[i] = this.mergeDeepProxy({}, source[i], "" + path + this.options.delimiter + i);
+                if (isObject(source[i])) {
+                    target[i] = this.mergeDeepProxy({}, source[i], "" + path + this.options.delimiter + i);
+                }
+                else if (Array.isArray(source[i])) {
+                    target[i] = this.mergeDeepProxy([], source[i], "" + path + this.options.delimiter + i);
                 }
                 else {
-                    targetVal[i] = source[i];
+                    target[i] = source[i];
                 }
             }
-            return new Proxy(targetVal, this.handler);
         }
-        return target;
+        return new Proxy(target, this.handler);
     };
     DeepState.prototype.loadWasmMatcher = function (pathToWasmFile) {
         return __awaiter(this, void 0, void 0, function () {
@@ -276,7 +342,8 @@ var DeepState = /** @class */ (function () {
         });
     };
     DeepState.prototype.same = function (newValue, oldValue) {
-        return ((["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
+        return ((['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) ||
+            newValue === null) &&
             oldValue === newValue);
     };
     DeepState.prototype.getListeners = function () {
@@ -296,7 +363,8 @@ var DeepState = /** @class */ (function () {
         if (first === this.options.wildcard || second === this.options.wildcard)
             return true;
         if (!nested &&
-            this.getIndicesCount(this.options.delimiter, first) < this.getIndicesCount(this.options.delimiter, second)) {
+            this.getIndicesCount(this.options.delimiter, first) <
+                this.getIndicesCount(this.options.delimiter, second)) {
             // first < second because first is a listener path and may be longer but not shorter
             return false;
         }
@@ -343,7 +411,7 @@ var DeepState = /** @class */ (function () {
         return path;
     };
     DeepState.prototype.split = function (path) {
-        return path === "" ? [] : path.split(this.options.delimiter);
+        return path === '' ? [] : path.split(this.options.delimiter);
     };
     DeepState.prototype.isWildcard = function (path) {
         return path.includes(this.options.wildcard) || this.hasParams(path);
@@ -352,14 +420,16 @@ var DeepState = /** @class */ (function () {
         return path.endsWith(this.options.notRecursive);
     };
     DeepState.prototype.cleanNotRecursivePath = function (path) {
-        return this.isNotRecursive(path) ? path.substring(0, path.length - 1) : path;
+        return this.isNotRecursive(path)
+            ? path.substring(0, path.length - 1)
+            : path;
     };
     DeepState.prototype.hasParams = function (path) {
         return path.includes(this.options.param);
     };
     DeepState.prototype.getParamsInfo = function (path) {
         var e_2, _a;
-        var paramsInfo = { replaced: "", original: path, params: {} };
+        var paramsInfo = { replaced: '', original: path, params: {} };
         var partIndex = 0;
         var fullReplaced = [];
         try {
@@ -367,10 +437,10 @@ var DeepState = /** @class */ (function () {
                 var part = _c.value;
                 paramsInfo.params[partIndex] = {
                     original: part,
-                    replaced: "",
-                    name: ""
+                    replaced: '',
+                    name: ''
                 };
-                var reg = new RegExp("\\" + this.options.param + "([^\\" + this.options.delimiter + "\\" + this.options.param + "]+)", "g");
+                var reg = new RegExp("\\" + this.options.param + "([^\\" + this.options.delimiter + "\\" + this.options.param + "]+)", 'g');
                 var param = reg.exec(part);
                 if (param) {
                     paramsInfo.params[partIndex].name = param[1];
@@ -480,7 +550,7 @@ var DeepState = /** @class */ (function () {
                 scopedListenerPath = self.cutPath(self.cleanNotRecursivePath(listenerPath), path);
             }
             if (debug) {
-                console.log("[getListenerCollectionMatch]", {
+                console.log('[getListenerCollectionMatch]', {
                     listenerPath: listenerPath,
                     scopedListenerPath: scopedListenerPath,
                     path: path,
@@ -532,7 +602,7 @@ var DeepState = /** @class */ (function () {
         }; }
         if (this.destroyed)
             return function () { };
-        var type = "subscribe";
+        var type = 'subscribe';
         var listener = this.getCleanListener(fn, options);
         if (options.group)
             listener.groupId = subscribeAllOptions.groupId;
@@ -542,7 +612,9 @@ var DeepState = /** @class */ (function () {
             console.log();
         }
         listenersCollection.count++;
-        if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
+        if (!options.group ||
+            (options.group &&
+                subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
             var cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
             if (!listenersCollection.isWildcard) {
                 if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
@@ -644,9 +716,14 @@ var DeepState = /** @class */ (function () {
             var _loop_1 = function (singleListener) {
                 var e_7, _d;
                 var alreadyInQueue = false;
-                var resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                var resolvedIdPath = singleListener.listener.id +
+                    ':' +
+                    singleListener.eventInfo.path.resolved;
                 if (!singleListener.eventInfo.path.resolved) {
-                    resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                    resolvedIdPath =
+                        singleListener.listener.id +
+                            ':' +
+                            singleListener.eventInfo.path.listener;
                 }
                 try {
                     for (var queue_1 = (e_7 = void 0, __values(queue)), queue_1_1 = queue_1.next(); !queue_1_1.done; queue_1_1 = queue_1.next()) {
@@ -669,9 +746,14 @@ var DeepState = /** @class */ (function () {
                 }
                 var time = this_1.debugTime(singleListener);
                 if (!this_1.isMuted(singleListener.listener.fn)) {
-                    var resolvedIdPath_1 = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                    var resolvedIdPath_1 = singleListener.listener.id +
+                        ':' +
+                        singleListener.eventInfo.path.resolved;
                     if (!singleListener.eventInfo.path.resolved) {
-                        resolvedIdPath_1 = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                        resolvedIdPath_1 =
+                            singleListener.listener.id +
+                                ':' +
+                                singleListener.eventInfo.path.listener;
                     }
                     queue.push({
                         id: singleListener.listener.id,
@@ -738,9 +820,14 @@ var DeepState = /** @class */ (function () {
                     finally { if (e_9) throw e_9.error; }
                 }
                 if (!this_2.isMuted(bulkListener.listener.fn)) {
-                    var resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
+                    var resolvedIdPath = bulkListener.listener.id +
+                        ':' +
+                        bulkListener.eventInfo.path.resolved;
                     if (!bulkListener.eventInfo.path.resolved) {
-                        resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+                        resolvedIdPath =
+                            bulkListener.listener.id +
+                                ':' +
+                                bulkListener.eventInfo.path.listener;
                     }
                     queue.push({
                         id: bulkListener.listener.id,
@@ -807,7 +894,7 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.getSubscribedListeners = function (updatePath, newValue, options, type, originalPath) {
         var e_11, _a;
         var _this = this;
-        if (type === void 0) { type = "update"; }
+        if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
         options = __assign(__assign({}, defaultUpdateOptions), options);
         var listeners = {};
@@ -925,13 +1012,13 @@ var DeepState = /** @class */ (function () {
         return listeners;
     };
     DeepState.prototype.notifySubscribedListeners = function (updatePath, newValue, options, type, originalPath) {
-        if (type === void 0) { type = "update"; }
+        if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
         return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
     };
     DeepState.prototype.getNestedListeners = function (updatePath, newValue, options, type, originalPath) {
         var e_14, _a;
-        if (type === void 0) { type = "update"; }
+        if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
         var _loop_4 = function (listenerPath, listenersCollection) {
@@ -1022,7 +1109,7 @@ var DeepState = /** @class */ (function () {
                     for (var _f = (e_15 = void 0, __values(listenersCollection.listeners.values())), _g = _f.next(); !_g.done; _g = _f.next()) {
                         var listener = _g.value;
                         if (listener.options.debug) {
-                            console.log("[getNestedListeners] Listener was not fired because there was no match.", {
+                            console.log('[getNestedListeners] Listener was not fired because there was no match.', {
                                 listener: listener,
                                 listenersCollection: listenersCollection,
                                 currentCutPath: currentCutPath,
@@ -1057,18 +1144,18 @@ var DeepState = /** @class */ (function () {
         return listeners;
     };
     DeepState.prototype.notifyNestedListeners = function (updatePath, newValue, options, type, queue, originalPath) {
-        if (type === void 0) { type = "update"; }
+        if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
         return this.getQueueNotifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), queue);
     };
     DeepState.prototype.getNotifyOnlyListeners = function (updatePath, newValue, options, type, originalPath) {
         var e_17, _a;
-        if (type === void 0) { type = "update"; }
+        if (type === void 0) { type = 'update'; }
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
-        if (typeof options.only !== "object" ||
+        if (typeof options.only !== 'object' ||
             !Array.isArray(options.only) ||
-            typeof options.only[0] === "undefined" ||
+            typeof options.only[0] === 'undefined' ||
             !this.canBeNested(newValue)) {
             return listeners;
         }
@@ -1200,17 +1287,17 @@ var DeepState = /** @class */ (function () {
         this.runQueue(queue);
     };
     DeepState.prototype.notifyOnly = function (updatePath, newValue, options, type, originalPath) {
-        if (type === void 0) { type = "update"; }
-        if (originalPath === void 0) { originalPath = ""; }
+        if (type === void 0) { type = 'update'; }
+        if (originalPath === void 0) { originalPath = ''; }
         var queue = this.getQueueNotifyListeners(this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath));
         this.sortAndRunQueue(queue, updatePath);
     };
     DeepState.prototype.canBeNested = function (newValue) {
-        return typeof newValue === "object" && newValue !== null;
+        return typeof newValue === 'object' && newValue !== null;
     };
     DeepState.prototype.getUpdateValues = function (oldValue, split, fn) {
         var newValue = fn;
-        if (typeof fn === "function") {
+        if (typeof fn === 'function') {
             newValue = fn(this.pathGet(split, this.data));
         }
         return { newValue: newValue, oldValue: oldValue };
@@ -1243,7 +1330,10 @@ var DeepState = /** @class */ (function () {
             var split = this.split(path);
             var _a = this.getUpdateValues(scanned[path], split, fn), oldValue = _a.oldValue, newValue = _a.newValue;
             if (!this.same(newValue, oldValue) || options.force) {
+                var parent_1 = this.getParent(path);
+                parent_1[this.proxyProperty].saving = true;
                 this.pathSet(split, newValue, this.data);
+                parent_1[this.proxyProperty].saving = false;
                 updated[path] = newValue;
             }
         }
@@ -1251,15 +1341,15 @@ var DeepState = /** @class */ (function () {
         for (var path in updated) {
             var newValue = updated[path];
             if (options.only.length) {
-                groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
+                groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, 'update', updatePath));
             }
             else {
-                groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, "update", updatePath));
+                groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, 'update', updatePath));
                 if (this.canBeNested(newValue)) {
-                    groupedListenersPack.push(this.getNestedListeners(path, newValue, options, "update", updatePath));
+                    groupedListenersPack.push(this.getNestedListeners(path, newValue, options, 'update', updatePath));
                 }
             }
-            options.debug && this.options.log("Wildcard update", { path: path, newValue: newValue });
+            options.debug && this.options.log('Wildcard update', { path: path, newValue: newValue });
         }
         if (multi) {
             var self_1 = this;
@@ -1274,7 +1364,7 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.updateNotify = function (updatePath, newValue, options) {
         var queue = this.notifySubscribedListeners(updatePath, newValue, options);
         if (this.canBeNested(newValue)) {
-            this.notifyNestedListeners(updatePath, newValue, options, "update", queue);
+            this.notifyNestedListeners(updatePath, newValue, options, 'update', queue);
         }
         this.sortAndRunQueue(queue, updatePath);
     };
@@ -1298,7 +1388,7 @@ var DeepState = /** @class */ (function () {
                 }
                 queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
                 if (this.canBeNested(current.newValue)) {
-                    this.notifyNestedListeners(current.updatePath, value, current.options, "update", queue);
+                    this.notifyNestedListeners(current.updatePath, value, current.options, 'update', queue);
                 }
             }
         }
@@ -1319,6 +1409,7 @@ var DeepState = /** @class */ (function () {
         if (multi === void 0) { multi = false; }
         if (this.destroyed)
             return;
+        var silent = this.silent;
         if (this.collection) {
             return this.collection.update(updatePath, fnOrValue, options);
         }
@@ -1332,9 +1423,10 @@ var DeepState = /** @class */ (function () {
             return this.wildcardUpdate(updatePath, fnOrValue, options, multi);
         }
         var split = this.split(updatePath);
-        var _a = this.getUpdateValues(this.pathGet(split, this.data), split, fnOrValue), oldValue = _a.oldValue, newValue = _a.newValue;
+        var currentValue = this.pathGet(split, this.data);
+        var _a = this.getUpdateValues(currentValue, split, fnOrValue), oldValue = _a.oldValue, newValue = _a.newValue;
         if (options.debug) {
-            this.options.log("Updating " + updatePath + " " + (options.source ? "from " + options.source : ""), {
+            this.options.log("Updating " + updatePath + " " + (options.source ? "from " + options.source : ''), {
                 oldValue: oldValue,
                 newValue: newValue
             });
@@ -1346,10 +1438,10 @@ var DeepState = /** @class */ (function () {
                 };
             return newValue;
         }
-        var silent = this.silent;
-        this.silent = true;
-        this.pathSet(split, newValue, this.proxy);
-        this.silent = silent;
+        var parent = this.getParent(updatePath);
+        parent[this.proxyProperty].saving = true;
+        this.pathSet(split, newValue, this.data);
+        parent[this.proxyProperty].saving = false;
         options = __assign(__assign({}, defaultUpdateOptions), options);
         if (options.only === null) {
             if (multi)
@@ -1360,7 +1452,8 @@ var DeepState = /** @class */ (function () {
             if (multi) {
                 var self_2 = this;
                 return function () {
-                    return self_2.updateNotifyOnly(updatePath, newValue, options);
+                    self_2.updateNotifyOnly(updatePath, newValue, options);
+                    this.silent = silent;
                 };
             }
             this.updateNotifyOnly(updatePath, newValue, options);
@@ -1398,13 +1491,13 @@ var DeepState = /** @class */ (function () {
                 if (grouped) {
                     var split = self.split(updatePath);
                     var value = fnOrValue;
-                    if (typeof value === "function") {
+                    if (typeof value === 'function') {
                         value = value(self.pathGet(split, self.data));
                     }
-                    var silent = self.silent;
-                    self.silent = true;
+                    var parent_2 = self.getParent(updatePath);
+                    parent_2[self.proxyProperty].saving = true;
                     self.pathSet(split, value, self.proxy);
-                    self.silent = silent;
+                    parent_2[self.proxyProperty].saving = false;
                     updateStack.push({ updatePath: updatePath, newValue: value, options: options });
                 }
                 else {
@@ -1469,7 +1562,7 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.get = function (userPath) {
         if (this.destroyed)
             return;
-        if (typeof userPath === "undefined" || userPath === "") {
+        if (typeof userPath === 'undefined' || userPath === '') {
             return this.data;
         }
         return this.pathGet(this.split(userPath), this.data);
@@ -1493,7 +1586,7 @@ var DeepState = /** @class */ (function () {
         var e_24, _a;
         if (!this.options.useMute)
             return false;
-        if (typeof pathOrListenerFunction === "function") {
+        if (typeof pathOrListenerFunction === 'function') {
             return this.isMutedListener(pathOrListenerFunction);
         }
         try {
@@ -1527,20 +1620,20 @@ var DeepState = /** @class */ (function () {
         return this.mutedListeners.has(listenerFunc);
     };
     DeepState.prototype.mute = function (pathOrListenerFunction) {
-        if (typeof pathOrListenerFunction === "function") {
+        if (typeof pathOrListenerFunction === 'function') {
             return this.mutedListeners.add(pathOrListenerFunction);
         }
         this.muted.add(pathOrListenerFunction);
     };
     DeepState.prototype.unmute = function (pathOrListenerFunction) {
-        if (typeof pathOrListenerFunction === "function") {
+        if (typeof pathOrListenerFunction === 'function') {
             return this.mutedListeners["delete"](pathOrListenerFunction);
         }
         this.muted["delete"](pathOrListenerFunction);
     };
     DeepState.prototype.debugSubscribe = function (listener, listenersCollection, listenerPath) {
         if (listener.options.debug) {
-            this.options.log("listener subscribed", {
+            this.options.log('listener subscribed', {
                 listenerPath: listenerPath,
                 listener: listener,
                 listenersCollection: listenersCollection
@@ -1548,20 +1641,24 @@ var DeepState = /** @class */ (function () {
         }
     };
     DeepState.prototype.debugListener = function (time, groupedListener) {
-        if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
-            this.options.log("Listener fired", {
+        if (groupedListener.eventInfo.options.debug ||
+            groupedListener.listener.options.debug) {
+            this.options.log('Listener fired', {
                 time: Date.now() - time,
                 info: groupedListener
             });
         }
     };
     DeepState.prototype.debugTime = function (groupedListener) {
-        return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
+        return groupedListener.listener.options.debug ||
+            groupedListener.eventInfo.options.debug
+            ? Date.now()
+            : 0;
     };
     DeepState.prototype.startTrace = function (name, additionalData) {
         if (additionalData === void 0) { additionalData = null; }
         this.traceId++;
-        var id = this.traceId + ":" + name;
+        var id = this.traceId + ':' + name;
         this.traceMap.set(id, {
             id: id,
             sort: this.traceId,
