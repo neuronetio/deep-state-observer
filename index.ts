@@ -164,6 +164,12 @@ export interface UpdateStack {
   options: UpdateOptions;
 }
 
+export interface Bulk {
+  path: string;
+  value: unknown;
+  params: Params;
+}
+
 const defaultUpdateOptions: UpdateOptions = {
   only: [],
   source: "",
@@ -192,11 +198,11 @@ type PathValue<T, P extends PossiblePath<T>> = P extends `${infer K}.${infer Res
   ? K extends keyof T
     ? Rest extends PossiblePath<T[K]>
       ? PathValue<T[K], Rest>
-      : any
-    : any
+      : any & Bulk[]
+    : any & Bulk[]
   : P extends keyof T
-  ? T[P]
-  : any;
+  ? T[P] & Bulk[]
+  : any & Bulk[];
 
 function log(message: string, info: any) {
   console.debug(message, info);
@@ -699,7 +705,7 @@ class DeepState<T> {
         }
       } else {
         const paths = this.scan.get(cleanPath);
-        const bulkValue = [];
+        const bulkValue: Bulk[] = [];
         for (const path in paths) {
           if (this.isMuted(path)) continue;
           bulkValue.push({
@@ -822,7 +828,7 @@ class DeepState<T> {
         }
         if (alreadyInQueue) continue;
         const time = this.debugTime(bulkListener);
-        const bulkValue = [];
+        const bulkValue: Bulk[] = [];
         for (const bulk of bulkListener.value) {
           bulkValue.push({ ...bulk, value: bulk.value() });
         }
@@ -886,7 +892,7 @@ class DeepState<T> {
         const cutPath = this.cutPath(updatePath, listenerPath);
         const traverse = listenersCollection.isRecursive || listenersCollection.isWildcard;
         const value = traverse ? () => this.get(cutPath) : () => newValue;
-        const bulkValue = [{ value, path: updatePath, params }];
+        const bulkValue: Bulk[] = [{ value, path: updatePath, params }];
         for (const listener of listenersCollection.listeners.values()) {
           if (this.shouldIgnore(listener, updatePath)) {
             if (listener.options.debug) {
@@ -984,7 +990,7 @@ class DeepState<T> {
         const params = listenersCollection.paramsInfo
           ? this.getParams(listenersCollection.paramsInfo, updatePath)
           : undefined;
-        const bulk = [];
+        const bulk: Bulk[] = [];
         const bulkListeners = {};
         for (const currentRestPath in wildcardNewValues) {
           const value = () => wildcardNewValues[currentRestPath];
