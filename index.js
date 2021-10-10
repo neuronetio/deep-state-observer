@@ -144,7 +144,7 @@ var DeepState = /** @class */ (function () {
         this.collection = null;
         this.collections = 0;
         this.proxyPath = [];
-        this.proxyUpdate = true;
+        this.silent = false;
         //public subscribe: typeof sub;
         this.handler = {
             get: function (obj, prop) {
@@ -166,8 +166,12 @@ var DeepState = /** @class */ (function () {
                     final = new Proxy(_this.mergeDeepProxy([], value), _this.handler);
                 }
                 _this.proxyPath = [];
-                if (_this.proxyUpdate)
+                if (_this.silent) {
+                    _this.pathSet(_this.split(path), final, _this.data);
+                }
+                else {
                     _this.update(path, final);
+                }
                 obj[prop] = final;
                 return true;
             }
@@ -185,7 +189,25 @@ var DeepState = /** @class */ (function () {
                 return obj[prop];
             },
             set: function (obj, prop, value) {
-                return self.handler.set(obj, prop, value);
+                if (typeof value === "function") {
+                    value = value(obj[prop]);
+                }
+                var final = value;
+                if (isObject(value)) {
+                    final = new Proxy(self.mergeDeepProxy({}, value), self.handler);
+                }
+                else if (Array.isArray(value)) {
+                    final = new Proxy(self.mergeDeepProxy([], value), self.handler);
+                }
+                self.proxyPath = [];
+                if (self.silent) {
+                    self.pathSet([prop], final, self.data);
+                }
+                else {
+                    self.update(prop, final);
+                }
+                obj[prop] = final;
+                return true;
             }
         });
         this.$$$ = this.proxy;
@@ -1359,10 +1381,10 @@ var DeepState = /** @class */ (function () {
                 };
             return newValue;
         }
-        this.pathSet(split, newValue, this.data);
-        this.proxyUpdate = false;
+        var silent = this.silent;
+        this.silent = true;
         this.pathSet(split, newValue, this.proxy);
-        this.proxyUpdate = true;
+        this.silent = silent;
         options = __assign(__assign({}, defaultUpdateOptions), options);
         if (options.only === null) {
             if (multi)
@@ -1414,10 +1436,10 @@ var DeepState = /** @class */ (function () {
                     if (typeof value === "function") {
                         value = value(self.pathGet(split, self.data));
                     }
-                    self.pathSet(split, value, self.data);
-                    self.proxyUpdate = false;
+                    var silent = self.silent;
+                    self.silent = true;
                     self.pathSet(split, value, self.proxy);
-                    self.proxyUpdate = true;
+                    self.silent = silent;
                     updateStack.push({ updatePath: updatePath, newValue: value, options: options });
                 }
                 else {

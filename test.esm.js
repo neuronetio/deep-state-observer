@@ -406,7 +406,7 @@ class DeepState {
         this.collection = null;
         this.collections = 0;
         this.proxyPath = [];
-        this.proxyUpdate = true;
+        this.silent = false;
         //public subscribe: typeof sub;
         this.handler = {
             get: (obj, prop) => {
@@ -428,8 +428,12 @@ class DeepState {
                     final = new Proxy(this.mergeDeepProxy([], value), this.handler);
                 }
                 this.proxyPath = [];
-                if (this.proxyUpdate)
+                if (this.silent) {
+                    this.pathSet(this.split(path), final, this.data);
+                }
+                else {
                     this.update(path, final);
+                }
                 obj[prop] = final;
                 return true;
             },
@@ -447,7 +451,25 @@ class DeepState {
                 return obj[prop];
             },
             set(obj, prop, value) {
-                return self.handler.set(obj, prop, value);
+                if (typeof value === "function") {
+                    value = value(obj[prop]);
+                }
+                let final = value;
+                if (isObject(value)) {
+                    final = new Proxy(self.mergeDeepProxy({}, value), self.handler);
+                }
+                else if (Array.isArray(value)) {
+                    final = new Proxy(self.mergeDeepProxy([], value), self.handler);
+                }
+                self.proxyPath = [];
+                if (self.silent) {
+                    self.pathSet([prop], final, self.data);
+                }
+                else {
+                    self.update(prop, final);
+                }
+                obj[prop] = final;
+                return true;
             },
         });
         this.$$$ = this.proxy;
@@ -1317,10 +1339,10 @@ class DeepState {
                 };
             return newValue;
         }
-        this.pathSet(split, newValue, this.data);
-        this.proxyUpdate = false;
+        const silent = this.silent;
+        this.silent = true;
         this.pathSet(split, newValue, this.proxy);
-        this.proxyUpdate = true;
+        this.silent = silent;
         options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
         if (options.only === null) {
             if (multi)
@@ -1370,10 +1392,10 @@ class DeepState {
                     if (typeof value === "function") {
                         value = value(self.pathGet(split, self.data));
                     }
-                    self.pathSet(split, value, self.data);
-                    self.proxyUpdate = false;
+                    const silent = self.silent;
+                    self.silent = true;
                     self.pathSet(split, value, self.proxy);
-                    self.proxyUpdate = true;
+                    self.silent = silent;
                     updateStack.push({ updatePath, newValue: value, options });
                 }
                 else {

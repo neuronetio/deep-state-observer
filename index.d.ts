@@ -167,7 +167,7 @@ declare class DeepState<T> {
     private collection;
     private collections;
     private proxyPath;
-    private proxyUpdate;
+    silent: boolean;
     private handler;
     proxy: T;
     /**

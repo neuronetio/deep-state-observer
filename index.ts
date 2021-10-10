@@ -267,7 +267,7 @@ class DeepState<T> {
   private collection: Multi = null;
   private collections: number = 0;
   private proxyPath = [];
-  private proxyUpdate = true;
+  public silent = false;
   //public subscribe: typeof sub;
   private handler = {
     get: (obj, prop) => {
@@ -287,7 +287,11 @@ class DeepState<T> {
         final = new Proxy(this.mergeDeepProxy([], value), this.handler);
       }
       this.proxyPath = [];
-      if (this.proxyUpdate) this.update(path, final);
+      if (this.silent) {
+        this.pathSet(this.split(path), final, this.data);
+      } else {
+        this.update(path, final);
+      }
       obj[prop] = final;
       return true;
     },
@@ -310,7 +314,23 @@ class DeepState<T> {
         return obj[prop];
       },
       set(obj, prop, value) {
-        return self.handler.set(obj, prop, value);
+        if (typeof value === "function") {
+          value = value(obj[prop]);
+        }
+        let final = value;
+        if (isObject(value)) {
+          final = new Proxy(self.mergeDeepProxy({}, value), self.handler);
+        } else if (Array.isArray(value)) {
+          final = new Proxy(self.mergeDeepProxy([], value), self.handler);
+        }
+        self.proxyPath = [];
+        if (self.silent) {
+          self.pathSet([prop], final, self.data);
+        } else {
+          self.update(prop as string, final);
+        }
+        obj[prop] = final;
+        return true;
       },
     }) as unknown as T;
     this.$$$ = this.proxy;
@@ -1286,10 +1306,10 @@ class DeepState<T> {
         };
       return newValue;
     }
-    this.pathSet(split, newValue, this.data);
-    this.proxyUpdate = false;
+    const silent = this.silent;
+    this.silent = true;
     this.pathSet(split, newValue, this.proxy);
-    this.proxyUpdate = true;
+    this.silent = silent;
     options = { ...defaultUpdateOptions, ...options };
     if (options.only === null) {
       if (multi) return function () {};
@@ -1338,10 +1358,10 @@ class DeepState<T> {
           if (typeof value === "function") {
             value = value(self.pathGet(split, self.data));
           }
-          self.pathSet(split, value, self.data);
-          self.proxyUpdate = false;
+          const silent = self.silent;
+          self.silent = true;
           self.pathSet(split, value, self.proxy);
-          self.proxyUpdate = true;
+          self.silent = silent;
           updateStack.push({ updatePath, newValue: value, options });
         } else {
           notifiers.push(self.update(updatePath, fnOrValue, options, true));
