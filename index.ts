@@ -1,6 +1,6 @@
-import WildcardObject from "./wildcard-object-scan";
-import Path from "./ObjectPath";
-import init, { is_match } from "./wildcard_matcher.js";
+import WildcardObject from './wildcard-object-scan';
+import Path from './ObjectPath';
+import init, { is_match } from './wildcard_matcher.js';
 
 export interface PathInfo {
   listener: string;
@@ -8,16 +8,19 @@ export interface PathInfo {
   resolved: string | undefined;
 }
 
-export interface ListenerFunctionEventInfo {
+export interface ListenerFunctionEventInfo<T> {
   type: string;
-  listener: Listener;
-  listenersCollection: ListenersCollection;
+  listener: Listener<T>;
+  listenersCollection: ListenersCollection<T>;
   path: PathInfo;
   params: Params;
   options: ListenerOptions | UpdateOptions | undefined;
 }
 
-export type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
+export type ListenerFunction<T> = (
+  value: T,
+  eventInfo: ListenerFunctionEventInfo<T>
+) => void;
 export type Match = (path: string, debug?: boolean) => boolean;
 
 export interface Options {
@@ -53,47 +56,47 @@ export interface UpdateOptions {
   force?: boolean;
 }
 
-export interface Listener {
-  fn: ListenerFunction;
+export interface Listener<T> {
+  fn: ListenerFunction<T>;
   options: ListenerOptions;
   id?: number;
   groupId: number | null;
 }
 
-export interface Queue {
+export interface Queue<T> {
   id: number;
   resolvedPath: string;
   resolvedIdPath: string;
   fn: () => void;
-  originalFn: ListenerFunction;
+  originalFn: ListenerFunction<T>;
   options: ListenerOptions;
   groupId: number;
 }
 
-export interface GroupedListener {
-  listener: Listener;
-  listenersCollection: ListenersCollection;
-  eventInfo: ListenerFunctionEventInfo;
+export interface GroupedListener<T> {
+  listener: Listener<PathValue<T, PossiblePath<T>>>;
+  listenersCollection: ListenersCollection<T>;
+  eventInfo: ListenerFunctionEventInfo<T>;
   value: any;
 }
 
-export interface GroupedListenerContainer {
-  single: GroupedListener[];
-  bulk: GroupedListener[];
+export interface GroupedListenerContainer<T> {
+  single: GroupedListener<T>[];
+  bulk: GroupedListener<T>[];
 }
 
-export interface GroupedListeners {
-  [path: string]: GroupedListenerContainer;
+export interface GroupedListeners<T> {
+  [path: string]: GroupedListenerContainer<T>;
 }
 
 export type Updater = (value: any) => any;
 
-export type ListenersObject = Map<string | number, Listener>;
+export type ListenersObject<T> = Map<string | number, Listener<T>>;
 
-export interface ListenersCollection {
+export interface ListenersCollection<T> {
   path: string;
   originalPath: string;
-  listeners: ListenersObject;
+  listeners: ListenersObject<PathValue<T, PossiblePath<T>>>;
   isWildcard: boolean;
   isRecursive: boolean;
   hasParams: boolean;
@@ -102,7 +105,7 @@ export interface ListenersCollection {
   count: number;
 }
 
-export type Listeners = Map<string, ListenersCollection>;
+export type Listeners<T> = Map<string, ListenersCollection<T>>;
 
 export interface WaitingPath {
   dirty: boolean;
@@ -166,17 +169,51 @@ export interface UpdateStack {
 
 const defaultUpdateOptions: UpdateOptions = {
   only: [],
-  source: "",
+  source: '',
   debug: false,
   data: undefined,
   force: false,
 };
 
 export interface Multi {
-  update: (updatePath: string, fn: Updater | any, options?: UpdateOptions) => Multi;
+  update: (
+    updatePath: string,
+    fn: Updater | any,
+    options?: UpdateOptions
+  ) => Multi;
   done: () => void;
   getStack: () => UpdateStack[];
 }
+
+type PathImpl<T, K extends keyof T> = K extends string
+  ? T[K] extends Record<string, any>
+    ? T[K] extends ArrayLike<any>
+      ? K | `${K}.${PathImpl<T[K], Exclude<keyof T[K], keyof any[]>>}`
+      : K | `${K}.${PathImpl<T[K], keyof T[K]>}`
+    : K
+  : any;
+
+type PossiblePath<T> = PathImpl<T, keyof T> | keyof T | string;
+
+type PathValue<
+  T,
+  P extends PossiblePath<T>
+> = P extends `${infer K}.${infer Rest}`
+  ? K extends keyof T
+    ? Rest extends PossiblePath<T[K]>
+      ? PathValue<T[K], Rest>
+      : any
+    : any
+  : P extends keyof T
+  ? T[P]
+  : any;
+
+declare function get<T, P extends PossiblePath<T>>(path: P): PathValue<T, P>;
+
+declare function sub<T, P extends PossiblePath<T>>(
+  path: P,
+  callback: (val: PathValue<T, P>) => void
+): void;
 
 function log(message: string, info: any) {
   console.debug(message, info);
@@ -189,7 +226,13 @@ function log(message: string, info: any) {
  * @returns {boolean}
  */
 function isObject(item: unknown) {
-  return item && typeof item === "object" && item !== null && item.constructor && item.constructor.name === "Object";
+  return (
+    item &&
+    typeof item === 'object' &&
+    item !== null &&
+    item.constructor &&
+    item.constructor.name === 'Object'
+  );
 }
 
 export interface UnknownObject {
@@ -216,13 +259,13 @@ function getDefaultOptions(): Options {
 const defaultListenerOptions: ListenerOptions = {
   bulk: false,
   debug: false,
-  source: "",
+  source: '',
   data: undefined,
   group: false,
 };
 
 class DeepState<T> {
-  private listeners: Listeners;
+  private listeners: Listeners<PathValue<T, PossiblePath<T>> | string>;
   private data: T | object;
   private options: Options;
   private id: number;
@@ -230,12 +273,15 @@ class DeepState<T> {
   private pathSet: any;
   private scan: any;
   private subscribeQueue = [];
-  private listenersIgnoreCache: WeakMap<Listener, { truthy: string[]; falsy: string[] }> = new WeakMap();
+  private listenersIgnoreCache: WeakMap<
+    Listener<PathValue<T, PossiblePath<T>>>,
+    { truthy: string[]; falsy: string[] }
+  > = new WeakMap();
   private is_match: any;
   private destroyed = false;
   private resolved: Promise<unknown> | any;
   private muted: Set<string>;
-  private mutedListeners: Set<ListenerFunction>;
+  private mutedListeners: Set<ListenerFunction<PathValue<T, PossiblePath<T>>>>;
   private groupId: number = 0;
   private traceId: number = 0;
   private traceMap: Map<string, TraceValue> = new Map();
@@ -244,6 +290,7 @@ class DeepState<T> {
   private collection: Multi = null;
   private collections: number = 0;
   private proxyPath = [];
+  //public subscribe: typeof sub;
   private handler = {
     get: (obj, prop) => {
       if (obj.hasOwnProperty(prop)) this.proxyPath.push(prop);
@@ -251,8 +298,8 @@ class DeepState<T> {
     },
     set: (obj, prop, value) => {
       this.proxyPath.push(prop);
-      const path = this.proxyPath.join(".");
-      if (typeof value === "function") {
+      const path = this.proxyPath.join('.');
+      if (typeof value === 'function') {
         value = value(obj[prop]);
       }
       let final = value;
@@ -300,7 +347,11 @@ class DeepState<T> {
     }
     this.muted = new Set();
     this.mutedListeners = new Set();
-    this.scan = new WildcardObject<T>(this.data, this.options.delimiter, this.options.wildcard);
+    this.scan = new WildcardObject<T>(
+      this.data,
+      this.options.delimiter,
+      this.options.wildcard
+    );
     this.destroyed = false;
   }
 
@@ -310,13 +361,19 @@ class DeepState<T> {
       const targetValMain = {};
       for (const key in source) {
         if (isObject(source[key])) {
-          targetValMain[key] = new Proxy(this.mergeDeepProxy({}, source[key]), this.handler);
+          targetValMain[key] = new Proxy(
+            this.mergeDeepProxy({}, source[key]),
+            this.handler
+          );
         } else if (Array.isArray(source[key])) {
           const targetVal = new Array(source[key].length);
           let index = 0;
           for (let item of source[key]) {
             if (isObject(item) || Array.isArray(item)) {
-              targetVal[index] = new Proxy(this.mergeDeepProxy({}, item), this.handler);
+              targetVal[index] = new Proxy(
+                this.mergeDeepProxy({}, item),
+                this.handler
+              );
             } else {
               targetVal[index] = item;
             }
@@ -356,17 +413,23 @@ class DeepState<T> {
   public async loadWasmMatcher(pathToWasmFile: string) {
     await init(pathToWasmFile);
     this.is_match = is_match;
-    this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.is_match);
+    this.scan = new WildcardObject(
+      this.data,
+      this.options.delimiter,
+      this.options.wildcard,
+      this.is_match
+    );
   }
 
   private same(newValue, oldValue): boolean {
     return (
-      (["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
+      (['number', 'string', 'undefined', 'boolean'].includes(typeof newValue) ||
+        newValue === null) &&
       oldValue === newValue
     );
   }
 
-  public getListeners(): Listeners {
+  public getListeners(): Listeners<T> {
     return this.listeners;
   }
 
@@ -376,13 +439,19 @@ class DeepState<T> {
     this.listeners = new Map();
   }
 
-  private match(first: string, second: string, nested: boolean = true): boolean {
+  private match(
+    first: string,
+    second: string,
+    nested: boolean = true
+  ): boolean {
     if (this.is_match) return this.is_match(first, second);
     if (first === second) return true;
-    if (first === this.options.wildcard || second === this.options.wildcard) return true;
+    if (first === this.options.wildcard || second === this.options.wildcard)
+      return true;
     if (
       !nested &&
-      this.getIndicesCount(this.options.delimiter, first) < this.getIndicesCount(this.options.delimiter, second)
+      this.getIndicesCount(this.options.delimiter, first) <
+        this.getIndicesCount(this.options.delimiter, second)
     ) {
       // first < second because first is a listener path and may be longer but not shorter
       return false;
@@ -424,7 +493,10 @@ class DeepState<T> {
     longer = this.cleanNotRecursivePath(longer);
     shorter = this.cleanNotRecursivePath(shorter);
     if (longer === shorter) return longer;
-    const shorterPartsLen = this.getIndicesCount(this.options.delimiter, shorter);
+    const shorterPartsLen = this.getIndicesCount(
+      this.options.delimiter,
+      shorter
+    );
     const longerParts = this.getIndicesOf(this.options.delimiter, longer);
     return longer.substr(0, longerParts[shorterPartsLen]);
   }
@@ -438,7 +510,7 @@ class DeepState<T> {
   }
 
   private split(path: string) {
-    return path === "" ? [] : path.split(this.options.delimiter);
+    return path === '' ? [] : path.split(this.options.delimiter);
   }
 
   private isWildcard(path: string): boolean {
@@ -450,7 +522,9 @@ class DeepState<T> {
   }
 
   private cleanNotRecursivePath(path: string): string {
-    return this.isNotRecursive(path) ? path.substring(0, path.length - 1) : path;
+    return this.isNotRecursive(path)
+      ? path.substring(0, path.length - 1)
+      : path;
   }
 
   private hasParams(path: string) {
@@ -458,16 +532,19 @@ class DeepState<T> {
   }
 
   private getParamsInfo(path: string): ParamsInfo {
-    let paramsInfo: ParamsInfo = { replaced: "", original: path, params: {} };
+    let paramsInfo: ParamsInfo = { replaced: '', original: path, params: {} };
     let partIndex = 0;
     let fullReplaced = [];
     for (const part of this.split(path)) {
       paramsInfo.params[partIndex] = {
         original: part,
-        replaced: "",
-        name: "",
+        replaced: '',
+        name: '',
       };
-      const reg = new RegExp(`\\${this.options.param}([^\\${this.options.delimiter}\\${this.options.param}]+)`, "g");
+      const reg = new RegExp(
+        `\\${this.options.param}([^\\${this.options.delimiter}\\${this.options.param}]+)`,
+        'g'
+      );
       let param = reg.exec(part);
       if (param) {
         paramsInfo.params[partIndex].name = param[1];
@@ -478,7 +555,10 @@ class DeepState<T> {
         continue;
       }
       reg.lastIndex = 0;
-      paramsInfo.params[partIndex].replaced = part.replace(reg, this.options.wildcard);
+      paramsInfo.params[partIndex].replaced = part.replace(
+        reg,
+        this.options.wildcard
+      );
       fullReplaced.push(paramsInfo.params[partIndex].replaced);
       partIndex++;
     }
@@ -501,7 +581,7 @@ class DeepState<T> {
 
   public subscribeAll(
     userPaths: string[],
-    fn: ListenerFunction | WaitingListenerFunction,
+    fn: ListenerFunction<PathValue<T, PossiblePath<T>>>,
     options: ListenerOptions = defaultListenerOptions
   ) {
     if (this.destroyed) return () => {};
@@ -513,7 +593,7 @@ class DeepState<T> {
     }
     for (const userPath of userPaths) {
       unsubscribers.push(
-        this.subscribe(userPath, fn, options, {
+        this.subscribe(userPath as never, fn, options, {
           all: userPaths,
           index,
           groupId: options.group ? this.groupId : null,
@@ -528,7 +608,7 @@ class DeepState<T> {
     };
   }
 
-  private getCleanListenersCollection(values = {}): ListenersCollection {
+  private getCleanListenersCollection(values = {}): ListenersCollection<T> {
     return {
       listeners: new Map(),
       isRecursive: false,
@@ -543,7 +623,10 @@ class DeepState<T> {
     };
   }
 
-  private getCleanListener(fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions): Listener {
+  private getCleanListener(
+    fn: ListenerFunction<PathValue<T, PossiblePath<T>>>,
+    options: ListenerOptions = defaultListenerOptions
+  ): Listener<PathValue<T, PossiblePath<T>>> {
     return {
       fn,
       options: { ...defaultListenerOptions, ...options },
@@ -551,7 +634,11 @@ class DeepState<T> {
     };
   }
 
-  private getListenerCollectionMatch(listenerPath: string, isRecursive: boolean, isWildcard: boolean) {
+  private getListenerCollectionMatch(
+    listenerPath: string,
+    isRecursive: boolean,
+    isWildcard: boolean
+  ) {
     listenerPath = this.cleanNotRecursivePath(listenerPath);
     const self = this;
     return function listenerCollectionMatch(path, debug = false) {
@@ -559,10 +646,13 @@ class DeepState<T> {
       if (isRecursive) {
         path = self.cutPath(path, listenerPath);
       } else {
-        scopedListenerPath = self.cutPath(self.cleanNotRecursivePath(listenerPath), path);
+        scopedListenerPath = self.cutPath(
+          self.cleanNotRecursivePath(listenerPath),
+          path
+        );
       }
       if (debug) {
-        console.log("[getListenerCollectionMatch]", {
+        console.log('[getListenerCollectionMatch]', {
           listenerPath,
           scopedListenerPath,
           path,
@@ -570,12 +660,16 @@ class DeepState<T> {
           isWildcard,
         });
       }
-      if (isWildcard && self.match(scopedListenerPath, path, isRecursive)) return true;
+      if (isWildcard && self.match(scopedListenerPath, path, isRecursive))
+        return true;
       return scopedListenerPath === path;
     };
   }
 
-  private getListenersCollection(listenerPath: string, listener: Listener): ListenersCollection {
+  private getListenersCollection(
+    listenerPath: string,
+    listener: Listener<PathValue<T, PossiblePath<T>>>
+  ): ListenersCollection<PathValue<T, PossiblePath<T>>> {
     if (this.listeners.has(listenerPath)) {
       let listenersCollection = this.listeners.get(listenerPath);
       listenersCollection.listeners.set(++this.id, listener);
@@ -600,7 +694,11 @@ class DeepState<T> {
     }
     let listenersCollection = this.getCleanListenersCollection({
       ...collCfg,
-      match: this.getListenerCollectionMatch(collCfg.path, collCfg.isRecursive, collCfg.isWildcard),
+      match: this.getListenerCollectionMatch(
+        collCfg.path,
+        collCfg.isRecursive,
+        collCfg.isWildcard
+      ),
     });
     this.id++;
     listenersCollection.listeners.set(this.id, listener);
@@ -609,27 +707,34 @@ class DeepState<T> {
     return listenersCollection;
   }
 
-  public subscribe(
-    listenerPath: string,
-    fn: ListenerFunction,
+  public subscribe<P extends PossiblePath<T>>(
+    listenerPath: P,
+    fn: ListenerFunction<PathValue<T, P>>,
     options: ListenerOptions = defaultListenerOptions,
     subscribeAllOptions: SubscribeAllOptions = {
-      all: [listenerPath],
+      all: [listenerPath as string],
       index: 0,
       groupId: this.groupId,
     }
   ) {
     if (this.destroyed) return () => {};
-    const type = "subscribe";
+    const type = 'subscribe';
     let listener = this.getCleanListener(fn, options);
     if (options.group) listener.groupId = subscribeAllOptions.groupId;
     this.listenersIgnoreCache.set(listener, { truthy: [], falsy: [] });
-    const listenersCollection = this.getListenersCollection(listenerPath, listener);
+    const listenersCollection = this.getListenersCollection(
+      listenerPath as string,
+      listener
+    );
     if (options.debug) {
       console.log();
     }
     listenersCollection.count++;
-    if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
+    if (
+      !options.group ||
+      (options.group &&
+        subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)
+    ) {
       const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
       if (!listenersCollection.isWildcard) {
         if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
@@ -638,9 +743,9 @@ class DeepState<T> {
             listener,
             listenersCollection,
             path: {
-              listener: listenerPath,
+              listener: listenerPath as string,
               update: undefined,
-              resolved: this.cleanNotRecursivePath(listenerPath),
+              resolved: this.cleanNotRecursivePath(listenerPath as string),
             },
             params: this.getParams(listenersCollection.paramsInfo, cleanPath),
             options,
@@ -649,22 +754,13 @@ class DeepState<T> {
       } else {
         const paths = this.scan.get(cleanPath);
         if (options.bulk) {
-          const bulkValue = [];
-          for (const path in paths) {
-            if (this.isMuted(path)) continue;
-            bulkValue.push({
-              path,
-              params: this.getParams(listenersCollection.paramsInfo, path),
-              value: paths[path],
-            });
-          }
           if (!this.isMuted(fn)) {
-            fn(bulkValue, {
+            fn(null, {
               type,
               listener,
               listenersCollection,
               path: {
-                listener: listenerPath,
+                listener: listenerPath as string,
                 update: undefined,
                 resolved: undefined,
               },
@@ -680,7 +776,7 @@ class DeepState<T> {
                 listener,
                 listenersCollection,
                 path: {
-                  listener: listenerPath,
+                  listener: listenerPath as string,
                   update: undefined,
                   resolved: this.cleanNotRecursivePath(path),
                 },
@@ -692,8 +788,8 @@ class DeepState<T> {
         }
       }
     }
-    this.debugSubscribe(listener, listenersCollection, listenerPath);
-    return this.unsubscribe(listenerPath, this.id);
+    this.debugSubscribe(listener, listenersCollection, listenerPath as string);
+    return this.unsubscribe(listenerPath as string, this.id);
   }
 
   private unsubscribe(path: string, id: number) {
@@ -718,15 +814,24 @@ class DeepState<T> {
     this.subscribeQueue.length = 0;
   }
 
-  private getQueueNotifyListeners(groupedListeners: GroupedListeners, queue: Queue[] = []): Queue[] {
+  private getQueueNotifyListeners(
+    groupedListeners: GroupedListeners<PathValue<T, PossiblePath<T>>>,
+    queue: Queue<PathValue<T, PossiblePath<T>>>[] = []
+  ): Queue<PathValue<T, PossiblePath<T>>>[] {
     for (const path in groupedListeners) {
       if (this.isMuted(path)) continue;
       let { single, bulk } = groupedListeners[path];
       for (const singleListener of single) {
         let alreadyInQueue = false;
-        let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+        let resolvedIdPath =
+          singleListener.listener.id +
+          ':' +
+          singleListener.eventInfo.path.resolved;
         if (!singleListener.eventInfo.path.resolved) {
-          resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+          resolvedIdPath =
+            singleListener.listener.id +
+            ':' +
+            singleListener.eventInfo.path.listener;
         }
         for (const excludedListener of queue) {
           if (resolvedIdPath === excludedListener.resolvedIdPath) {
@@ -739,9 +844,15 @@ class DeepState<T> {
         }
         const time = this.debugTime(singleListener);
         if (!this.isMuted(singleListener.listener.fn)) {
-          let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+          let resolvedIdPath =
+            singleListener.listener.id +
+            ':' +
+            singleListener.eventInfo.path.resolved;
           if (!singleListener.eventInfo.path.resolved) {
-            resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+            resolvedIdPath =
+              singleListener.listener.id +
+              ':' +
+              singleListener.eventInfo.path.listener;
           }
           queue.push({
             id: singleListener.listener.id,
@@ -749,7 +860,10 @@ class DeepState<T> {
             resolvedIdPath,
             originalFn: singleListener.listener.fn,
             fn: () => {
-              singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+              singleListener.listener.fn(
+                singleListener.value(),
+                singleListener.eventInfo
+              );
             },
             options: singleListener.listener.options,
             groupId: singleListener.listener.groupId,
@@ -768,14 +882,16 @@ class DeepState<T> {
         }
         if (alreadyInQueue) continue;
         const time = this.debugTime(bulkListener);
-        const bulkValue = [];
-        for (const bulk of bulkListener.value) {
-          bulkValue.push({ ...bulk, value: bulk.value() });
-        }
         if (!this.isMuted(bulkListener.listener.fn)) {
-          let resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
+          let resolvedIdPath =
+            bulkListener.listener.id +
+            ':' +
+            bulkListener.eventInfo.path.resolved;
           if (!bulkListener.eventInfo.path.resolved) {
-            resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+            resolvedIdPath =
+              bulkListener.listener.id +
+              ':' +
+              bulkListener.eventInfo.path.listener;
           }
           queue.push({
             id: bulkListener.listener.id,
@@ -783,7 +899,7 @@ class DeepState<T> {
             resolvedIdPath,
             originalFn: bulkListener.listener.fn,
             fn: () => {
-              bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+              bulkListener.listener.fn(undefined, bulkListener.eventInfo);
             },
             options: bulkListener.listener.options,
             groupId: bulkListener.listener.groupId,
@@ -796,7 +912,10 @@ class DeepState<T> {
     return queue;
   }
 
-  private shouldIgnore(listener: Listener, updatePath: string): boolean {
+  private shouldIgnore(
+    listener: Listener<PathValue<T, PossiblePath<T>>>,
+    updatePath: string
+  ): boolean {
     if (!listener.options.ignore) return false;
     for (const ignorePath of listener.options.ignore) {
       if (updatePath.startsWith(ignorePath)) {
@@ -818,9 +937,9 @@ class DeepState<T> {
     updatePath: string,
     newValue,
     options: UpdateOptions,
-    type: string = "update",
+    type: string = 'update',
     originalPath: string = null
-  ): GroupedListeners {
+  ): GroupedListeners<PathValue<T, PossiblePath<T>>> {
     options = { ...defaultUpdateOptions, ...options };
     const listeners = {};
     for (let [listenerPath, listenersCollection] of this.listeners) {
@@ -830,16 +949,20 @@ class DeepState<T> {
           ? this.getParams(listenersCollection.paramsInfo, updatePath)
           : undefined;
         const cutPath = this.cutPath(updatePath, listenerPath);
-        const traverse = listenersCollection.isRecursive || listenersCollection.isWildcard;
+        const traverse =
+          listenersCollection.isRecursive || listenersCollection.isWildcard;
         const value = traverse ? () => this.get(cutPath) : () => newValue;
         const bulkValue = [{ value, path: updatePath, params }];
         for (const listener of listenersCollection.listeners.values()) {
           if (this.shouldIgnore(listener, updatePath)) {
             if (listener.options.debug) {
-              console.log(`[getSubscribedListeners] Listener was not fired because it was ignored.`, {
-                listener,
-                listenersCollection,
-              });
+              console.log(
+                `[getSubscribedListeners] Listener was not fired because it was ignored.`,
+                {
+                  listener,
+                  listenersCollection,
+                }
+              );
             }
             continue;
           }
@@ -885,11 +1008,14 @@ class DeepState<T> {
         for (const listener of listenersCollection.listeners.values()) {
           if (listener.options.debug) {
             showMatch = true;
-            console.log(`[getSubscribedListeners] Listener was not fired because there was no match.`, {
-              listener,
-              listenersCollection,
-              updatePath,
-            });
+            console.log(
+              `[getSubscribedListeners] Listener was not fired because there was no match.`,
+              {
+                listener,
+                listenersCollection,
+                updatePath,
+              }
+            );
           }
         }
         if (showMatch) {
@@ -904,29 +1030,41 @@ class DeepState<T> {
     updatePath: string,
     newValue,
     options: UpdateOptions,
-    type: string = "update",
+    type: string = 'update',
     originalPath: string = null
-  ): Queue[] {
-    return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
+  ): Queue<PathValue<T, PossiblePath<T>>>[] {
+    return this.getQueueNotifyListeners(
+      this.getSubscribedListeners(
+        updatePath,
+        newValue,
+        options,
+        type,
+        originalPath
+      )
+    );
   }
 
   private getNestedListeners(
     updatePath: string,
     newValue,
     options: UpdateOptions,
-    type: string = "update",
+    type: string = 'update',
     originalPath: string = null
-  ): GroupedListeners {
-    const listeners: GroupedListeners = {};
+  ): GroupedListeners<PathValue<T, PossiblePath<T>>> {
+    const listeners: GroupedListeners<PathValue<T, PossiblePath<T>>> = {};
     for (let [listenerPath, listenersCollection] of this.listeners) {
       if (!listenersCollection.isRecursive) continue;
       listeners[listenerPath] = { single: [], bulk: [] };
       const currentCutPath = this.cutPath(listenerPath, updatePath);
       if (this.match(currentCutPath, updatePath)) {
-        const restPath = this.trimPath(listenerPath.substr(currentCutPath.length));
-        const wildcardNewValues = new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(
-          restPath
+        const restPath = this.trimPath(
+          listenerPath.substr(currentCutPath.length)
         );
+        const wildcardNewValues = new WildcardObject(
+          newValue,
+          this.options.delimiter,
+          this.options.wildcard
+        ).get(restPath);
         const params = listenersCollection.paramsInfo
           ? this.getParams(listenersCollection.paramsInfo, updatePath)
           : undefined;
@@ -934,7 +1072,9 @@ class DeepState<T> {
         const bulkListeners = {};
         for (const currentRestPath in wildcardNewValues) {
           const value = () => wildcardNewValues[currentRestPath];
-          const fullPath = [updatePath, currentRestPath].join(this.options.delimiter);
+          const fullPath = [updatePath, currentRestPath].join(
+            this.options.delimiter
+          );
           for (const [listenerId, listener] of listenersCollection.listeners) {
             const eventInfo = {
               type,
@@ -987,12 +1127,15 @@ class DeepState<T> {
         // debug
         for (const listener of listenersCollection.listeners.values()) {
           if (listener.options.debug) {
-            console.log("[getNestedListeners] Listener was not fired because there was no match.", {
-              listener,
-              listenersCollection,
-              currentCutPath,
-              updatePath,
-            });
+            console.log(
+              '[getNestedListeners] Listener was not fired because there was no match.',
+              {
+                listener,
+                listenersCollection,
+                currentCutPath,
+                updatePath,
+              }
+            );
           }
         }
       }
@@ -1004,12 +1147,18 @@ class DeepState<T> {
     updatePath: string,
     newValue,
     options: UpdateOptions,
-    type: string = "update",
-    queue: Queue[],
+    type: string = 'update',
+    queue: Queue<PathValue<T, PossiblePath<T>>>[],
     originalPath: string = null
-  ): Queue[] {
+  ): Queue<PathValue<T, PossiblePath<T>>>[] {
     return this.getQueueNotifyListeners(
-      this.getNestedListeners(updatePath, newValue, options, type, originalPath),
+      this.getNestedListeners(
+        updatePath,
+        newValue,
+        options,
+        type,
+        originalPath
+      ),
       queue
     );
   }
@@ -1018,22 +1167,24 @@ class DeepState<T> {
     updatePath: string,
     newValue,
     options: UpdateOptions,
-    type: string = "update",
+    type: string = 'update',
     originalPath: string = null
-  ): GroupedListeners {
+  ): GroupedListeners<PathValue<T, PossiblePath<T>>> {
     const listeners = {};
     if (
-      typeof options.only !== "object" ||
+      typeof options.only !== 'object' ||
       !Array.isArray(options.only) ||
-      typeof options.only[0] === "undefined" ||
+      typeof options.only[0] === 'undefined' ||
       !this.canBeNested(newValue)
     ) {
       return listeners;
     }
     for (const notifyPath of options.only) {
-      const wildcardScanNewValue = new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(
-        notifyPath
-      );
+      const wildcardScanNewValue = new WildcardObject(
+        newValue,
+        this.options.delimiter,
+        this.options.wildcard
+      ).get(notifyPath);
       listeners[notifyPath] = { bulk: [], single: [] };
       for (const wildcardPath in wildcardScanNewValue) {
         const fullPath = updatePath + this.options.delimiter + wildcardPath;
@@ -1059,7 +1210,11 @@ class DeepState<T> {
               };
               if (this.shouldIgnore(listener, updatePath)) continue;
               if (listener.options.bulk) {
-                if (!listeners[notifyPath].bulk.some((bulkListener) => bulkListener.listener === listener)) {
+                if (
+                  !listeners[notifyPath].bulk.some(
+                    (bulkListener) => bulkListener.listener === listener
+                  )
+                ) {
                   listeners[notifyPath].bulk.push({
                     listener,
                     listenersCollection,
@@ -1083,7 +1238,7 @@ class DeepState<T> {
     return listeners;
   }
 
-  private runQueue(queue: Queue[]) {
+  private runQueue(queue: Queue<PathValue<T, PossiblePath<T>>>[]) {
     const firedGroups = [];
     for (const q of queue) {
       if (q.options.group) {
@@ -1097,7 +1252,10 @@ class DeepState<T> {
     }
   }
 
-  private sortAndRunQueue(queue: Queue[], path: string) {
+  private sortAndRunQueue(
+    queue: Queue<PathValue<T, PossiblePath<T>>>[],
+    path: string
+  ) {
     queue.sort(function (a, b) {
       return a.id - b.id;
     });
@@ -1111,22 +1269,28 @@ class DeepState<T> {
     updatePath: string,
     newValue,
     options: UpdateOptions,
-    type: string = "update",
-    originalPath: string = ""
+    type: string = 'update',
+    originalPath: string = ''
   ) {
     const queue = this.getQueueNotifyListeners(
-      this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath)
+      this.getNotifyOnlyListeners(
+        updatePath,
+        newValue,
+        options,
+        type,
+        originalPath
+      )
     );
     this.sortAndRunQueue(queue, updatePath);
   }
 
   private canBeNested(newValue): boolean {
-    return typeof newValue === "object" && newValue !== null;
+    return typeof newValue === 'object' && newValue !== null;
   }
 
   private getUpdateValues(oldValue, split, fn) {
     let newValue = fn;
-    if (typeof fn === "function") {
+    if (typeof fn === 'function') {
       newValue = fn(this.pathGet(split, this.data));
     }
     return { newValue, oldValue };
@@ -1151,7 +1315,11 @@ class DeepState<T> {
     const updated = {};
     for (const path in scanned) {
       const split = this.split(path);
-      const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn);
+      const { oldValue, newValue } = this.getUpdateValues(
+        scanned[path],
+        split,
+        fn
+      );
       if (!this.same(newValue, oldValue) || options.force) {
         this.pathSet(split, newValue, this.data);
         updated[path] = newValue;
@@ -1162,14 +1330,38 @@ class DeepState<T> {
     for (const path in updated) {
       const newValue = updated[path];
       if (options.only.length) {
-        groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
+        groupedListenersPack.push(
+          this.getNotifyOnlyListeners(
+            path,
+            newValue,
+            options,
+            'update',
+            updatePath
+          )
+        );
       } else {
-        groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, "update", updatePath));
+        groupedListenersPack.push(
+          this.getSubscribedListeners(
+            path,
+            newValue,
+            options,
+            'update',
+            updatePath
+          )
+        );
         if (this.canBeNested(newValue)) {
-          groupedListenersPack.push(this.getNestedListeners(path, newValue, options, "update", updatePath));
+          groupedListenersPack.push(
+            this.getNestedListeners(
+              path,
+              newValue,
+              options,
+              'update',
+              updatePath
+            )
+          );
         }
       }
-      options.debug && this.options.log("Wildcard update", { path, newValue });
+      options.debug && this.options.log('Wildcard update', { path, newValue });
     }
     if (multi) {
       const self = this;
@@ -1182,10 +1374,20 @@ class DeepState<T> {
     this.sortAndRunQueue(queue, updatePath);
   }
 
-  private updateNotify(updatePath: string, newValue: unknown, options: UpdateOptions) {
+  private updateNotify(
+    updatePath: string,
+    newValue: unknown,
+    options: UpdateOptions
+  ) {
     const queue = this.notifySubscribedListeners(updatePath, newValue, options);
     if (this.canBeNested(newValue)) {
-      this.notifyNestedListeners(updatePath, newValue, options, "update", queue);
+      this.notifyNestedListeners(
+        updatePath,
+        newValue,
+        options,
+        'update',
+        queue
+      );
     }
     this.sortAndRunQueue(queue, updatePath);
   }
@@ -1205,9 +1407,21 @@ class DeepState<T> {
         });
         this.traceMap.set(traceId, trace);
       }
-      queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
+      queue = queue.concat(
+        this.notifySubscribedListeners(
+          current.updatePath,
+          value,
+          current.options
+        )
+      );
       if (this.canBeNested(current.newValue)) {
-        this.notifyNestedListeners(current.updatePath, value, current.options, "update", queue);
+        this.notifyNestedListeners(
+          current.updatePath,
+          value,
+          current.options,
+          'update',
+          queue
+        );
       }
     }
     this.runQueue(queue);
@@ -1237,12 +1451,21 @@ class DeepState<T> {
       return this.wildcardUpdate(updatePath, fnOrValue, options, multi);
     }
     const split = this.split(updatePath);
-    const { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fnOrValue);
+    const { oldValue, newValue } = this.getUpdateValues(
+      this.pathGet(split, this.data),
+      split,
+      fnOrValue
+    );
     if (options.debug) {
-      this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ""}`, {
-        oldValue,
-        newValue,
-      });
+      this.options.log(
+        `Updating ${updatePath} ${
+          options.source ? `from ${options.source}` : ''
+        }`,
+        {
+          oldValue,
+          newValue,
+        }
+      );
     }
 
     if (this.same(newValue, oldValue) && !options.force) {
@@ -1294,11 +1517,15 @@ class DeepState<T> {
     const updateStack: UpdateStack[] = [];
     const notifiers = [];
     const multiObject: Multi = {
-      update(updatePath: string, fnOrValue: Updater | any, options: UpdateOptions = defaultUpdateOptions) {
+      update(
+        updatePath: string,
+        fnOrValue: Updater | any,
+        options: UpdateOptions = defaultUpdateOptions
+      ) {
         if (grouped) {
           const split = self.split(updatePath);
           let value = fnOrValue;
-          if (typeof value === "function") {
+          if (typeof value === 'function') {
             value = value(self.pathGet(split, self.data));
           }
           self.pathSet(split, value, self.data);
@@ -1356,7 +1583,7 @@ class DeepState<T> {
 
   public get(userPath: string | undefined = undefined) {
     if (this.destroyed) return;
-    if (typeof userPath === "undefined" || userPath === "") {
+    if (typeof userPath === 'undefined' || userPath === '') {
       return this.data;
     }
     return this.pathGet(this.split(userPath), this.data);
@@ -1378,9 +1605,13 @@ class DeepState<T> {
     });
   }
 
-  public isMuted(pathOrListenerFunction: string | ListenerFunction): boolean {
+  public isMuted(
+    pathOrListenerFunction:
+      | string
+      | ListenerFunction<PathValue<T, PossiblePath<T>>>
+  ): boolean {
     if (!this.options.useMute) return false;
-    if (typeof pathOrListenerFunction === "function") {
+    if (typeof pathOrListenerFunction === 'function') {
       return this.isMutedListener(pathOrListenerFunction);
     }
     for (const mutedPath of this.muted) {
@@ -1397,27 +1628,41 @@ class DeepState<T> {
     return false;
   }
 
-  public isMutedListener(listenerFunc: ListenerFunction): boolean {
+  public isMutedListener(
+    listenerFunc: ListenerFunction<PathValue<T, PossiblePath<T>>>
+  ): boolean {
     return this.mutedListeners.has(listenerFunc);
   }
 
-  public mute(pathOrListenerFunction: string | ListenerFunction) {
-    if (typeof pathOrListenerFunction === "function") {
+  public mute(
+    pathOrListenerFunction:
+      | string
+      | ListenerFunction<PathValue<T, PossiblePath<T>>>
+  ) {
+    if (typeof pathOrListenerFunction === 'function') {
       return this.mutedListeners.add(pathOrListenerFunction);
     }
     this.muted.add(pathOrListenerFunction);
   }
 
-  public unmute(pathOrListenerFunction: string | ListenerFunction) {
-    if (typeof pathOrListenerFunction === "function") {
+  public unmute(
+    pathOrListenerFunction:
+      | string
+      | ListenerFunction<PathValue<T, PossiblePath<T>>>
+  ) {
+    if (typeof pathOrListenerFunction === 'function') {
       return this.mutedListeners.delete(pathOrListenerFunction);
     }
     this.muted.delete(pathOrListenerFunction);
   }
 
-  private debugSubscribe(listener: Listener, listenersCollection: ListenersCollection, listenerPath: string) {
+  private debugSubscribe(
+    listener: Listener<PathValue<T, PossiblePath<T>>>,
+    listenersCollection: ListenersCollection<T>,
+    listenerPath: string
+  ) {
     if (listener.options.debug) {
-      this.options.log("listener subscribed", {
+      this.options.log('listener subscribed', {
         listenerPath,
         listener,
         listenersCollection,
@@ -1425,22 +1670,33 @@ class DeepState<T> {
     }
   }
 
-  private debugListener(time: number, groupedListener: GroupedListener) {
-    if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
-      this.options.log("Listener fired", {
+  private debugListener(
+    time: number,
+    groupedListener: GroupedListener<PathValue<T, PossiblePath<T>>>
+  ) {
+    if (
+      groupedListener.eventInfo.options.debug ||
+      groupedListener.listener.options.debug
+    ) {
+      this.options.log('Listener fired', {
         time: Date.now() - time,
         info: groupedListener,
       });
     }
   }
 
-  private debugTime(groupedListener: GroupedListener): number {
-    return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
+  private debugTime(
+    groupedListener: GroupedListener<PathValue<T, PossiblePath<T>>>
+  ): number {
+    return groupedListener.listener.options.debug ||
+      groupedListener.eventInfo.options.debug
+      ? Date.now()
+      : 0;
   }
 
   public startTrace(name: string, additionalData: any = null) {
     this.traceId++;
-    const id = this.traceId + ":" + name;
+    const id = this.traceId + ':' + name;
     this.traceMap.set(id, {
       id,
       sort: this.traceId,
