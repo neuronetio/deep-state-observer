@@ -172,6 +172,7 @@ describe("Proxy", () => {
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
+    //console.log(state.proxyProperty, state.$$$.x[state.proxyProperty]);
     const values = [];
     state.subscribe("x.y.z", (value) => {
       values.push(value);
@@ -188,6 +189,45 @@ describe("Proxy", () => {
     expect(state.data.x.y.z).toEqual(20);
     state.executeCollected();
     expect(values.length).toEqual(1);
+    //console.log(state.data);
+    expect(state.data.x.y.z).toEqual(20);
+    expect(state.proxy.x.y.z).toEqual(20);
+  });
+
+  it("should have proxyProperty in proxy and not have in data", () => {
+    const state = new State({ x: { y: { z: 10 } } });
+    //console.log(state.data);
+    expect(state.data.x.y.z).toEqual(10);
+    expect(state.proxy.x.y.z).toEqual(10);
+    expect(typeof state.$$$[state.proxyProperty]).toEqual("string");
+    expect(typeof state.$$$.x[state.proxyProperty]).toEqual("string");
+    expect(typeof state.$$$.x.y[state.proxyProperty]).toEqual("string");
+    expect(typeof state.data[state.proxyProperty]).toEqual("undefined");
+    expect(typeof state.data.x[state.proxyProperty]).toEqual("undefined");
+    expect(typeof state.data.x.y[state.proxyProperty]).toEqual("undefined");
+    //console.log(state.proxyProperty, state.$$$.x[state.proxyProperty]);
+    const values = [];
+    state.subscribe("x.y.z", (value) => {
+      values.push(value);
+    });
+    expect(values[0]).toEqual(10);
+    state.collect();
+    state.silent = true;
+    state.$$$.x.y = (val) => {
+      return { z: val.z + 10 };
+    };
+    state.silent = false;
+    expect(values.length).toEqual(1);
+    expect(state.proxy.x.y.z).toEqual(20);
+    expect(state.data.x.y.z).toEqual(20);
+    state.executeCollected();
+    expect(values.length).toEqual(1);
+    expect(typeof state.$$$[state.proxyProperty]).toEqual("string");
+    expect(typeof state.$$$.x[state.proxyProperty]).toEqual("string");
+    expect(typeof state.$$$.x.y[state.proxyProperty]).toEqual("string");
+    expect(typeof state.data[state.proxyProperty]).toEqual("undefined");
+    expect(typeof state.data.x[state.proxyProperty]).toEqual("undefined");
+    expect(typeof state.data.x.y[state.proxyProperty]).toEqual("undefined");
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(20);
     expect(state.proxy.x.y.z).toEqual(20);

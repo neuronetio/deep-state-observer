@@ -143,29 +143,23 @@ var DeepState = /** @class */ (function () {
         this.savedTrace = [];
         this.collection = null;
         this.collections = 0;
-        this.proxyPath = [];
         this.silent = false;
-        //public subscribe: typeof sub;
+        this.proxyProperty = "___deep_state_observer___";
         this.handler = {
-            get: function (obj, prop) {
-                if (obj.hasOwnProperty(prop))
-                    _this.proxyPath.push(prop);
-                return obj[prop];
-            },
             set: function (obj, prop, value) {
-                _this.proxyPath.push(prop);
-                var path = _this.proxyPath.join(".");
+                var path = _this.fixPath(obj[_this.proxyProperty] + _this.options.delimiter + prop);
                 if (typeof value === "function") {
-                    value = value(_this.pathGet(_this.proxyPath, _this.data));
+                    value = value(_this.pathGet(_this.split(path), _this.data));
                 }
                 var final = value;
-                if (isObject(value)) {
-                    final = new Proxy(_this.mergeDeepProxy({}, value), _this.handler);
+                if ((isObject(value) || Array.isArray(value)) && typeof value[_this.proxyProperty] === "undefined") {
+                    if (isObject(value)) {
+                        final = _this.mergeDeepProxy({}, value, path);
+                    }
+                    else if (Array.isArray(value)) {
+                        final = _this.mergeDeepProxy([], value, path);
+                    }
                 }
-                else if (Array.isArray(value)) {
-                    final = new Proxy(_this.mergeDeepProxy([], value), _this.handler);
-                }
-                _this.proxyPath = [];
                 if (_this.silent) {
                     _this.pathSet(_this.split(path), value, _this.data);
                 }
@@ -178,40 +172,11 @@ var DeepState = /** @class */ (function () {
         };
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
-        this.handler.get = this.handler.get.bind(this);
         this.handler.set = this.handler.set.bind(this);
-        var self = this;
-        this.data = data;
-        this.proxy = new Proxy(this.mergeDeepProxy({}, data), {
-            get: function (obj, prop) {
-                if (obj.hasOwnProperty(prop))
-                    self.proxyPath = [prop];
-                return obj[prop];
-            },
-            set: function (obj, prop, value) {
-                if (typeof value === "function") {
-                    value = value(obj[prop]);
-                }
-                var final = value;
-                if (isObject(value)) {
-                    final = new Proxy(self.mergeDeepProxy({}, value), self.handler);
-                }
-                else if (Array.isArray(value)) {
-                    final = new Proxy(self.mergeDeepProxy([], value), self.handler);
-                }
-                self.proxyPath = [];
-                if (self.silent) {
-                    self.pathSet([prop], final, self.data);
-                }
-                else {
-                    self.update(prop, final);
-                }
-                obj[prop] = final;
-                return true;
-            }
-        });
-        this.$$$ = this.proxy;
         this.options = __assign(__assign({}, getDefaultOptions()), options);
+        this.data = data;
+        this.proxy = this.mergeDeepProxy({}, data, "");
+        this.$$$ = this.proxy;
         this.id = 0;
         this.pathGet = ObjectPath_1["default"].get;
         this.pathSet = ObjectPath_1["default"].set;
@@ -226,27 +191,39 @@ var DeepState = /** @class */ (function () {
         this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard);
         this.destroyed = false;
     }
-    DeepState.prototype.mergeDeepProxy = function (target) {
+    DeepState.prototype.fixPath = function (path) {
+        if (path === ".")
+            return "";
+        if (path[0] === this.options.delimiter)
+            path = path.substr(1);
+        if (path[path.length - 1] === this.options.delimiter)
+            path = path.substring(0, -1);
+        return path;
+    };
+    DeepState.prototype.mergeDeepProxy = function (target, source, path) {
         var e_1, _a;
-        var sources = [];
-        for (var _i = 1; _i < arguments.length; _i++) {
-            sources[_i - 1] = arguments[_i];
-        }
-        var source = sources.shift();
+        path = this.fixPath(path);
         if (isObject(target) && isObject(source)) {
             var targetValMain = {};
+            Object.defineProperty(targetValMain, this.proxyProperty, { enumerable: false, value: path });
             for (var key in source) {
+                if (key === this.proxyProperty)
+                    continue;
                 if (isObject(source[key])) {
-                    targetValMain[key] = new Proxy(this.mergeDeepProxy({}, source[key]), this.handler);
+                    targetValMain[key] = this.mergeDeepProxy({}, source[key], "" + path + this.options.delimiter + key);
                 }
                 else if (Array.isArray(source[key])) {
                     var targetVal = new Array(source[key].length);
+                    Object.defineProperty(targetVal, this.proxyProperty, {
+                        enumerable: false,
+                        value: "" + path + this.proxyProperty + key
+                    });
                     var index = 0;
                     try {
                         for (var _b = (e_1 = void 0, __values(source[key])), _c = _b.next(); !_c.done; _c = _b.next()) {
                             var item = _c.value;
                             if (isObject(item) || Array.isArray(item)) {
-                                targetVal[index] = new Proxy(this.mergeDeepProxy({}, item), this.handler);
+                                targetVal[index] = this.mergeDeepProxy({}, item, "" + path + this.options.delimiter + key + this.options.delimiter + index);
                             }
                             else {
                                 targetVal[index] = item;
@@ -267,34 +244,22 @@ var DeepState = /** @class */ (function () {
                     targetValMain[key] = source[key];
                 }
             }
-            if (sources.length) {
-                target = new Proxy(targetValMain, this.handler);
-            }
-            else {
-                target = targetValMain;
-            }
+            return new Proxy(targetValMain, this.handler);
         }
         else if (Array.isArray(source)) {
             var targetVal = new Array(source.length);
+            Object.defineProperty(targetVal, this.proxyProperty, { enumerable: false, value: path });
             for (var i = 0, len = source.length; i < len; i++) {
                 if (isObject(source[i]) || Array.isArray(source[i])) {
-                    targetVal[i] = this.mergeDeepProxy({}, source[i]);
+                    targetVal[i] = this.mergeDeepProxy({}, source[i], "" + path + this.options.delimiter + i);
                 }
                 else {
                     targetVal[i] = source[i];
                 }
             }
-            if (sources.length) {
-                target = new Proxy(targetVal, this.handler);
-            }
-            else {
-                target = targetVal;
-            }
+            return new Proxy(targetVal, this.handler);
         }
-        if (!sources.length) {
-            return target;
-        }
-        return this.mergeDeepProxy.apply(this, __spreadArray([target], __read(sources), false));
+        return target;
     };
     DeepState.prototype.loadWasmMatcher = function (pathToWasmFile) {
         return __awaiter(this, void 0, void 0, function () {

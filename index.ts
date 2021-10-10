@@ -272,27 +272,23 @@ class DeepState<T> {
   private savedTrace: TraceValue[] = [];
   private collection: Multi = null;
   private collections: number = 0;
-  private proxyPath = [];
   public silent = false;
-  //public subscribe: typeof sub;
+  public proxyProperty = "___deep_state_observer___";
+
   private handler = {
-    get: (obj, prop) => {
-      if (obj.hasOwnProperty(prop)) this.proxyPath.push(prop);
-      return obj[prop];
-    },
     set: (obj, prop, value) => {
-      this.proxyPath.push(prop);
-      const path = this.proxyPath.join(".");
+      const path = this.fixPath(obj[this.proxyProperty] + this.options.delimiter + prop);
       if (typeof value === "function") {
-        value = value(this.pathGet(this.proxyPath, this.data));
+        value = value(this.pathGet(this.split(path), this.data));
       }
       let final = value;
-      if (isObject(value)) {
-        final = new Proxy(this.mergeDeepProxy({}, value), this.handler);
-      } else if (Array.isArray(value)) {
-        final = new Proxy(this.mergeDeepProxy([], value), this.handler);
+      if ((isObject(value) || Array.isArray(value)) && typeof value[this.proxyProperty] === "undefined") {
+        if (isObject(value)) {
+          final = this.mergeDeepProxy({}, value, path);
+        } else if (Array.isArray(value)) {
+          final = this.mergeDeepProxy([], value, path);
+        }
       }
-      this.proxyPath = [];
       if (this.silent) {
         this.pathSet(this.split(path), value, this.data);
       } else {
@@ -310,37 +306,11 @@ class DeepState<T> {
 
   constructor(data: T | object = {}, options: Options = {}) {
     this.listeners = new Map();
-    this.handler.get = this.handler.get.bind(this);
     this.handler.set = this.handler.set.bind(this);
-    const self = this;
-    this.data = data;
-    this.proxy = new Proxy(this.mergeDeepProxy({}, data) as object, {
-      get(obj, prop) {
-        if (obj.hasOwnProperty(prop)) self.proxyPath = [prop];
-        return obj[prop];
-      },
-      set(obj, prop, value) {
-        if (typeof value === "function") {
-          value = value(obj[prop]);
-        }
-        let final = value;
-        if (isObject(value)) {
-          final = new Proxy(self.mergeDeepProxy({}, value), self.handler);
-        } else if (Array.isArray(value)) {
-          final = new Proxy(self.mergeDeepProxy([], value), self.handler);
-        }
-        self.proxyPath = [];
-        if (self.silent) {
-          self.pathSet([prop], final, self.data);
-        } else {
-          self.update(prop as string, final);
-        }
-        obj[prop] = final;
-        return true;
-      },
-    }) as unknown as T;
-    this.$$$ = this.proxy;
     this.options = { ...getDefaultOptions(), ...options };
+    this.data = data;
+    this.proxy = this.mergeDeepProxy({}, data, "");
+    this.$$$ = this.proxy;
     this.id = 0;
     this.pathGet = Path.get;
     this.pathSet = Path.set;
@@ -355,19 +325,36 @@ class DeepState<T> {
     this.destroyed = false;
   }
 
-  private mergeDeepProxy<T>(target: any, ...sources: any[]): T {
-    const source = sources.shift();
+  private fixPath(path: string) {
+    if (path === ".") return "";
+    if (path[0] === this.options.delimiter) path = path.substr(1);
+    if (path[path.length - 1] === this.options.delimiter) path = path.substring(0, -1);
+    return path;
+  }
+
+  private mergeDeepProxy<T>(target: any, source: any, path: string): T {
+    path = this.fixPath(path);
     if (isObject(target) && isObject(source)) {
       const targetValMain = {};
+      Object.defineProperty(targetValMain, this.proxyProperty, { enumerable: false, value: path });
       for (const key in source) {
+        if (key === this.proxyProperty) continue;
         if (isObject(source[key])) {
-          targetValMain[key] = new Proxy(this.mergeDeepProxy({}, source[key]), this.handler);
+          targetValMain[key] = this.mergeDeepProxy({}, source[key], `${path}${this.options.delimiter}${key}`);
         } else if (Array.isArray(source[key])) {
           const targetVal = new Array(source[key].length);
+          Object.defineProperty(targetVal, this.proxyProperty, {
+            enumerable: false,
+            value: `${path}${this.proxyProperty}${key}`,
+          });
           let index = 0;
           for (let item of source[key]) {
             if (isObject(item) || Array.isArray(item)) {
-              targetVal[index] = new Proxy(this.mergeDeepProxy({}, item), this.handler);
+              targetVal[index] = this.mergeDeepProxy(
+                {},
+                item,
+                `${path}${this.options.delimiter}${key}${this.options.delimiter}${index}`
+              );
             } else {
               targetVal[index] = item;
             }
@@ -378,30 +365,20 @@ class DeepState<T> {
           targetValMain[key] = source[key];
         }
       }
-      if (sources.length) {
-        target = new Proxy(targetValMain, this.handler);
-      } else {
-        target = targetValMain;
-      }
+      return new Proxy(targetValMain, this.handler);
     } else if (Array.isArray(source)) {
       const targetVal = new Array(source.length);
+      Object.defineProperty(targetVal, this.proxyProperty, { enumerable: false, value: path });
       for (let i = 0, len = source.length; i < len; i++) {
         if (isObject(source[i]) || Array.isArray(source[i])) {
-          targetVal[i] = this.mergeDeepProxy({}, source[i]);
+          targetVal[i] = this.mergeDeepProxy({}, source[i], `${path}${this.options.delimiter}${i}`);
         } else {
           targetVal[i] = source[i];
         }
       }
-      if (sources.length) {
-        target = new Proxy(targetVal, this.handler);
-      } else {
-        target = targetVal;
-      }
+      return new Proxy(targetVal, this.handler);
     }
-    if (!sources.length) {
-      return target;
-    }
-    return this.mergeDeepProxy(target, ...sources);
+    return target;
   }
 
   public async loadWasmMatcher(pathToWasmFile: string) {

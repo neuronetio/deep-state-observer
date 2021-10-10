@@ -171,8 +171,8 @@ declare class DeepState<T> {
     private savedTrace;
     private collection;
     private collections;
-    private proxyPath;
     silent: boolean;
+    proxyProperty: string;
     private handler;
     proxy: T;
     /**
@@ -180,6 +180,7 @@ declare class DeepState<T> {
      */
     $$$: T;
     constructor(data?: T | object, options?: Options);
+    private fixPath;
     private mergeDeepProxy;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
