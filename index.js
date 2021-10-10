@@ -144,6 +144,7 @@ var DeepState = /** @class */ (function () {
         this.collection = null;
         this.collections = 0;
         this.proxyPath = [];
+        this.proxyUpdate = true;
         //public subscribe: typeof sub;
         this.handler = {
             get: function (obj, prop) {
@@ -165,7 +166,8 @@ var DeepState = /** @class */ (function () {
                     final = new Proxy(_this.mergeDeepProxy([], value), _this.handler);
                 }
                 _this.proxyPath = [];
-                _this.update(path, final);
+                if (_this.proxyUpdate)
+                    _this.update(path, final);
                 obj[prop] = final;
                 return true;
             }
@@ -1358,6 +1360,9 @@ var DeepState = /** @class */ (function () {
             return newValue;
         }
         this.pathSet(split, newValue, this.data);
+        this.proxyUpdate = false;
+        this.pathSet(split, newValue, this.proxy);
+        this.proxyUpdate = true;
         options = __assign(__assign({}, defaultUpdateOptions), options);
         if (options.only === null) {
             if (multi)
@@ -1410,6 +1415,9 @@ var DeepState = /** @class */ (function () {
                         value = value(self.pathGet(split, self.data));
                     }
                     self.pathSet(split, value, self.data);
+                    self.proxyUpdate = false;
+                    self.pathSet(split, value, self.proxy);
+                    self.proxyUpdate = true;
                     updateStack.push({ updatePath: updatePath, newValue: value, options: options });
                 }
                 else {

@@ -267,6 +267,7 @@ class DeepState<T> {
   private collection: Multi = null;
   private collections: number = 0;
   private proxyPath = [];
+  private proxyUpdate = true;
   //public subscribe: typeof sub;
   private handler = {
     get: (obj, prop) => {
@@ -286,7 +287,7 @@ class DeepState<T> {
         final = new Proxy(this.mergeDeepProxy([], value), this.handler);
       }
       this.proxyPath = [];
-      this.update(path, final);
+      if (this.proxyUpdate) this.update(path, final);
       obj[prop] = final;
       return true;
     },
@@ -1286,6 +1287,9 @@ class DeepState<T> {
       return newValue;
     }
     this.pathSet(split, newValue, this.data);
+    this.proxyUpdate = false;
+    this.pathSet(split, newValue, this.proxy);
+    this.proxyUpdate = true;
     options = { ...defaultUpdateOptions, ...options };
     if (options.only === null) {
       if (multi) return function () {};
@@ -1335,6 +1339,9 @@ class DeepState<T> {
             value = value(self.pathGet(split, self.data));
           }
           self.pathSet(split, value, self.data);
+          self.proxyUpdate = false;
+          self.pathSet(split, value, self.proxy);
+          self.proxyUpdate = true;
           updateStack.push({ updatePath, newValue: value, options });
         } else {
           notifiers.push(self.update(updatePath, fnOrValue, options, true));
