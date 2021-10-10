@@ -284,7 +284,7 @@ class DeepState<T> {
       this.proxyPath.push(prop);
       const path = this.proxyPath.join(".");
       if (typeof value === "function") {
-        value = value(obj[prop]);
+        value = value(this.pathGet(this.proxyPath, this.data));
       }
       let final = value;
       if (isObject(value)) {
@@ -294,9 +294,9 @@ class DeepState<T> {
       }
       this.proxyPath = [];
       if (this.silent) {
-        this.pathSet(this.split(path), final, this.data);
+        this.pathSet(this.split(path), value, this.data);
       } else {
-        this.update(path, final);
+        this.update(path, value);
       }
       obj[prop] = final;
       return true;

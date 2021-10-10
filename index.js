@@ -156,7 +156,7 @@ var DeepState = /** @class */ (function () {
                 _this.proxyPath.push(prop);
                 var path = _this.proxyPath.join(".");
                 if (typeof value === "function") {
-                    value = value(obj[prop]);
+                    value = value(_this.pathGet(_this.proxyPath, _this.data));
                 }
                 var final = value;
                 if (isObject(value)) {
@@ -167,10 +167,10 @@ var DeepState = /** @class */ (function () {
                 }
                 _this.proxyPath = [];
                 if (_this.silent) {
-                    _this.pathSet(_this.split(path), final, _this.data);
+                    _this.pathSet(_this.split(path), value, _this.data);
                 }
                 else {
-                    _this.update(path, final);
+                    _this.update(path, value);
                 }
                 obj[prop] = final;
                 return true;
