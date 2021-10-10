@@ -1,13 +1,13 @@
-const State = require("../index.cjs.js");
+const State = require('../index.cjs.js');
 
-describe("Proxy", () => {
-  it("should get value by proxy", () => {
+describe('Proxy', () => {
+  it('should get value by proxy', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -18,13 +18,13 @@ describe("Proxy", () => {
     expect(state.proxy.x.y.z).toEqual(20);
   });
 
-  it("should get value by proxy inside function", () => {
+  it('should get value by proxy inside function', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -37,13 +37,13 @@ describe("Proxy", () => {
     expect(state.proxy.x.y.z).toEqual(20);
   });
 
-  it("should set object by proxy", () => {
+  it('should set object by proxy', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -54,13 +54,13 @@ describe("Proxy", () => {
     expect(state.proxy.x.y.z).toEqual(20);
   });
 
-  it("should get value by proxy inside function", () => {
+  it('should get value by proxy inside function', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -73,13 +73,13 @@ describe("Proxy", () => {
     expect(state.proxy.x.y.z).toEqual(20);
   });
 
-  it("should run collection with proxy", () => {
+  it('should run collection with proxy', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -96,13 +96,13 @@ describe("Proxy", () => {
     expect(state.proxy.x.y.z).toEqual(20);
   });
 
-  it("should run collection with proxy function", () => {
+  it('should run collection with proxy function', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -121,18 +121,18 @@ describe("Proxy", () => {
     expect(state.proxy.x.y.z).toEqual(20);
   });
 
-  it("should update by update fn too", () => {
+  it('should update by update fn too', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
     state.collect();
-    state.update("x.y", (val) => {
+    state.update('x.y', (val) => {
       return { z: val.z + 10 };
     });
     expect(values.length).toEqual(1);
@@ -146,13 +146,13 @@ describe("Proxy", () => {
     expect(state.proxy.x.y.z).toEqual(20);
   });
 
-  it("should update with silent", () => {
+  it('should update with silent', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -167,14 +167,14 @@ describe("Proxy", () => {
     expect(state.data.x.y.z).toEqual(20);
   });
 
-  it("should update with silent collection", () => {
+  it('should update with silent collection', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     //console.log(state.proxyProperty, state.$$$.x[state.proxyProperty]);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -194,20 +194,17 @@ describe("Proxy", () => {
     expect(state.proxy.x.y.z).toEqual(20);
   });
 
-  it("should have proxyProperty in proxy and not have in data", () => {
+  it('should have proxyProperty data', () => {
     const state = new State({ x: { y: { z: 10 } } });
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
-    expect(typeof state.$$$[state.proxyProperty]).toEqual("string");
-    expect(typeof state.$$$.x[state.proxyProperty]).toEqual("string");
-    expect(typeof state.$$$.x.y[state.proxyProperty]).toEqual("string");
-    expect(typeof state.data[state.proxyProperty]).toEqual("undefined");
-    expect(typeof state.data.x[state.proxyProperty]).toEqual("undefined");
-    expect(typeof state.data.x.y[state.proxyProperty]).toEqual("undefined");
+    expect(typeof state.$$$[state.proxyProperty]).toEqual('object');
+    expect(typeof state.$$$.x[state.proxyProperty]).toEqual('object');
+    expect(typeof state.$$$.x.y[state.proxyProperty]).toEqual('object');
     //console.log(state.proxyProperty, state.$$$.x[state.proxyProperty]);
     const values = [];
-    state.subscribe("x.y.z", (value) => {
+    state.subscribe('x.y.z', (value) => {
       values.push(value);
     });
     expect(values[0]).toEqual(10);
@@ -222,12 +219,9 @@ describe("Proxy", () => {
     expect(state.data.x.y.z).toEqual(20);
     state.executeCollected();
     expect(values.length).toEqual(1);
-    expect(typeof state.$$$[state.proxyProperty]).toEqual("string");
-    expect(typeof state.$$$.x[state.proxyProperty]).toEqual("string");
-    expect(typeof state.$$$.x.y[state.proxyProperty]).toEqual("string");
-    expect(typeof state.data[state.proxyProperty]).toEqual("undefined");
-    expect(typeof state.data.x[state.proxyProperty]).toEqual("undefined");
-    expect(typeof state.data.x.y[state.proxyProperty]).toEqual("undefined");
+    expect(typeof state.$$$[state.proxyProperty]).toEqual('object');
+    expect(typeof state.$$$.x[state.proxyProperty]).toEqual('object');
+    expect(typeof state.$$$.x.y[state.proxyProperty]).toEqual('object');
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(20);
     expect(state.proxy.x.y.z).toEqual(20);

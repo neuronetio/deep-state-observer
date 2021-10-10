@@ -180,11 +180,9 @@ declare class DeepState<T> {
      */
     $$$: T;
     constructor(data?: T | object, options?: Options);
-    private fixPath;
     private getParent;
     private setProxy;
     private makeObservable;
-    private mergeDeepProxy;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
     getListeners(): Listeners<T>;

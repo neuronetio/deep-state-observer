@@ -294,27 +294,27 @@ class DeepState<T> {
   private handler = {
     set: (obj, prop, value, proxy) => {
       if (prop === this.proxyProperty) return true;
-      if (!proxy[this.proxyProperty].saving) {
+      if (!obj[this.proxyProperty].saving) {
         const path = obj[this.proxyProperty]
           ? obj[this.proxyProperty].path
             ? obj[this.proxyProperty].path + this.options.delimiter + prop
             : prop
           : prop;
-        if (typeof value === 'function') {
-          value = value(obj[prop]);
-        }
-        if (isObject(value) || Array.isArray(value)) {
-          value = this.makeObservable(value, path);
-        }
         if (!this.silent) {
           this.update(path, value);
         } else {
+          if (typeof value === 'function') {
+            value = value(this.pathGet(this.split(path), this.data));
+          }
+          if (isObject(value) || Array.isArray(value)) {
+            value = this.makeObservable(value, path);
+          }
           obj[prop] = value;
         }
       } else {
         obj[prop] = value;
+        obj[this.proxyProperty].saving = false;
       }
-      proxy[this.proxyProperty].saving = false;
       return true;
     },
   };
@@ -328,7 +328,6 @@ class DeepState<T> {
     this.listeners = new Map();
     this.handler.set = this.handler.set.bind(this);
     this.options = { ...getDefaultOptions(), ...options };
-    //this.data = this.mergeDeepProxy({}, data, '');
     this.data = this.makeObservable(data, '');
     this.proxy = this.data as T;
     this.$$$ = this.proxy;
@@ -348,14 +347,6 @@ class DeepState<T> {
       this.options.wildcard
     );
     this.destroyed = false;
-  }
-
-  private fixPath(path: string) {
-    if (path === '.') return '';
-    if (path[0] === this.options.delimiter) path = path.substr(1);
-    if (path[path.length - 1] === this.options.delimiter)
-      path = path.substring(0, -1);
-    return path;
   }
 
   private getParent(path) {
@@ -407,79 +398,6 @@ class DeepState<T> {
       target = this.setProxy(target, { path, saving: false });
     }
     return target;
-  }
-
-  private mergeDeepProxy<T>(target: any, source: any, path: string): T {
-    path = this.fixPath(path);
-    if (isObject(target) && isObject(source)) {
-      if (typeof target[this.proxyProperty] === 'undefined')
-        Object.defineProperty(target, this.proxyProperty, {
-          enumerable: false,
-          value: path,
-        });
-      for (const key in source) {
-        if (key === this.proxyProperty) continue;
-        if (isObject(source[key])) {
-          target[key] = this.mergeDeepProxy(
-            {},
-            source[key],
-            `${path}${this.options.delimiter}${key}`
-          );
-        } else if (Array.isArray(source[key])) {
-          target[key] = new Array(source[key].length);
-          Object.defineProperty(target[key], this.proxyProperty, {
-            enumerable: false,
-            value: `${path}${this.proxyProperty}${key}`,
-          });
-          let index = 0;
-          for (let item of source[key]) {
-            if (isObject(item)) {
-              target[key][index] = this.mergeDeepProxy(
-                {},
-                item,
-                `${path}${this.options.delimiter}${key}${this.options.delimiter}${index}`
-              );
-            } else if (Array.isArray(item)) {
-              target[key][index] = this.mergeDeepProxy(
-                [],
-                item,
-                `${path}${this.options.delimiter}${key}${this.options.delimiter}${index}`
-              );
-            } else {
-              target[key][index] = item;
-            }
-            index++;
-          }
-        } else {
-          target[key] = source[key];
-        }
-      }
-    } else if (Array.isArray(source)) {
-      target.length = source.length;
-      if (typeof target[this.proxyProperty] === 'undefined')
-        Object.defineProperty(target, this.proxyProperty, {
-          enumerable: false,
-          value: path,
-        });
-      for (let i = 0, len = source.length; i < len; i++) {
-        if (isObject(source[i])) {
-          target[i] = this.mergeDeepProxy(
-            {},
-            source[i],
-            `${path}${this.options.delimiter}${i}`
-          );
-        } else if (Array.isArray(source[i])) {
-          target[i] = this.mergeDeepProxy(
-            [],
-            source[i],
-            `${path}${this.options.delimiter}${i}`
-          );
-        } else {
-          target[i] = source[i];
-        }
-      }
-    }
-    return new Proxy(target, this.handler);
   }
 
   public async loadWasmMatcher(pathToWasmFile: string) {
@@ -1376,7 +1294,10 @@ class DeepState<T> {
   private getUpdateValues(oldValue, split, fn) {
     let newValue = fn;
     if (typeof fn === 'function') {
+      const silent = this.silent;
+      this.silent = true;
       newValue = fn(this.pathGet(split, this.data));
+      this.silent = silent;
     }
     return { newValue, oldValue };
   }
@@ -1526,7 +1447,6 @@ class DeepState<T> {
     multi = false
   ) {
     if (this.destroyed) return;
-    const silent = this.silent;
     if (this.collection) {
       return this.collection.update(updatePath, fnOrValue, options);
     }
@@ -1566,6 +1486,10 @@ class DeepState<T> {
       return newValue;
     }
 
+    if (isObject(newValue) || Array.isArray(newValue)) {
+      newValue = this.makeObservable(newValue, updatePath);
+    }
+
     const parent = this.getParent(updatePath);
     parent[this.proxyProperty].saving = true;
     this.pathSet(split, newValue, this.data);
@@ -1580,8 +1504,7 @@ class DeepState<T> {
       if (multi) {
         const self = this;
         return function () {
-          self.updateNotifyOnly(updatePath, newValue, options);
-          this.silent = silent;
+          return self.updateNotifyOnly(updatePath, newValue, options);
         };
       }
       this.updateNotifyOnly(updatePath, newValue, options);
@@ -1624,9 +1547,12 @@ class DeepState<T> {
           if (typeof value === 'function') {
             value = value(self.pathGet(split, self.data));
           }
+          if (isObject(value) || Array.isArray(value)) {
+            value = self.makeObservable(value, updatePath);
+          }
           const parent = self.getParent(updatePath);
           parent[self.proxyProperty].saving = true;
-          self.pathSet(split, value, self.proxy);
+          self.pathSet(split, value, self.data);
           parent[self.proxyProperty].saving = false;
           updateStack.push({ updatePath, newValue: value, options });
         } else {
