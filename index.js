@@ -278,7 +278,7 @@ var DeepState = /** @class */ (function () {
             var targetVal = new Array(source.length);
             for (var i = 0, len = source.length; i < len; i++) {
                 if (isObject(source[i]) || Array.isArray(source[i])) {
-                    targetVal[i] = this.mergeDeepProxy(source[i]);
+                    targetVal[i] = this.mergeDeepProxy({}, source[i]);
                 }
                 else {
                     targetVal[i] = source[i];

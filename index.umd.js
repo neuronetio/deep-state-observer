@@ -531,7 +531,7 @@
                 const targetVal = new Array(source.length);
                 for (let i = 0, len = source.length; i < len; i++) {
                     if (isObject(source[i]) || Array.isArray(source[i])) {
-                        targetVal[i] = this.mergeDeepProxy(source[i]);
+                        targetVal[i] = this.mergeDeepProxy({}, source[i]);
                     }
                     else {
                         targetVal[i] = source[i];
@@ -1331,7 +1331,7 @@
                 return this.wildcardUpdate(updatePath, fnOrValue, options, multi);
             }
             const split = this.split(updatePath);
-            const { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fnOrValue);
+            let { oldValue, newValue } = this.getUpdateValues(this.pathGet(split, this.data), split, fnOrValue);
             if (options.debug) {
                 this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ""}`, {
                     oldValue,
