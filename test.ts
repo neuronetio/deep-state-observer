@@ -36,7 +36,7 @@ const someState: SomeState = {
 
 const state = new DeepStateObserver<SomeState>(someState);
 
-state.subscribe("y.c", (v) => {}, { bulk: true });
+state.subscribe("y.c.d", (v) => {}, { bulk: true });
 
 state.$$$.y.c.d = 33;
 

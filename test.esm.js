@@ -1578,7 +1578,7 @@ const someState = {
     },
 };
 const state = new DeepState(someState);
-state.subscribe("y.c", (v) => { }, { bulk: true });
+state.subscribe("y.c.d", (v) => { }, { bulk: true });
 state.$$$.y.c.d = 33;
 if (state.get("y.c.d") !== 33) {
     console.error("wrong");

@@ -166,7 +166,7 @@ export interface UpdateStack {
 
 export interface Bulk {
   path: string;
-  value: unknown;
+  value: any;
   params: Params;
 }
 
@@ -198,11 +198,11 @@ type PathValue<T, P extends PossiblePath<T>> = P extends `${infer K}.${infer Res
   ? K extends keyof T
     ? Rest extends PossiblePath<T[K]>
       ? PathValue<T[K], Rest>
-      : any & Bulk[]
-    : any & Bulk[]
+      : any
+    : any
   : P extends keyof T
-  ? T[P] & Bulk[]
-  : any & Bulk[];
+  ? T[P]
+  : any;
 
 function log(message: string, info: any) {
   console.debug(message, info);
@@ -1420,7 +1420,7 @@ class DeepState<T> {
     return this.collection.getStack();
   }
 
-  public get<P extends PossiblePath<T>>(userPath: P | string): PathValue<T, P> {
+  public get<P extends PossiblePath<T>>(userPath: P): PathValue<T, P> {
     if (this.destroyed) return;
     if (typeof userPath === "undefined" || userPath === "") {
       return this.data;

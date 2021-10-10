@@ -135,7 +135,7 @@ export interface UpdateStack {
 }
 export interface Bulk {
     path: string;
-    value: unknown;
+    value: any;
     params: Params;
 }
 export interface Multi {
@@ -145,7 +145,7 @@ export interface Multi {
 }
 declare type PathImpl<T, K extends keyof T> = K extends string ? T[K] extends Record<string, any> ? T[K] extends ArrayLike<any> ? K | `${K}.${PathImpl<T[K], Exclude<keyof T[K], keyof any[]>>}` : K | `${K}.${PathImpl<T[K], keyof T[K]>}` : K : any;
 declare type PossiblePath<T> = PathImpl<T, keyof T> | keyof T | string;
-declare type PathValue<T, P extends PossiblePath<T>> = P extends `${infer K}.${infer Rest}` ? K extends keyof T ? Rest extends PossiblePath<T[K]> ? PathValue<T[K], Rest> : any & Bulk[] : any & Bulk[] : P extends keyof T ? T[P] & Bulk[] : any & Bulk[];
+declare type PathValue<T, P extends PossiblePath<T>> = P extends `${infer K}.${infer Rest}` ? K extends keyof T ? Rest extends PossiblePath<T[K]> ? PathValue<T[K], Rest> : any : any : P extends keyof T ? T[P] : any;
 export interface UnknownObject {
     [key: string]: unknown;
 }
@@ -228,12 +228,12 @@ declare class DeepState<T> {
     executeCollected(): void;
     getCollectedCount(): number;
     getCollectedStack(): UpdateStack[];
-    get<P extends PossiblePath<T>>(userPath: P | string): PathValue<T, P>;
+    get<P extends PossiblePath<T>>(userPath: P): PathValue<T, P>;
     private lastExecs;
     last(callback: () => void): void;
     isMuted(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
     isMutedListener(listenerFunc: ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
-    mute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): Set<ListenerFunction<(string extends keyof T ? T[keyof T & string] & Bulk[] : any) | PathValue<T, keyof T> | PathValue<T, PathImpl<T, keyof T>>>>;
+    mute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): Set<ListenerFunction<(string extends keyof T ? T[keyof T & string] : any) | PathValue<T, keyof T> | PathValue<T, PathImpl<T, keyof T>>>>;
     unmute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
     private debugSubscribe;
     private debugListener;
