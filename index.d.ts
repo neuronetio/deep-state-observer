@@ -3,15 +3,15 @@ export interface PathInfo {
     update: string | undefined;
     resolved: string | undefined;
 }
-export interface ListenerFunctionEventInfo {
+export interface ListenerFunctionEventInfo<T> {
     type: string;
-    listener: Listener;
-    listenersCollection: ListenersCollection;
+    listener: Listener<T>;
+    listenersCollection: ListenersCollection<T>;
     path: PathInfo;
     params: Params;
     options: ListenerOptions | UpdateOptions | undefined;
 }
-export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
+export declare type ListenerFunction<T> = (value: T, eventInfo: ListenerFunctionEventInfo<T>) => void;
 export declare type Match = (path: string, debug?: boolean) => boolean;
 export interface Options {
     delimiter?: string;
@@ -43,40 +43,40 @@ export interface UpdateOptions {
     queue?: boolean;
     force?: boolean;
 }
-export interface Listener {
-    fn: ListenerFunction;
+export interface Listener<T> {
+    fn: ListenerFunction<T>;
     options: ListenerOptions;
     id?: number;
     groupId: number | null;
 }
-export interface Queue {
+export interface Queue<T> {
     id: number;
     resolvedPath: string;
     resolvedIdPath: string;
     fn: () => void;
-    originalFn: ListenerFunction;
+    originalFn: ListenerFunction<T>;
     options: ListenerOptions;
     groupId: number;
 }
-export interface GroupedListener {
-    listener: Listener;
-    listenersCollection: ListenersCollection;
-    eventInfo: ListenerFunctionEventInfo;
+export interface GroupedListener<T> {
+    listener: Listener<PathValue<T, PossiblePath<T>>>;
+    listenersCollection: ListenersCollection<T>;
+    eventInfo: ListenerFunctionEventInfo<T>;
     value: any;
 }
-export interface GroupedListenerContainer {
-    single: GroupedListener[];
-    bulk: GroupedListener[];
+export interface GroupedListenerContainer<T> {
+    single: GroupedListener<T>[];
+    bulk: GroupedListener<T>[];
 }
-export interface GroupedListeners {
-    [path: string]: GroupedListenerContainer;
+export interface GroupedListeners<T> {
+    [path: string]: GroupedListenerContainer<T>;
 }
 export declare type Updater = (value: any) => any;
-export declare type ListenersObject = Map<string | number, Listener>;
-export interface ListenersCollection {
+export declare type ListenersObject<T> = Map<string | number, Listener<T>>;
+export interface ListenersCollection<T> {
     path: string;
     originalPath: string;
-    listeners: ListenersObject;
+    listeners: ListenersObject<PathValue<T, PossiblePath<T>>>;
     isWildcard: boolean;
     isRecursive: boolean;
     hasParams: boolean;
@@ -84,7 +84,7 @@ export interface ListenersCollection {
     match: Match;
     count: number;
 }
-export declare type Listeners = Map<string, ListenersCollection>;
+export declare type Listeners<T> = Map<string, ListenersCollection<T>>;
 export interface WaitingPath {
     dirty: boolean;
     isWildcard: boolean;
@@ -138,6 +138,9 @@ export interface Multi {
     done: () => void;
     getStack: () => UpdateStack[];
 }
+declare type PathImpl<T, K extends keyof T> = K extends string ? T[K] extends Record<string, any> ? T[K] extends ArrayLike<any> ? K | `${K}.${PathImpl<T[K], Exclude<keyof T[K], keyof any[]>>}` : K | `${K}.${PathImpl<T[K], keyof T[K]>}` : K : any;
+declare type PossiblePath<T> = PathImpl<T, keyof T> | keyof T | string;
+declare type PathValue<T, P extends PossiblePath<T>> = P extends `${infer K}.${infer Rest}` ? K extends keyof T ? Rest extends PossiblePath<T[K]> ? PathValue<T[K], Rest> : any : any : P extends keyof T ? T[P] : any;
 export interface UnknownObject {
     [key: string]: unknown;
 }
@@ -174,7 +177,7 @@ declare class DeepState<T> {
     private mergeDeepProxy;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
-    getListeners(): Listeners;
+    getListeners(): Listeners<T>;
     destroy(): void;
     private match;
     private getIndicesOf;
@@ -188,12 +191,12 @@ declare class DeepState<T> {
     private hasParams;
     private getParamsInfo;
     private getParams;
-    subscribeAll(userPaths: string[], fn: ListenerFunction | WaitingListenerFunction, options?: ListenerOptions): () => void;
+    subscribeAll(userPaths: string[], fn: ListenerFunction<PathValue<T, PossiblePath<T>>>, options?: ListenerOptions): () => void;
     private getCleanListenersCollection;
     private getCleanListener;
     private getListenerCollectionMatch;
     private getListenersCollection;
-    subscribe(listenerPath: string, fn: ListenerFunction, options?: ListenerOptions, subscribeAllOptions?: SubscribeAllOptions): () => void;
+    subscribe<P extends PossiblePath<T>>(listenerPath: P, fn: ListenerFunction<PathValue<T, P>>, options?: ListenerOptions, subscribeAllOptions?: SubscribeAllOptions): () => void;
     private unsubscribe;
     private runQueuedListeners;
     private getQueueNotifyListeners;
@@ -219,13 +222,13 @@ declare class DeepState<T> {
     executeCollected(): void;
     getCollectedCount(): number;
     getCollectedStack(): UpdateStack[];
-    get(userPath?: string | undefined): any;
+    get<P extends PossiblePath<T>>(userPath: P | string): PathValue<T, P>;
     private lastExecs;
     last(callback: () => void): void;
-    isMuted(pathOrListenerFunction: string | ListenerFunction): boolean;
-    isMutedListener(listenerFunc: ListenerFunction): boolean;
-    mute(pathOrListenerFunction: string | ListenerFunction): Set<ListenerFunction>;
-    unmute(pathOrListenerFunction: string | ListenerFunction): boolean;
+    isMuted(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
+    isMutedListener(listenerFunc: ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
+    mute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): Set<ListenerFunction<(string extends keyof T ? T[keyof T & string] : any) | PathValue<T, keyof T> | PathValue<T, PathImpl<T, keyof T>>>>;
+    unmute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
     private debugSubscribe;
     private debugListener;
     private debugTime;

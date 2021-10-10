@@ -47,7 +47,7 @@ WildcardObject.prototype.match = function match(first, second) {
         first === this.wildcard ||
         second === this.wildcard ||
         this.simpleMatch(first, second) ||
-        stringMatcher_1.Match(first, second, this.wildcard));
+        (0, stringMatcher_1.Match)(first, second, this.wildcard));
 };
 WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr, partIndex, path, result) {
     var e_1, _a;

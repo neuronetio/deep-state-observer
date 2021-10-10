@@ -6,6 +6,7 @@ export interface Yobj {
     a: number;
     b: string;
     c: Zobj;
+    d: Zobj;
 }
 export interface SomeState {
     x: number;

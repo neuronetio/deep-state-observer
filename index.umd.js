@@ -412,6 +412,7 @@
             this.collection = null;
             this.collections = 0;
             this.proxyPath = [];
+            //public subscribe: typeof sub;
             this.handler = {
                 get: (obj, prop) => {
                     if (obj.hasOwnProperty(prop))
@@ -778,17 +779,17 @@
                 }
                 else {
                     const paths = this.scan.get(cleanPath);
+                    const bulkValue = [];
+                    for (const path in paths) {
+                        if (this.isMuted(path))
+                            continue;
+                        bulkValue.push({
+                            path,
+                            params: this.getParams(listenersCollection.paramsInfo, path),
+                            value: paths[path],
+                        });
+                    }
                     if (options.bulk) {
-                        const bulkValue = [];
-                        for (const path in paths) {
-                            if (this.isMuted(path))
-                                continue;
-                            bulkValue.push({
-                                path,
-                                params: this.getParams(listenersCollection.paramsInfo, path),
-                                value: paths[path],
-                            });
-                        }
                         if (!this.isMuted(fn)) {
                             fn(bulkValue, {
                                 type,
@@ -1421,7 +1422,7 @@
                 return [];
             return this.collection.getStack();
         }
-        get(userPath = undefined) {
+        get(userPath) {
             if (this.destroyed)
                 return;
             if (typeof userPath === "undefined" || userPath === "") {
