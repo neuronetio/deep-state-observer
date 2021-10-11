@@ -1,6 +1,6 @@
 const State = require("../index.cjs.js");
 
-const options = { useProxy: true, useObjectMap: true };
+const options = { useProxy: true, useObjectMaps: true };
 
 describe("Proxy", () => {
   it("should get value by proxy", () => {
@@ -151,7 +151,7 @@ describe("Proxy", () => {
 
   it("should have proxyProperty data", () => {
     const state = new State({ x: { y: { z: 10 } } }, options);
-    //console.log(state.data);
+    // console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
     expect(typeof state.$$$[state.proxyProperty]).toEqual("object");

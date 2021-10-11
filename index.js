@@ -115,8 +115,8 @@ function getDefaultOptions() {
         param: ":",
         wildcard: "*",
         experimentalMatch: false,
-        useObjectMaps: true,
-        useProxy: true,
+        useObjectMaps: false,
+        useProxy: false,
         maxSimultaneousJobs: 1000,
         maxQueueRuns: 1000,
         log: log,
@@ -197,12 +197,13 @@ var DeepState = /** @class */ (function () {
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
         this.options = __assign(__assign({}, getDefaultOptions()), options);
+        //if (this.options.useProxy) this.options.useObjectMaps = true;
         if (this.options.useProxy) {
             if (this.options.useObjectMaps) {
                 this.data = this.updateMapDown("", data, this.rootProxyNode, false);
             }
             else {
-                this.data = this.makeObservable(this.data, "", this.rootProxyNode);
+                this.data = this.makeObservable(data, "", this.rootProxyNode);
             }
             this.proxy = this.data;
             this.$$$ = this.proxy;
@@ -245,10 +246,14 @@ var DeepState = /** @class */ (function () {
         var e_1, _a;
         if (deleteReferences === void 0) { deleteReferences = true; }
         if (map === void 0) { map = this.map; }
+        if (!this.options.useObjectMaps)
+            return value;
         if (deleteReferences) {
             try {
                 for (var _b = __values(map.keys()), _c = _b.next(); !_c.done; _c = _b.next()) {
                     var key = _c.value;
+                    if (key === this.proxyProperty)
+                        continue;
                     if (key.startsWith(fullPath))
                         map["delete"](key);
                 }
@@ -264,6 +269,8 @@ var DeepState = /** @class */ (function () {
         if (isObject(value)) {
             value = this.makeObservable(value, fullPath, parent);
             for (var prop in value) {
+                if (prop === this.proxyProperty)
+                    continue;
                 this.updateMapDown(fullPath ? fullPath + this.options.delimiter + prop : prop, value[prop], value, false, map);
             }
         }
@@ -278,6 +285,8 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.deleteMapReferences = function (path) {
         var e_2, _a;
+        if (!this.options.useObjectMaps)
+            return;
         try {
             for (var _b = __values(this.map.keys()), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var key = _c.value;
@@ -299,6 +308,8 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.pathSet = function (pathChunks, value) {
         var e_3, _a;
         var prop, currentPath = "", obj = this.data;
+        if (!Array.isArray(pathChunks))
+            throw new Error("Invalid path chunks");
         var chunks = pathChunks.slice();
         var last = chunks.pop();
         var referencesDeleted = false;
@@ -353,6 +364,8 @@ var DeepState = /** @class */ (function () {
         }
     };
     DeepState.prototype.getParent = function (pathChunks, proxyNode) {
+        if (!this.options.useProxy)
+            return;
         if (proxyNode && typeof proxyNode[this.proxyProperty] !== "undefined")
             return proxyNode[this.proxyProperty].parent;
         if (pathChunks.length === 0)
@@ -362,6 +375,8 @@ var DeepState = /** @class */ (function () {
         return this.pathGet(split.join(this.options.delimiter));
     };
     DeepState.prototype.isSaving = function (pathChunks, proxyNode) {
+        if (!this.options.useProxy)
+            return;
         var parent = this.getParent(pathChunks, proxyNode);
         if (parent) {
             if (parent[this.proxyProperty].saving.includes(pathChunks[pathChunks.length - 1]))
@@ -371,10 +386,14 @@ var DeepState = /** @class */ (function () {
         return false;
     };
     DeepState.prototype.setNodeSaving = function (proxyNode, prop) {
+        if (!this.options.useProxy)
+            return;
         proxyNode[this.proxyProperty].saving.push(String(prop));
     };
     DeepState.prototype.unsetNodeSaving = function (proxyNode, prop) {
         var e_4, _a;
+        if (!this.options.useProxy)
+            return;
         var saving = [];
         try {
             for (var _b = __values(proxyNode[this.proxyProperty].saving), _c = _b.next(); !_c.done; _c = _b.next()) {
@@ -393,12 +412,16 @@ var DeepState = /** @class */ (function () {
         proxyNode[this.proxyProperty].saving = saving;
     };
     DeepState.prototype.addSaving = function (pathChunks, proxyNode) {
+        if (!this.options.useProxy)
+            return;
         var parent = this.getParent(pathChunks, proxyNode);
         var changedProp = pathChunks[pathChunks.length - 1];
         if (parent)
             this.setNodeSaving(parent, changedProp);
     };
     DeepState.prototype.removeSaving = function (pathChunks, proxyNode) {
+        if (!this.options.useProxy)
+            return;
         var parent = this.getParent(pathChunks, proxyNode);
         if (parent) {
             var changedProp = pathChunks[pathChunks.length - 1];
@@ -406,6 +429,8 @@ var DeepState = /** @class */ (function () {
         }
     };
     DeepState.prototype.setProxy = function (target, data) {
+        if (!this.options.useProxy)
+            return target;
         if (typeof target[this.proxyProperty] === "undefined") {
             Object.defineProperty(target, this.proxyProperty, {
                 enumerable: false,
@@ -426,6 +451,8 @@ var DeepState = /** @class */ (function () {
         return typeof target[this.proxyProperty] !== "undefined";
     };
     DeepState.prototype.makeObservable = function (target, path, parent) {
+        if (!this.options.useProxy)
+            return target;
         if (isObject(target) || Array.isArray(target)) {
             if (typeof target[this.proxyProperty] !== "undefined") {
                 var pp = target[this.proxyProperty];
@@ -1578,7 +1605,7 @@ var DeepState = /** @class */ (function () {
         // if we are saving a parent node - do not notify about changes
         // because someone may modify object which is given as argument
         // and will fire subscriptions immediately which is not intended
-        if (currentlySaving && !options.force) {
+        if (this.options.useProxy && currentlySaving && !options.force) {
             this.removeSaving(split, newValue);
             return newValue;
         }
