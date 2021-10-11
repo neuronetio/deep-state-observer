@@ -172,7 +172,7 @@ declare class DeepState<T> {
     private collection;
     private collections;
     silent: boolean;
-    proxyProperty: string;
+    readonly proxyProperty = "___deep_state_observer___";
     private handler;
     proxy: T;
     /**
@@ -181,6 +181,7 @@ declare class DeepState<T> {
     $$$: T;
     constructor(data?: T | object, options?: Options);
     private getParent;
+    private parentIsSaving;
     private setProxy;
     private makeObservable;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
