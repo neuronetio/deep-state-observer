@@ -249,4 +249,17 @@ describe("Proxy", () => {
     };
     expect(values.length).toEqual(2);
   });
+
+  it("should react to changes on objects from get fn", () => {
+    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } });
+    const values = [];
+    state.subscribe("root.right.r", (r) => {
+      values.push(r);
+    });
+
+    expect(values[0]).toEqual("r");
+    const root = state.get("root");
+    root.right.r = "rr";
+    expect(values[1]).toEqual("rr");
+  });
 });
