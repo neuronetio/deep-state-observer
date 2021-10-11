@@ -262,4 +262,19 @@ describe("Proxy", () => {
     root.right.r = "rr";
     expect(values[1]).toEqual("rr");
   });
+
+  it("should notify children when parent proxy node is changed", () => {
+    const state = new State({ root: { left: { l: "l" } } });
+    const values = [];
+    state.subscribe("root.left.l", (l) => {
+      values.push(l);
+    });
+    expect(values[0]).toEqual("l");
+    let root = state.get("root");
+    root.left = { l: "ll" };
+    expect(values[1]).toEqual("ll");
+
+    state.proxy.root = { left: { l: "lll" } };
+    expect(values[2]).toEqual("lll");
+  });
 });

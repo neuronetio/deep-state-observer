@@ -113,6 +113,36 @@ state.$$$.x.y.z = (value) => {
 };
 ```
 
+## All objects and arrays are reactive (proxies)
+
+```js
+const state = new State({ x: { y: { z: 10 } } });
+let counter = 0;
+state.subscribe("x.y.z", () => {
+  counter++;
+});
+
+// counter === 1
+// x.y.z === 10
+
+const z = state.get("x.y.z");
+z = 20;
+
+// counter === 1
+// x.y.z === 10 because it is not an object or array
+
+const y = state.get("x.y"); // object
+y.z = 20; // change detected
+
+// counter === 2
+// x.y.z === 20
+
+state.proxy.x = { y: { z: 30 } };
+
+// counter === 3
+// x.y.z === 30
+```
+
 ## Wildcards
 
 ```javascript
