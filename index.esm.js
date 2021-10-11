@@ -410,7 +410,7 @@ class DeepState {
             ___deep_state_observer___: {
                 path: "___deep_state_observer___",
                 pathChunks: ["___deep_state_observer___"],
-                saving: false,
+                saving: [],
                 parent: null,
             },
         };
@@ -418,21 +418,23 @@ class DeepState {
             set: (parent, prop, value, proxy) => {
                 if (prop === this.proxyProperty)
                     return true;
-                if (!parent[this.proxyProperty].saving) {
-                    const path = parent[this.proxyProperty].path + this.options.delimiter + prop;
+                if (!parent[this.proxyProperty].saving.includes(prop)) {
+                    const path = parent[this.proxyProperty].path
+                        ? parent[this.proxyProperty].path + this.options.delimiter + prop
+                        : prop;
                     if (!this.isSaving(parent[this.proxyProperty].pathChunks, parent)) {
                         this.update(path, value);
                     }
                     else {
-                        parent[this.proxyProperty].saving = true;
+                        // if parent node is saving current node and in meanwhile someone updates nodes below - just update it - do not notify
                         if (typeof value === "function") {
-                            value = value(this.pathGet(this.split(path), this.data));
+                            const currentValue = this.pathGet(this.split(path), this.data);
+                            value = value(currentValue);
                         }
                         if (isObject(value) || Array.isArray(value)) {
                             value = this.makeObservable(value, path, parent);
                         }
                         parent[prop] = value;
-                        parent[this.proxyProperty].saving = false;
                     }
                 }
                 else {
@@ -441,6 +443,7 @@ class DeepState {
                 return true;
             },
         };
+        this.map = new Map();
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
@@ -462,6 +465,8 @@ class DeepState {
         this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
         this.destroyed = false;
     }
+    // private pathGet(pathChunks: string[]) {}
+    // private pathSet(pathChunks: string[], value: any) {}
     getParent(pathChunks, proxyNode) {
         if (proxyNode && typeof proxyNode[this.proxyProperty] !== "undefined")
             return proxyNode[this.proxyProperty].parent;
@@ -474,16 +479,24 @@ class DeepState {
     isSaving(pathChunks, proxyNode) {
         let parent = this.getParent(pathChunks, proxyNode);
         if (parent) {
-            if (parent[this.proxyProperty].saving)
+            if (parent[this.proxyProperty].saving.includes(pathChunks[pathChunks.length - 1]))
                 return true;
             return this.isSaving(parent[this.proxyProperty].pathChunks, parent);
         }
         return false;
     }
-    setSaving(pathChunks, proxyNode, saving) {
+    addSaving(pathChunks, proxyNode) {
         const parent = this.getParent(pathChunks, proxyNode);
+        const changedProp = pathChunks[pathChunks.length - 1];
         if (parent)
-            parent[this.proxyProperty].saving = saving;
+            parent[this.proxyProperty].saving.push(changedProp);
+    }
+    removeSaving(pathChunks, proxyNode) {
+        const parent = this.getParent(pathChunks, proxyNode);
+        if (parent) {
+            const changedProp = pathChunks[pathChunks.length - 1];
+            parent[this.proxyProperty].saving = parent[this.proxyProperty].saving.filter((current) => current !== changedProp);
+        }
     }
     setProxy(target, data) {
         if (typeof target[this.proxyProperty] === "undefined") {
@@ -518,7 +531,7 @@ class DeepState {
                     }
                 }
             }
-            target = this.setProxy(target, { path, pathChunks: this.split(path), saving: false, parent });
+            target = this.setProxy(target, { path, pathChunks: this.split(path), saving: [], parent });
         }
         return target;
     }
@@ -1229,7 +1242,7 @@ class DeepState {
         for (const path in scanned) {
             const split = this.split(path);
             const parent = this.getParent(split, scanned[path]);
-            this.setSaving(split, scanned[path], true);
+            this.addSaving(split, scanned[path]);
             const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn, parent);
             if (!this.same(newValue, oldValue) || options.force) {
                 this.pathSet(split, newValue, this.data);
@@ -1256,14 +1269,14 @@ class DeepState {
                 const queue = self.wildcardNotify(groupedListenersPack);
                 self.sortAndRunQueue(queue, updatePath);
                 for (const path in scanned) {
-                    self.setSaving(self.split(path), scanned[path], false);
+                    self.removeSaving(self.split(path), scanned[path]);
                 }
             };
         }
         const queue = this.wildcardNotify(groupedListenersPack);
         this.sortAndRunQueue(queue, updatePath);
         for (const path in scanned) {
-            this.setSaving(this.split(path), scanned[path], false);
+            this.removeSaving(this.split(path), scanned[path]);
         }
     }
     updateNotify(updatePath, newValue, options) {
@@ -1315,7 +1328,8 @@ class DeepState {
         }
         const split = this.split(updatePath);
         const currentValue = this.pathGet(split, this.data);
-        this.setSaving(split, currentValue, true);
+        const currentlySaving = this.isSaving(split, currentValue);
+        this.addSaving(split, currentValue);
         const parent = this.getParent(split, currentValue);
         let { oldValue, newValue } = this.getUpdateValues(currentValue, split, fnOrValue, parent);
         if (options.debug) {
@@ -1332,11 +1346,15 @@ class DeepState {
             return newValue;
         }
         this.pathSet(split, newValue, this.data);
+        // if we are saving a parent node - do not notify about changes
+        if (currentlySaving && !options.force) {
+            return this.removeSaving(split, newValue);
+        }
         options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
         if (options.only === null) {
             if (multi)
                 return function () { };
-            this.setSaving(split, newValue, false);
+            this.removeSaving(split, newValue);
             return newValue;
         }
         if (options.only.length) {
@@ -1344,24 +1362,24 @@ class DeepState {
                 const self = this;
                 return function () {
                     const result = self.updateNotifyOnly(updatePath, newValue, options);
-                    self.setSaving(split, newValue, false);
+                    self.removeSaving(split, newValue);
                     return result;
                 };
             }
             this.updateNotifyOnly(updatePath, newValue, options);
-            this.setSaving(split, newValue, false);
+            this.removeSaving(split, newValue);
             return newValue;
         }
         if (multi) {
             const self = this;
             return function multiUpdate() {
                 const result = self.updateNotify(updatePath, newValue, options);
-                self.setSaving(split, newValue, false);
+                self.removeSaving(split, newValue);
                 return result;
             };
         }
         this.updateNotify(updatePath, newValue, options);
-        this.setSaving(split, newValue, false);
+        this.removeSaving(split, newValue);
         return newValue;
     }
     multi(grouped = false) {
@@ -1386,7 +1404,7 @@ class DeepState {
                     const split = self.split(updatePath);
                     let value = fnOrValue;
                     const currentValue = self.pathGet(split, self.data);
-                    self.setSaving(split, currentValue, true);
+                    self.addSaving(split, currentValue);
                     if (typeof value === "function") {
                         value = value(currentValue);
                     }
@@ -1395,7 +1413,7 @@ class DeepState {
                         value = self.makeObservable(value, updatePath, parent);
                     }
                     self.pathSet(split, value, self.data);
-                    self.setSaving(split, currentValue, false);
+                    self.removeSaving(split, currentValue);
                     updateStack.push({ updatePath, newValue: value, options });
                 }
                 else {

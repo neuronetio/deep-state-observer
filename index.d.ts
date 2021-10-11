@@ -157,7 +157,7 @@ export interface ProxyNode {
 export interface ProxyData {
     path: string;
     pathChunks: string[];
-    saving: boolean;
+    saving: string[];
     parent: ProxyNode | null;
 }
 declare class DeepState<T> {
@@ -190,10 +190,12 @@ declare class DeepState<T> {
      * @property $$$ proxy shorthand
      */
     $$$: T;
+    private map;
     constructor(data?: T | object, options?: Options);
     private getParent;
     private isSaving;
-    private setSaving;
+    private addSaving;
+    private removeSaving;
     private setProxy;
     private makeObservable;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;

@@ -148,7 +148,7 @@ var DeepState = /** @class */ (function () {
             ___deep_state_observer___: {
                 path: "___deep_state_observer___",
                 pathChunks: ["___deep_state_observer___"],
-                saving: false,
+                saving: [],
                 parent: null
             }
         };
@@ -156,21 +156,23 @@ var DeepState = /** @class */ (function () {
             set: function (parent, prop, value, proxy) {
                 if (prop === _this.proxyProperty)
                     return true;
-                if (!parent[_this.proxyProperty].saving) {
-                    var path = parent[_this.proxyProperty].path + _this.options.delimiter + prop;
+                if (!parent[_this.proxyProperty].saving.includes(prop)) {
+                    var path = parent[_this.proxyProperty].path
+                        ? parent[_this.proxyProperty].path + _this.options.delimiter + prop
+                        : prop;
                     if (!_this.isSaving(parent[_this.proxyProperty].pathChunks, parent)) {
                         _this.update(path, value);
                     }
                     else {
-                        parent[_this.proxyProperty].saving = true;
+                        // if parent node is saving current node and in meanwhile someone updates nodes below - just update it - do not notify
                         if (typeof value === "function") {
-                            value = value(_this.pathGet(_this.split(path), _this.data));
+                            var currentValue = _this.pathGet(_this.split(path), _this.data);
+                            value = value(currentValue);
                         }
                         if (isObject(value) || Array.isArray(value)) {
                             value = _this.makeObservable(value, path, parent);
                         }
                         parent[prop] = value;
-                        parent[_this.proxyProperty].saving = false;
                     }
                 }
                 else {
@@ -179,6 +181,7 @@ var DeepState = /** @class */ (function () {
                 return true;
             }
         };
+        this.map = new Map();
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
@@ -200,6 +203,8 @@ var DeepState = /** @class */ (function () {
         this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard);
         this.destroyed = false;
     }
+    // private pathGet(pathChunks: string[]) {}
+    // private pathSet(pathChunks: string[], value: any) {}
     DeepState.prototype.getParent = function (pathChunks, proxyNode) {
         if (proxyNode && typeof proxyNode[this.proxyProperty] !== "undefined")
             return proxyNode[this.proxyProperty].parent;
@@ -212,16 +217,24 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.isSaving = function (pathChunks, proxyNode) {
         var parent = this.getParent(pathChunks, proxyNode);
         if (parent) {
-            if (parent[this.proxyProperty].saving)
+            if (parent[this.proxyProperty].saving.includes(pathChunks[pathChunks.length - 1]))
                 return true;
             return this.isSaving(parent[this.proxyProperty].pathChunks, parent);
         }
         return false;
     };
-    DeepState.prototype.setSaving = function (pathChunks, proxyNode, saving) {
+    DeepState.prototype.addSaving = function (pathChunks, proxyNode) {
         var parent = this.getParent(pathChunks, proxyNode);
+        var changedProp = pathChunks[pathChunks.length - 1];
         if (parent)
-            parent[this.proxyProperty].saving = saving;
+            parent[this.proxyProperty].saving.push(changedProp);
+    };
+    DeepState.prototype.removeSaving = function (pathChunks, proxyNode) {
+        var parent = this.getParent(pathChunks, proxyNode);
+        if (parent) {
+            var changedProp_1 = pathChunks[pathChunks.length - 1];
+            parent[this.proxyProperty].saving = parent[this.proxyProperty].saving.filter(function (current) { return current !== changedProp_1; });
+        }
     };
     DeepState.prototype.setProxy = function (target, data) {
         if (typeof target[this.proxyProperty] === "undefined") {
@@ -256,7 +269,7 @@ var DeepState = /** @class */ (function () {
                     }
                 }
             }
-            target = this.setProxy(target, { path: path, pathChunks: this.split(path), saving: false, parent: parent });
+            target = this.setProxy(target, { path: path, pathChunks: this.split(path), saving: [], parent: parent });
         }
         return target;
     };
@@ -1243,7 +1256,7 @@ var DeepState = /** @class */ (function () {
         for (var path in scanned) {
             var split = this.split(path);
             var parent_1 = this.getParent(split, scanned[path]);
-            this.setSaving(split, scanned[path], true);
+            this.addSaving(split, scanned[path]);
             var _a = this.getUpdateValues(scanned[path], split, fn, parent_1), oldValue = _a.oldValue, newValue = _a.newValue;
             if (!this.same(newValue, oldValue) || options.force) {
                 this.pathSet(split, newValue, this.data);
@@ -1270,14 +1283,14 @@ var DeepState = /** @class */ (function () {
                 var queue = self_1.wildcardNotify(groupedListenersPack);
                 self_1.sortAndRunQueue(queue, updatePath);
                 for (var path in scanned) {
-                    self_1.setSaving(self_1.split(path), scanned[path], false);
+                    self_1.removeSaving(self_1.split(path), scanned[path]);
                 }
             };
         }
         var queue = this.wildcardNotify(groupedListenersPack);
         this.sortAndRunQueue(queue, updatePath);
         for (var path in scanned) {
-            this.setSaving(this.split(path), scanned[path], false);
+            this.removeSaving(this.split(path), scanned[path]);
         }
     };
     DeepState.prototype.updateNotify = function (updatePath, newValue, options) {
@@ -1342,7 +1355,8 @@ var DeepState = /** @class */ (function () {
         }
         var split = this.split(updatePath);
         var currentValue = this.pathGet(split, this.data);
-        this.setSaving(split, currentValue, true);
+        var currentlySaving = this.isSaving(split, currentValue);
+        this.addSaving(split, currentValue);
         var parent = this.getParent(split, currentValue);
         var _a = this.getUpdateValues(currentValue, split, fnOrValue, parent), oldValue = _a.oldValue, newValue = _a.newValue;
         if (options.debug) {
@@ -1359,11 +1373,15 @@ var DeepState = /** @class */ (function () {
             return newValue;
         }
         this.pathSet(split, newValue, this.data);
+        // if we are saving a parent node - do not notify about changes
+        if (currentlySaving && !options.force) {
+            return this.removeSaving(split, newValue);
+        }
         options = __assign(__assign({}, defaultUpdateOptions), options);
         if (options.only === null) {
             if (multi)
                 return function () { };
-            this.setSaving(split, newValue, false);
+            this.removeSaving(split, newValue);
             return newValue;
         }
         if (options.only.length) {
@@ -1371,24 +1389,24 @@ var DeepState = /** @class */ (function () {
                 var self_2 = this;
                 return function () {
                     var result = self_2.updateNotifyOnly(updatePath, newValue, options);
-                    self_2.setSaving(split, newValue, false);
+                    self_2.removeSaving(split, newValue);
                     return result;
                 };
             }
             this.updateNotifyOnly(updatePath, newValue, options);
-            this.setSaving(split, newValue, false);
+            this.removeSaving(split, newValue);
             return newValue;
         }
         if (multi) {
             var self_3 = this;
             return function multiUpdate() {
                 var result = self_3.updateNotify(updatePath, newValue, options);
-                self_3.setSaving(split, newValue, false);
+                self_3.removeSaving(split, newValue);
                 return result;
             };
         }
         this.updateNotify(updatePath, newValue, options);
-        this.setSaving(split, newValue, false);
+        this.removeSaving(split, newValue);
         return newValue;
     };
     DeepState.prototype.multi = function (grouped) {
@@ -1415,7 +1433,7 @@ var DeepState = /** @class */ (function () {
                     var split = self.split(updatePath);
                     var value = fnOrValue;
                     var currentValue = self.pathGet(split, self.data);
-                    self.setSaving(split, currentValue, true);
+                    self.addSaving(split, currentValue);
                     if (typeof value === "function") {
                         value = value(currentValue);
                     }
@@ -1424,7 +1442,7 @@ var DeepState = /** @class */ (function () {
                         value = self.makeObservable(value, updatePath, parent_2);
                     }
                     self.pathSet(split, value, self.data);
-                    self.setSaving(split, currentValue, false);
+                    self.removeSaving(split, currentValue);
                     updateStack.push({ updatePath: updatePath, newValue: value, options: options });
                 }
                 else {

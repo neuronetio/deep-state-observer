@@ -178,4 +178,75 @@ describe("Proxy", () => {
     expect(state.data.x.y.z).toEqual(20);
     expect(state.proxy.x.y.z).toEqual(20);
   });
+
+  it("should notify neighbor", () => {
+    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } });
+    const values = [];
+    state.subscribe("root.left.l", (val) => {
+      values.push(val);
+    });
+
+    state.subscribe("root.right.r", (val) => {
+      values.push(val);
+    });
+
+    expect(values[0]).toEqual("l");
+    expect(values[1]).toEqual("r");
+
+    state.update("root.left", (left) => {
+      //console.log(state.getParent(["root", "right"], state.get("root.right"))[state.proxyProperty]);
+      state.update("root.right.r", (r) => {
+        //console.log(state.getParent(["root", "right"], state.get("root.right"))[state.proxyProperty]);
+        return "rr";
+      });
+      return { l: "ll" };
+    });
+    expect(values[2]).toEqual("rr");
+    expect(values[3]).toEqual("ll");
+  });
+
+  it("should not notify child nodes", () => {
+    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } });
+    const values = [];
+    state.subscribe("root", (val) => {
+      values.push("x");
+    });
+
+    expect(values[0]).toEqual("x");
+
+    state.update("root", (root) => {
+      root.left.l = "ll";
+      expect(state.isSaving(["root", "right", "r"], root.right.r)).toEqual(true);
+      state.update("root.right.r", (r) => {
+        //console.log(root[state.proxyProperty].parent[state.proxyProperty]);
+        expect(state.isSaving(["root", "right", "r"], root.right.r)).toEqual(true);
+        return "rr";
+      });
+      return "root";
+    });
+    expect(values.length).toEqual(2);
+  });
+
+  it("should not notify child nodes (by proxy)", () => {
+    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } });
+    const values = [];
+    state.subscribe("root", (val) => {
+      values.push("x");
+    });
+
+    expect(values[0]).toEqual("x");
+
+    state.proxy.root = (root) => {
+      //console.log(root);
+      root.left.l = "ll";
+      expect(state.isSaving(["root", "right", "r"], root.right.r)).toEqual(true);
+      state.proxy.root.right.r = (r) => {
+        //console.log(root[state.proxyProperty].parent[state.proxyProperty]);
+        expect(state.isSaving(["root", "right", "r"], root.right.r)).toEqual(true);
+        return "rr";
+      };
+      return "root";
+    };
+    expect(values.length).toEqual(2);
+  });
 });
