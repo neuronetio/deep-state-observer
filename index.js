@@ -84,6 +84,7 @@ var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
 };
 exports.__esModule = true;
 var wildcard_object_scan_1 = require("./wildcard-object-scan");
+var ObjectPath_1 = require("./ObjectPath");
 var wildcard_matcher_js_1 = require("./wildcard_matcher.js");
 var defaultUpdateOptions = {
     only: [],
@@ -114,6 +115,8 @@ function getDefaultOptions() {
         param: ":",
         wildcard: "*",
         experimentalMatch: false,
+        useObjectMaps: true,
+        useProxy: true,
         maxSimultaneousJobs: 1000,
         maxQueueRuns: 1000,
         log: log,
@@ -154,32 +157,37 @@ var DeepState = /** @class */ (function () {
             }
         };
         this.handler = {
-            set: function (parent, prop, value, proxy) {
+            set: function (obj, prop, value, proxy) {
                 if (prop === _this.proxyProperty)
                     return true;
-                if (prop in parent && parent[prop] === value)
+                if (prop in obj && (_this.same(obj[prop], value) || (_this.isProxy(value) && obj[prop] === value)))
                     return true;
-                if (!parent[_this.proxyProperty].saving.includes(prop)) {
-                    var path = parent[_this.proxyProperty].path
-                        ? parent[_this.proxyProperty].path + _this.options.delimiter + prop
-                        : prop;
-                    if (!_this.isSaving(parent[_this.proxyProperty].pathChunks, parent)) {
-                        _this.update(path, value);
+                if (!obj[_this.proxyProperty].saving.includes(prop)) {
+                    // we are not fired this from update
+                    // change from proxy
+                    var path = obj[_this.proxyProperty].path ? obj[_this.proxyProperty].path + _this.options.delimiter + prop : prop;
+                    // check if any parent property is currently saving this node - if yes we are not going to notify
+                    if (!_this.isSaving(obj[_this.proxyProperty].pathChunks, obj)) {
+                        _this.update(path, value); // fire update to notify listeners and set isSaving
                     }
                     else {
                         // if parent node is saving current node and in meanwhile someone updates nodes below - just update it - do not notify
+                        // we are not generating new map because update fn will do it for us on final object
+                        var currentValue = _this.pathGet(path);
                         if (typeof value === "function") {
-                            var currentValue = _this.pathGet(path);
                             value = value(currentValue);
                         }
+                        if ((_this.isProxy(value) && value === currentValue) || _this.same(value, currentValue))
+                            return true;
                         if (isObject(value) || Array.isArray(value)) {
-                            value = _this.makeObservable(value, path, parent);
+                            value = _this.makeObservable(value, path, obj);
                         }
-                        parent[prop] = value;
+                        obj[prop] = value;
                     }
                 }
                 else {
-                    parent[prop] = value;
+                    // change from update
+                    obj[prop] = value;
                 }
                 return true;
             }
@@ -189,12 +197,34 @@ var DeepState = /** @class */ (function () {
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
         this.options = __assign(__assign({}, getDefaultOptions()), options);
-        this.data = this.updateMapDown("", data, this.rootProxyNode, false);
-        this.proxy = this.data;
-        this.$$$ = this.proxy;
+        if (this.options.useProxy) {
+            if (this.options.useObjectMaps) {
+                this.data = this.updateMapDown("", data, this.rootProxyNode, false);
+            }
+            else {
+                this.data = this.makeObservable(this.data, "", this.rootProxyNode);
+            }
+            this.proxy = this.data;
+            this.$$$ = this.proxy;
+        }
+        else {
+            this.data = data;
+            this.isSaving = function () { return true; };
+            this.addSaving = function () { return true; };
+            this.setNodeSaving = function () { return true; };
+            this.unsetNodeSaving = function () { return true; };
+            this.removeSaving = function () { return true; };
+            this.getParent = function () { return null; };
+        }
         this.id = 0;
-        // this.pathGet = Path.get;
-        // this.pathSet = Path.set;
+        if (!this.options.useObjectMaps) {
+            this.pathGet = function (path) {
+                return ObjectPath_1["default"].get(_this.split(path), _this.data);
+            };
+            this.pathSet = function (pathChunks, value) {
+                return ObjectPath_1["default"].set(pathChunks, value, _this.data);
+            };
+        }
         if (options.Promise) {
             this.resolved = options.Promise.resolve();
         }
@@ -203,18 +233,24 @@ var DeepState = /** @class */ (function () {
         }
         this.muted = new Set();
         this.mutedListeners = new Set();
-        this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard);
+        if (this.options.useObjectMaps) {
+            this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard, this.map);
+        }
+        else {
+            this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard);
+        }
         this.destroyed = false;
     }
-    DeepState.prototype.updateMapDown = function (fullPath, value, parent, deleteReferences) {
+    DeepState.prototype.updateMapDown = function (fullPath, value, parent, deleteReferences, map) {
         var e_1, _a;
         if (deleteReferences === void 0) { deleteReferences = true; }
+        if (map === void 0) { map = this.map; }
         if (deleteReferences) {
             try {
-                for (var _b = __values(this.map.keys()), _c = _b.next(); !_c.done; _c = _b.next()) {
+                for (var _b = __values(map.keys()), _c = _b.next(); !_c.done; _c = _b.next()) {
                     var key = _c.value;
                     if (key.startsWith(fullPath))
-                        this.map["delete"](key);
+                        map["delete"](key);
                 }
             }
             catch (e_1_1) { e_1 = { error: e_1_1 }; }
@@ -228,16 +264,16 @@ var DeepState = /** @class */ (function () {
         if (isObject(value)) {
             value = this.makeObservable(value, fullPath, parent);
             for (var prop in value) {
-                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + prop : prop, value[prop], value);
+                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + prop : prop, value[prop], value, false, map);
             }
         }
         else if (Array.isArray(value)) {
             value = this.makeObservable(value, fullPath, parent);
             for (var i = 0, len = value.length; i < len; i++) {
-                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + String(i) : String(i), value[i], value);
+                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + String(i) : String(i), value[i], value, false, map);
             }
         }
-        this.map.set(fullPath, value);
+        map.set(fullPath, value);
         return value;
     };
     DeepState.prototype.deleteMapReferences = function (path) {
@@ -281,7 +317,7 @@ var DeepState = /** @class */ (function () {
                 continue;
             }
             // property doesn't exists
-            obj[prop] = this.makeObservable({}, currentPath, obj);
+            obj[prop] = this.makeObservable(Object.create(null), currentPath, obj);
             this.setNodeSaving(obj[prop], pathChunks[i + 1]); // do not notify anything now
             removeSavings.push([obj[prop], pathChunks[i + 1]]);
             if (!referencesDeleted) {
@@ -298,8 +334,8 @@ var DeepState = /** @class */ (function () {
             currentPath = last;
         }
         // update down if needed
-        value = this.updateMapDown(currentPath, value, obj, !referencesDeleted);
         this.setNodeSaving(obj, last);
+        value = this.updateMapDown(currentPath, value, obj, !referencesDeleted);
         obj[last] = value;
         this.unsetNodeSaving(obj, last);
         try {
@@ -335,10 +371,26 @@ var DeepState = /** @class */ (function () {
         return false;
     };
     DeepState.prototype.setNodeSaving = function (proxyNode, prop) {
-        proxyNode[this.proxyProperty].saving.push(prop);
+        proxyNode[this.proxyProperty].saving.push(String(prop));
     };
     DeepState.prototype.unsetNodeSaving = function (proxyNode, prop) {
-        proxyNode[this.proxyProperty].saving = proxyNode[this.proxyProperty].saving.filter(function (current) { return current !== prop; });
+        var e_4, _a;
+        var saving = [];
+        try {
+            for (var _b = __values(proxyNode[this.proxyProperty].saving), _c = _b.next(); !_c.done; _c = _b.next()) {
+                var currentProp = _c.value;
+                if (currentProp !== prop)
+                    saving.push(currentProp);
+            }
+        }
+        catch (e_4_1) { e_4 = { error: e_4_1 }; }
+        finally {
+            try {
+                if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
+            }
+            finally { if (e_4) throw e_4.error; }
+        }
+        proxyNode[this.proxyProperty].saving = saving;
     };
     DeepState.prototype.addSaving = function (pathChunks, proxyNode) {
         var parent = this.getParent(pathChunks, proxyNode);
@@ -357,6 +409,8 @@ var DeepState = /** @class */ (function () {
         if (typeof target[this.proxyProperty] === "undefined") {
             Object.defineProperty(target, this.proxyProperty, {
                 enumerable: false,
+                writable: false,
+                configurable: false,
                 value: data
             });
             return new Proxy(target, this.handler);
@@ -368,25 +422,48 @@ var DeepState = /** @class */ (function () {
         }
         return target;
     };
+    DeepState.prototype.isProxy = function (target) {
+        return typeof target[this.proxyProperty] !== "undefined";
+    };
     DeepState.prototype.makeObservable = function (target, path, parent) {
         if (isObject(target) || Array.isArray(target)) {
+            if (typeof target[this.proxyProperty] !== "undefined") {
+                var pp = target[this.proxyProperty];
+                if (pp.path === path && pp.parent === parent)
+                    return target;
+            }
             if (isObject(target)) {
                 for (var key in target) {
                     if (key === this.proxyProperty)
                         continue;
-                    if (isObject(target[key]) || Array.isArray(target[key])) {
+                    if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
+                        if (this.isProxy(target))
+                            this.setNodeSaving(target, key);
                         target[key] = this.makeObservable(target[key], "" + (path ? path + this.options.delimiter : "") + key, target);
+                        if (this.isProxy(target))
+                            this.unsetNodeSaving(target, key);
                     }
                 }
             }
             else {
                 for (var key = 0, len = target.length; key < len; key++) {
-                    if (isObject(target[key]) || Array.isArray(target[key])) {
+                    if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
+                        if (this.isProxy(target))
+                            this.setNodeSaving(target, String(key));
                         target[key] = this.makeObservable(target[key], "" + (path ? path + this.options.delimiter : "") + key, target);
+                        if (this.isProxy(target))
+                            this.unsetNodeSaving(target, String(key));
                     }
                 }
             }
-            target = this.setProxy(target, { path: path, pathChunks: this.split(path), saving: [], parent: parent });
+            if (!this.isProxy(target)) {
+                var proxyObj = Object.create(null);
+                proxyObj.path = path;
+                proxyObj.pathChunks = this.split(path);
+                proxyObj.saving = [];
+                proxyObj.parent = parent;
+                target = this.setProxy(target, proxyObj);
+            }
         }
         return target;
     };
@@ -398,7 +475,7 @@ var DeepState = /** @class */ (function () {
                     case 1:
                         _a.sent();
                         this.is_match = wildcard_matcher_js_1.is_match;
-                        this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard, this.is_match);
+                        this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard, this.options.useObjectMaps ? this.map : null, this.is_match);
                         return [2 /*return*/];
                 }
             });
@@ -487,7 +564,7 @@ var DeepState = /** @class */ (function () {
         return path.includes(this.options.param);
     };
     DeepState.prototype.getParamsInfo = function (path) {
-        var e_4, _a;
+        var e_5, _a;
         var paramsInfo = { replaced: "", original: path, params: {} };
         var partIndex = 0;
         var fullReplaced = [];
@@ -516,12 +593,12 @@ var DeepState = /** @class */ (function () {
                 partIndex++;
             }
         }
-        catch (e_4_1) { e_4 = { error: e_4_1 }; }
+        catch (e_5_1) { e_5 = { error: e_5_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_4) throw e_4.error; }
+            finally { if (e_5) throw e_5.error; }
         }
         paramsInfo.replaced = fullReplaced.join(this.options.delimiter);
         return paramsInfo;
@@ -539,7 +616,7 @@ var DeepState = /** @class */ (function () {
         return result;
     };
     DeepState.prototype.subscribeAll = function (userPaths, fn, options) {
-        var e_5, _a;
+        var e_6, _a;
         if (options === void 0) { options = defaultListenerOptions; }
         if (this.destroyed)
             return function () { };
@@ -560,27 +637,27 @@ var DeepState = /** @class */ (function () {
                 index++;
             }
         }
-        catch (e_5_1) { e_5 = { error: e_5_1 }; }
+        catch (e_6_1) { e_6 = { error: e_6_1 }; }
         finally {
             try {
                 if (userPaths_1_1 && !userPaths_1_1.done && (_a = userPaths_1["return"])) _a.call(userPaths_1);
             }
-            finally { if (e_5) throw e_5.error; }
+            finally { if (e_6) throw e_6.error; }
         }
         return function unsubscribe() {
-            var e_6, _a;
+            var e_7, _a;
             try {
                 for (var unsubscribers_1 = __values(unsubscribers), unsubscribers_1_1 = unsubscribers_1.next(); !unsubscribers_1_1.done; unsubscribers_1_1 = unsubscribers_1.next()) {
                     var unsubscribe_1 = unsubscribers_1_1.value;
                     unsubscribe_1();
                 }
             }
-            catch (e_6_1) { e_6 = { error: e_6_1 }; }
+            catch (e_7_1) { e_7 = { error: e_7_1 }; }
             finally {
                 try {
                     if (unsubscribers_1_1 && !unsubscribers_1_1.done && (_a = unsubscribers_1["return"])) _a.call(unsubscribers_1);
                 }
-                finally { if (e_6) throw e_6.error; }
+                finally { if (e_7) throw e_7.error; }
             }
         };
     };
@@ -763,7 +840,7 @@ var DeepState = /** @class */ (function () {
         this.subscribeQueue.length = 0;
     };
     DeepState.prototype.getQueueNotifyListeners = function (groupedListeners, queue) {
-        var e_7, _a, e_8, _b;
+        var e_8, _a, e_9, _b;
         var _this = this;
         if (queue === void 0) { queue = []; }
         for (var path in groupedListeners) {
@@ -771,14 +848,14 @@ var DeepState = /** @class */ (function () {
                 continue;
             var _c = groupedListeners[path], single = _c.single, bulk = _c.bulk;
             var _loop_1 = function (singleListener) {
-                var e_9, _d;
+                var e_10, _d;
                 var alreadyInQueue = false;
                 var resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
                 if (!singleListener.eventInfo.path.resolved) {
                     resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
                 }
                 try {
-                    for (var queue_1 = (e_9 = void 0, __values(queue)), queue_1_1 = queue_1.next(); !queue_1_1.done; queue_1_1 = queue_1.next()) {
+                    for (var queue_1 = (e_10 = void 0, __values(queue)), queue_1_1 = queue_1.next(); !queue_1_1.done; queue_1_1 = queue_1.next()) {
                         var excludedListener = queue_1_1.value;
                         if (resolvedIdPath === excludedListener.resolvedIdPath) {
                             alreadyInQueue = true;
@@ -786,12 +863,12 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_9_1) { e_9 = { error: e_9_1 }; }
+                catch (e_10_1) { e_10 = { error: e_10_1 }; }
                 finally {
                     try {
                         if (queue_1_1 && !queue_1_1.done && (_d = queue_1["return"])) _d.call(queue_1);
                     }
-                    finally { if (e_9) throw e_9.error; }
+                    finally { if (e_10) throw e_10.error; }
                 }
                 if (alreadyInQueue) {
                     return "continue";
@@ -818,23 +895,23 @@ var DeepState = /** @class */ (function () {
             };
             var this_1 = this;
             try {
-                for (var single_1 = (e_7 = void 0, __values(single)), single_1_1 = single_1.next(); !single_1_1.done; single_1_1 = single_1.next()) {
+                for (var single_1 = (e_8 = void 0, __values(single)), single_1_1 = single_1.next(); !single_1_1.done; single_1_1 = single_1.next()) {
                     var singleListener = single_1_1.value;
                     _loop_1(singleListener);
                 }
             }
-            catch (e_7_1) { e_7 = { error: e_7_1 }; }
+            catch (e_8_1) { e_8 = { error: e_8_1 }; }
             finally {
                 try {
                     if (single_1_1 && !single_1_1.done && (_a = single_1["return"])) _a.call(single_1);
                 }
-                finally { if (e_7) throw e_7.error; }
+                finally { if (e_8) throw e_8.error; }
             }
             var _loop_2 = function (bulkListener) {
-                var e_10, _e, e_11, _f;
+                var e_11, _e, e_12, _f;
                 var alreadyInQueue = false;
                 try {
-                    for (var queue_2 = (e_10 = void 0, __values(queue)), queue_2_1 = queue_2.next(); !queue_2_1.done; queue_2_1 = queue_2.next()) {
+                    for (var queue_2 = (e_11 = void 0, __values(queue)), queue_2_1 = queue_2.next(); !queue_2_1.done; queue_2_1 = queue_2.next()) {
                         var excludedListener = queue_2_1.value;
                         if (excludedListener.id === bulkListener.listener.id) {
                             alreadyInQueue = true;
@@ -842,29 +919,29 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_10_1) { e_10 = { error: e_10_1 }; }
+                catch (e_11_1) { e_11 = { error: e_11_1 }; }
                 finally {
                     try {
                         if (queue_2_1 && !queue_2_1.done && (_e = queue_2["return"])) _e.call(queue_2);
                     }
-                    finally { if (e_10) throw e_10.error; }
+                    finally { if (e_11) throw e_11.error; }
                 }
                 if (alreadyInQueue)
                     return "continue";
                 var time = this_2.debugTime(bulkListener);
                 var bulkValue = [];
                 try {
-                    for (var _g = (e_11 = void 0, __values(bulkListener.value)), _h = _g.next(); !_h.done; _h = _g.next()) {
+                    for (var _g = (e_12 = void 0, __values(bulkListener.value)), _h = _g.next(); !_h.done; _h = _g.next()) {
                         var bulk_2 = _h.value;
                         bulkValue.push(__assign(__assign({}, bulk_2), { value: bulk_2.value() }));
                     }
                 }
-                catch (e_11_1) { e_11 = { error: e_11_1 }; }
+                catch (e_12_1) { e_12 = { error: e_12_1 }; }
                 finally {
                     try {
                         if (_h && !_h.done && (_f = _g["return"])) _f.call(_g);
                     }
-                    finally { if (e_11) throw e_11.error; }
+                    finally { if (e_12) throw e_12.error; }
                 }
                 if (!this_2.isMuted(bulkListener.listener.fn)) {
                     var resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
@@ -887,24 +964,24 @@ var DeepState = /** @class */ (function () {
             };
             var this_2 = this;
             try {
-                for (var bulk_1 = (e_8 = void 0, __values(bulk)), bulk_1_1 = bulk_1.next(); !bulk_1_1.done; bulk_1_1 = bulk_1.next()) {
+                for (var bulk_1 = (e_9 = void 0, __values(bulk)), bulk_1_1 = bulk_1.next(); !bulk_1_1.done; bulk_1_1 = bulk_1.next()) {
                     var bulkListener = bulk_1_1.value;
                     _loop_2(bulkListener);
                 }
             }
-            catch (e_8_1) { e_8 = { error: e_8_1 }; }
+            catch (e_9_1) { e_9 = { error: e_9_1 }; }
             finally {
                 try {
                     if (bulk_1_1 && !bulk_1_1.done && (_b = bulk_1["return"])) _b.call(bulk_1);
                 }
-                finally { if (e_8) throw e_8.error; }
+                finally { if (e_9) throw e_9.error; }
             }
         }
         Promise.resolve().then(function () { return _this.runQueuedListeners(); });
         return queue;
     };
     DeepState.prototype.shouldIgnore = function (listener, updatePath) {
-        var e_12, _a;
+        var e_13, _a;
         if (!listener.options.ignore)
             return false;
         try {
@@ -924,24 +1001,24 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_12_1) { e_12 = { error: e_12_1 }; }
+        catch (e_13_1) { e_13 = { error: e_13_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_12) throw e_12.error; }
+            finally { if (e_13) throw e_13.error; }
         }
         return false;
     };
     DeepState.prototype.getSubscribedListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_13, _a;
+        var e_14, _a;
         var _this = this;
         if (type === void 0) { type = "update"; }
         if (originalPath === void 0) { originalPath = null; }
         options = __assign(__assign({}, defaultUpdateOptions), options);
         var listeners = {};
         var _loop_3 = function (listenerPath, listenersCollection) {
-            var e_14, _e, e_15, _f;
+            var e_15, _e, e_16, _f;
             listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
             if (listenersCollection.match(updatePath)) {
                 var params = listenersCollection.paramsInfo
@@ -952,7 +1029,7 @@ var DeepState = /** @class */ (function () {
                 var value = traverse ? function () { return _this.get(cutPath_1); } : function () { return newValue; };
                 var bulkValue = [{ value: value, path: updatePath, params: params }];
                 try {
-                    for (var _g = (e_14 = void 0, __values(listenersCollection.listeners.values())), _h = _g.next(); !_h.done; _h = _g.next()) {
+                    for (var _g = (e_15 = void 0, __values(listenersCollection.listeners.values())), _h = _g.next(); !_h.done; _h = _g.next()) {
                         var listener = _h.value;
                         if (this_3.shouldIgnore(listener, updatePath)) {
                             if (listener.options.debug) {
@@ -1001,19 +1078,19 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_14_1) { e_14 = { error: e_14_1 }; }
+                catch (e_15_1) { e_15 = { error: e_15_1 }; }
                 finally {
                     try {
                         if (_h && !_h.done && (_e = _g["return"])) _e.call(_g);
                     }
-                    finally { if (e_14) throw e_14.error; }
+                    finally { if (e_15) throw e_15.error; }
                 }
             }
             else if (this_3.options.extraDebug) {
                 // debug
                 var showMatch = false;
                 try {
-                    for (var _j = (e_15 = void 0, __values(listenersCollection.listeners.values())), _k = _j.next(); !_k.done; _k = _j.next()) {
+                    for (var _j = (e_16 = void 0, __values(listenersCollection.listeners.values())), _k = _j.next(); !_k.done; _k = _j.next()) {
                         var listener = _k.value;
                         if (listener.options.debug) {
                             showMatch = true;
@@ -1025,12 +1102,12 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_15_1) { e_15 = { error: e_15_1 }; }
+                catch (e_16_1) { e_16 = { error: e_16_1 }; }
                 finally {
                     try {
                         if (_k && !_k.done && (_f = _j["return"])) _f.call(_j);
                     }
-                    finally { if (e_15) throw e_15.error; }
+                    finally { if (e_16) throw e_16.error; }
                 }
                 if (showMatch) {
                     listenersCollection.match(updatePath, true);
@@ -1044,12 +1121,12 @@ var DeepState = /** @class */ (function () {
                 _loop_3(listenerPath, listenersCollection);
             }
         }
-        catch (e_13_1) { e_13 = { error: e_13_1 }; }
+        catch (e_14_1) { e_14 = { error: e_14_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_13) throw e_13.error; }
+            finally { if (e_14) throw e_14.error; }
         }
         return listeners;
     };
@@ -1059,30 +1136,36 @@ var DeepState = /** @class */ (function () {
         return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
     };
     DeepState.prototype.getNestedListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_16, _a;
+        var e_17, _a;
         if (type === void 0) { type = "update"; }
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
+        var restBelowValues = {};
         var _loop_4 = function (listenerPath, listenersCollection) {
-            var e_17, _e;
+            var e_18, _e;
             if (!listenersCollection.isRecursive)
                 return "continue";
             listeners[listenerPath] = { single: [], bulk: [] };
-            var currentCutPath = this_4.cutPath(listenerPath, updatePath);
-            if (this_4.match(currentCutPath, updatePath)) {
-                var restPath = this_4.trimPath(listenerPath.substr(currentCutPath.length));
-                var wildcardNewValues_1 = new wildcard_object_scan_1["default"](newValue, this_4.options.delimiter, this_4.options.wildcard).get(restPath);
+            // listenerPath is longer and is shortened - because we want to get listeners underneath change
+            var currentAbovePathCut = this_4.cutPath(listenerPath, updatePath);
+            if (this_4.match(currentAbovePathCut, updatePath)) {
+                // listener is listening below updated node
+                var restBelowPathCut = this_4.trimPath(listenerPath.substr(currentAbovePathCut.length));
+                var wildcardNewValues_1 = restBelowValues[restBelowPathCut]
+                    ? restBelowValues[restBelowPathCut] // if those values are already calculated use it
+                    : new wildcard_object_scan_1["default"](newValue, this_4.options.delimiter, this_4.options.wildcard).get(restBelowPathCut);
+                restBelowValues[restBelowPathCut] = wildcardNewValues_1;
                 var params = listenersCollection.paramsInfo
                     ? this_4.getParams(listenersCollection.paramsInfo, updatePath)
                     : undefined;
                 var bulk = [];
                 var bulkListeners = {};
                 var _loop_5 = function (currentRestPath) {
-                    var e_18, _h;
+                    var e_19, _h;
                     var value = function () { return wildcardNewValues_1[currentRestPath]; };
                     var fullPath = [updatePath, currentRestPath].join(this_4.options.delimiter);
                     try {
-                        for (var _j = (e_18 = void 0, __values(listenersCollection.listeners)), _k = _j.next(); !_k.done; _k = _j.next()) {
+                        for (var _j = (e_19 = void 0, __values(listenersCollection.listeners)), _k = _j.next(); !_k.done; _k = _j.next()) {
                             var _l = __read(_k.value, 2), listenerId = _l[0], listener = _l[1];
                             var eventInfo = {
                                 type: type,
@@ -1112,12 +1195,12 @@ var DeepState = /** @class */ (function () {
                             }
                         }
                     }
-                    catch (e_18_1) { e_18 = { error: e_18_1 }; }
+                    catch (e_19_1) { e_19 = { error: e_19_1 }; }
                     finally {
                         try {
                             if (_k && !_k.done && (_h = _j["return"])) _h.call(_j);
                         }
-                        finally { if (e_18) throw e_18.error; }
+                        finally { if (e_19) throw e_19.error; }
                     }
                 };
                 for (var currentRestPath in wildcardNewValues_1) {
@@ -1148,24 +1231,24 @@ var DeepState = /** @class */ (function () {
             else if (this_4.options.extraDebug) {
                 try {
                     // debug
-                    for (var _f = (e_17 = void 0, __values(listenersCollection.listeners.values())), _g = _f.next(); !_g.done; _g = _f.next()) {
+                    for (var _f = (e_18 = void 0, __values(listenersCollection.listeners.values())), _g = _f.next(); !_g.done; _g = _f.next()) {
                         var listener = _g.value;
                         if (listener.options.debug) {
                             console.log("[getNestedListeners] Listener was not fired because there was no match.", {
                                 listener: listener,
                                 listenersCollection: listenersCollection,
-                                currentCutPath: currentCutPath,
+                                currentCutPath: currentAbovePathCut,
                                 updatePath: updatePath
                             });
                         }
                     }
                 }
-                catch (e_17_1) { e_17 = { error: e_17_1 }; }
+                catch (e_18_1) { e_18 = { error: e_18_1 }; }
                 finally {
                     try {
                         if (_g && !_g.done && (_e = _f["return"])) _e.call(_f);
                     }
-                    finally { if (e_17) throw e_17.error; }
+                    finally { if (e_18) throw e_18.error; }
                 }
             }
         };
@@ -1176,12 +1259,12 @@ var DeepState = /** @class */ (function () {
                 _loop_4(listenerPath, listenersCollection);
             }
         }
-        catch (e_16_1) { e_16 = { error: e_16_1 }; }
+        catch (e_17_1) { e_17 = { error: e_17_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_16) throw e_16.error; }
+            finally { if (e_17) throw e_17.error; }
         }
         return listeners;
     };
@@ -1191,7 +1274,7 @@ var DeepState = /** @class */ (function () {
         return this.getQueueNotifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), queue);
     };
     DeepState.prototype.getNotifyOnlyListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_19, _a;
+        var e_20, _a;
         if (type === void 0) { type = "update"; }
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
@@ -1205,10 +1288,10 @@ var DeepState = /** @class */ (function () {
             var wildcardScanNewValue = new wildcard_object_scan_1["default"](newValue, this_5.options.delimiter, this_5.options.wildcard).get(notifyPath);
             listeners[notifyPath] = { bulk: [], single: [] };
             var _loop_7 = function (wildcardPath) {
-                var e_20, _d, e_21, _e;
+                var e_21, _d, e_22, _e;
                 var fullPath = updatePath + this_5.options.delimiter + wildcardPath;
                 try {
-                    for (var _f = (e_20 = void 0, __values(this_5.listeners)), _g = _f.next(); !_g.done; _g = _f.next()) {
+                    for (var _f = (e_21 = void 0, __values(this_5.listeners)), _g = _f.next(); !_g.done; _g = _f.next()) {
                         var _h = __read(_g.value, 2), listenerPath = _h[0], listenersCollection = _h[1];
                         var params = listenersCollection.paramsInfo
                             ? this_5.getParams(listenersCollection.paramsInfo, fullPath)
@@ -1251,27 +1334,27 @@ var DeepState = /** @class */ (function () {
                                 }
                             };
                             try {
-                                for (var _j = (e_21 = void 0, __values(listenersCollection.listeners.values())), _k = _j.next(); !_k.done; _k = _j.next()) {
+                                for (var _j = (e_22 = void 0, __values(listenersCollection.listeners.values())), _k = _j.next(); !_k.done; _k = _j.next()) {
                                     var listener = _k.value;
                                     _loop_8(listener);
                                 }
                             }
-                            catch (e_21_1) { e_21 = { error: e_21_1 }; }
+                            catch (e_22_1) { e_22 = { error: e_22_1 }; }
                             finally {
                                 try {
                                     if (_k && !_k.done && (_e = _j["return"])) _e.call(_j);
                                 }
-                                finally { if (e_21) throw e_21.error; }
+                                finally { if (e_22) throw e_22.error; }
                             }
                         }
                     }
                 }
-                catch (e_20_1) { e_20 = { error: e_20_1 }; }
+                catch (e_21_1) { e_21 = { error: e_21_1 }; }
                 finally {
                     try {
                         if (_g && !_g.done && (_d = _f["return"])) _d.call(_f);
                     }
-                    finally { if (e_20) throw e_20.error; }
+                    finally { if (e_21) throw e_21.error; }
                 }
             };
             for (var wildcardPath in wildcardScanNewValue) {
@@ -1285,17 +1368,17 @@ var DeepState = /** @class */ (function () {
                 _loop_6(notifyPath);
             }
         }
-        catch (e_19_1) { e_19 = { error: e_19_1 }; }
+        catch (e_20_1) { e_20 = { error: e_20_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_19) throw e_19.error; }
+            finally { if (e_20) throw e_20.error; }
         }
         return listeners;
     };
     DeepState.prototype.runQueue = function (queue) {
-        var e_22, _a;
+        var e_23, _a;
         var firedGroups = [];
         try {
             for (var queue_3 = __values(queue), queue_3_1 = queue_3.next(); !queue_3_1.done; queue_3_1 = queue_3.next()) {
@@ -1311,12 +1394,12 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_22_1) { e_22 = { error: e_22_1 }; }
+        catch (e_23_1) { e_23 = { error: e_23_1 }; }
         finally {
             try {
                 if (queue_3_1 && !queue_3_1.done && (_a = queue_3["return"])) _a.call(queue_3);
             }
-            finally { if (e_22) throw e_22.error; }
+            finally { if (e_23) throw e_23.error; }
         }
     };
     DeepState.prototype.sortAndRunQueue = function (queue, path) {
@@ -1342,12 +1425,14 @@ var DeepState = /** @class */ (function () {
         if (typeof fn === "function") {
             newValue = fn(oldValue);
         }
-        if (isObject(newValue) || Array.isArray(newValue))
-            newValue = this.makeObservable(newValue, split.join(this.options.delimiter), parent);
+        if (this.options.useProxy) {
+            if (isObject(newValue) || Array.isArray(newValue))
+                newValue = this.makeObservable(newValue, split.join(this.options.delimiter), parent);
+        }
         return { newValue: newValue, oldValue: oldValue };
     };
     DeepState.prototype.wildcardNotify = function (groupedListenersPack) {
-        var e_23, _a;
+        var e_24, _a;
         var queue = [];
         try {
             for (var groupedListenersPack_1 = __values(groupedListenersPack), groupedListenersPack_1_1 = groupedListenersPack_1.next(); !groupedListenersPack_1_1.done; groupedListenersPack_1_1 = groupedListenersPack_1.next()) {
@@ -1355,12 +1440,12 @@ var DeepState = /** @class */ (function () {
                 this.getQueueNotifyListeners(groupedListeners, queue);
             }
         }
-        catch (e_23_1) { e_23 = { error: e_23_1 }; }
+        catch (e_24_1) { e_24 = { error: e_24_1 }; }
         finally {
             try {
                 if (groupedListenersPack_1_1 && !groupedListenersPack_1_1.done && (_a = groupedListenersPack_1["return"])) _a.call(groupedListenersPack_1);
             }
-            finally { if (e_23) throw e_23.error; }
+            finally { if (e_24) throw e_24.error; }
         }
         return queue;
     };
@@ -1418,7 +1503,7 @@ var DeepState = /** @class */ (function () {
         this.sortAndRunQueue(queue, updatePath);
     };
     DeepState.prototype.updateNotifyAll = function (updateStack) {
-        var e_24, _a;
+        var e_25, _a;
         var queue = [];
         try {
             for (var updateStack_1 = __values(updateStack), updateStack_1_1 = updateStack_1.next(); !updateStack_1_1.done; updateStack_1_1 = updateStack_1.next()) {
@@ -1441,12 +1526,12 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_24_1) { e_24 = { error: e_24_1 }; }
+        catch (e_25_1) { e_25 = { error: e_25_1 }; }
         finally {
             try {
                 if (updateStack_1_1 && !updateStack_1_1.done && (_a = updateStack_1["return"])) _a.call(updateStack_1);
             }
-            finally { if (e_24) throw e_24.error; }
+            finally { if (e_25) throw e_25.error; }
         }
         this.runQueue(queue);
     };
@@ -1557,9 +1642,11 @@ var DeepState = /** @class */ (function () {
                     if (typeof value === "function") {
                         value = value(currentValue);
                     }
-                    if (isObject(value) || Array.isArray(value)) {
-                        var parent_2 = self.getParent(split, currentValue);
-                        value = self.makeObservable(value, updatePath, parent_2);
+                    if (self.options.useProxy) {
+                        if (isObject(value) || Array.isArray(value)) {
+                            var parent_2 = self.getParent(split, currentValue);
+                            value = self.makeObservable(value, updatePath, parent_2);
+                        }
                     }
                     self.pathSet(split, value);
                     self.removeSaving(split, currentValue);
@@ -1571,7 +1658,7 @@ var DeepState = /** @class */ (function () {
                 return this;
             },
             done: function () {
-                var e_25, _a;
+                var e_26, _a;
                 if (self.collections !== 0) {
                     return;
                 }
@@ -1585,12 +1672,12 @@ var DeepState = /** @class */ (function () {
                             current();
                         }
                     }
-                    catch (e_25_1) { e_25 = { error: e_25_1 }; }
+                    catch (e_26_1) { e_26 = { error: e_26_1 }; }
                     finally {
                         try {
                             if (notifiers_1_1 && !notifiers_1_1.done && (_a = notifiers_1["return"])) _a.call(notifiers_1);
                         }
-                        finally { if (e_25) throw e_25.error; }
+                        finally { if (e_26) throw e_26.error; }
                     }
                 }
                 updateStack.length = 0;
@@ -1648,7 +1735,7 @@ var DeepState = /** @class */ (function () {
         });
     };
     DeepState.prototype.isMuted = function (pathOrListenerFunction) {
-        var e_26, _a;
+        var e_27, _a;
         if (!this.options.useMute)
             return false;
         if (typeof pathOrListenerFunction === "function") {
@@ -1672,12 +1759,12 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_26_1) { e_26 = { error: e_26_1 }; }
+        catch (e_27_1) { e_27 = { error: e_27_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_26) throw e_26.error; }
+            finally { if (e_27) throw e_27.error; }
         }
         return false;
     };

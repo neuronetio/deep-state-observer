@@ -20,6 +20,8 @@ export interface Options {
     param?: string;
     wildcard?: string;
     experimentalMatch?: boolean;
+    useObjectMaps?: boolean;
+    useProxy?: boolean;
     maxSimultaneousJobs?: number;
     maxQueueRuns?: number;
     log?: (message: string, info: any) => void;
@@ -201,6 +203,7 @@ declare class DeepState<T> {
     private addSaving;
     private removeSaving;
     private setProxy;
+    private isProxy;
     private makeObservable;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;

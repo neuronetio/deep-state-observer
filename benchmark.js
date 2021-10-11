@@ -1,7 +1,7 @@
-const State = require('./index.cjs.js');
+const State = require("./index.cjs.js");
 
-let dataItemsCount = 50000;
-let iterations = 1;
+let dataItemsCount = 1000; //50000;
+let iterations = 1000;
 
 if (process.argv.length > 2) {
   dataItemsCount = parseInt(process.argv[2]);
@@ -23,15 +23,16 @@ function prepareData() {
   for (let i = 0; i < dataItemsCount; i++) {
     data.nested.values.basic.data[i] = {
       id: i,
-      value: i + ' test',
+      value: i + " test",
     };
   }
   return data;
 }
 
-const state = new State(prepareData());
+const data = prepareData();
+const state = new State(data, { useObjectMap: false, useProxy: false });
 
-console.log('Data generated.');
+console.log("Data generated.", Object.keys(data.nested.values.basic.data).length);
 
 const times = {
   basic: {
@@ -42,13 +43,10 @@ const times = {
 };
 
 let t1 = Date.now();
-const basic = state.subscribe('nested.*.basic.data.*.value', (value) => {});
+const basic = state.subscribe("nested.values.basic.data.*.value", (value) => {});
 for (let i = 0; i < iterations; i++) {
   const time = { start: Date.now() };
-  state.update(
-    `nested.*.basic.data.${Math.round(Math.random() * dataItemsCount)}.value`,
-    () => i + ' mod'
-  );
+  state.update(`nested.values.basic.data.${Math.round(Math.random() * dataItemsCount)}.value`, () => i + " mod");
   time.end = Date.now();
   time.result = time.end - time.start;
   times.basic.update.push(time);
@@ -69,21 +67,18 @@ console.log(`basic.update average result: ${result}`);
 
 // ---------------------------
 t1 = Date.now();
-const large = state.subscribe(
-  'nested.values.basic.data.*.value',
-  (value) => {}
-);
+const large = state.subscribe("nested.*.basic.data.*.value", (value) => {} /*, { bulk: true }*/);
 for (let i = 0; i < iterations; i++) {
   const time = { start: Date.now() };
   state.update(
     `nested.values.basic.data`,
     (data) => {
       for (const key in data) {
-        data[key].value = 'mod';
+        data[key].value = "mod";
       }
       return data;
-    },
-    { only: ['value'] }
+    } /*,
+    { only: ["value"] }*/
   );
   time.end = Date.now();
   time.result = time.end - time.start;
@@ -103,14 +98,9 @@ console.log(`basic.large average result: ${result}`);
 const subscribers = [];
 t1 = Date.now();
 for (let i = 0; i < iterations; i++) {
-  subscribers.push(
-    state.subscribe('nested.*.basic.data.*.value', (value) => {})
-  );
+  subscribers.push(state.subscribe("nested.*.basic.data.*.value", (value) => {}));
   const time = { start: Date.now() };
-  state.update(
-    `nested.*.basic.data.${Math.round(Math.random() * dataItemsCount)}.value`,
-    () => i + ' mod'
-  );
+  state.update(`nested.*.basic.data.${Math.round(Math.random() * dataItemsCount)}.value`, () => i + " mod");
   time.end = Date.now();
   time.result = time.end - time.start;
   times.basic.subscribe.push(time);

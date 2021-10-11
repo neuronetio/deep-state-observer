@@ -1,8 +1,10 @@
 const State = require("../index.cjs.js");
 
+const options = { useProxy: true, useObjectMap: true };
+
 describe("Proxy", () => {
   it("should get value by proxy", () => {
-    const state = new State({ x: { y: { z: 10 } } });
+    const state = new State({ x: { y: { z: 10 } } }, options);
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
@@ -19,7 +21,7 @@ describe("Proxy", () => {
   });
 
   it("should get value by proxy inside function", () => {
-    const state = new State({ x: { y: { z: 10 } } });
+    const state = new State({ x: { y: { z: 10 } } }, options);
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
@@ -38,7 +40,7 @@ describe("Proxy", () => {
   });
 
   it("should set object by proxy", () => {
-    const state = new State({ x: { y: { z: 10 } } });
+    const state = new State({ x: { y: { z: 10 } } }, options);
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
@@ -55,7 +57,7 @@ describe("Proxy", () => {
   });
 
   it("should get value by proxy inside function", () => {
-    const state = new State({ x: { y: { z: 10 } } });
+    const state = new State({ x: { y: { z: 10 } } }, options);
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
@@ -74,7 +76,7 @@ describe("Proxy", () => {
   });
 
   it("should run collection with proxy", () => {
-    const state = new State({ x: { y: { z: 10 } } });
+    const state = new State({ x: { y: { z: 10 } } }, options);
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
@@ -97,7 +99,7 @@ describe("Proxy", () => {
   });
 
   it("should run collection with proxy function", () => {
-    const state = new State({ x: { y: { z: 10 } } });
+    const state = new State({ x: { y: { z: 10 } } }, options);
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
@@ -122,7 +124,7 @@ describe("Proxy", () => {
   });
 
   it("should update by update fn too", () => {
-    const state = new State({ x: { y: { z: 10 } } });
+    const state = new State({ x: { y: { z: 10 } } }, options);
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
@@ -148,7 +150,7 @@ describe("Proxy", () => {
   });
 
   it("should have proxyProperty data", () => {
-    const state = new State({ x: { y: { z: 10 } } });
+    const state = new State({ x: { y: { z: 10 } } }, options);
     //console.log(state.data);
     expect(state.data.x.y.z).toEqual(10);
     expect(state.proxy.x.y.z).toEqual(10);
@@ -180,7 +182,7 @@ describe("Proxy", () => {
   });
 
   it("should notify neighbor", () => {
-    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } });
+    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } }, options);
     const values = [];
     state.subscribe("root.left.l", (val) => {
       values.push(val);
@@ -206,7 +208,7 @@ describe("Proxy", () => {
   });
 
   it("should not notify child nodes", () => {
-    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } });
+    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } }, options);
     const values = [];
     state.subscribe("root", (val) => {
       values.push("x");
@@ -228,7 +230,7 @@ describe("Proxy", () => {
   });
 
   it("should not notify child nodes (by proxy)", () => {
-    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } });
+    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } }, options);
     const values = [];
     state.subscribe("root", (val) => {
       values.push("x");
@@ -251,7 +253,7 @@ describe("Proxy", () => {
   });
 
   it("should react to changes on objects from get fn", () => {
-    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } });
+    const state = new State({ root: { left: { l: "l" }, right: { r: "r" } } }, options);
     const values = [];
     state.subscribe("root.right.r", (r) => {
       values.push(r);
@@ -264,7 +266,7 @@ describe("Proxy", () => {
   });
 
   it("should notify children when parent proxy node is changed", () => {
-    const state = new State({ root: { left: { l: "l" } } });
+    const state = new State({ root: { left: { l: "l" } } }, options);
     const values = [];
     state.subscribe("root.left.l", (l) => {
       values.push(l);

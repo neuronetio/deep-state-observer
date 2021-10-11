@@ -3,10 +3,10 @@ export default class ObjectPath {
     if (!obj) return;
     let currObj = obj;
     for (const currentPath of path) {
-      if (currObj.hasOwnProperty(currentPath)) {
+      if (currentPath in currObj) {
         currObj = currObj[currentPath];
       } else if (create) {
-        currObj[currentPath] = {};
+        currObj[currentPath] = Object.create({});
         currObj = currObj[currentPath];
       } else {
         return;
@@ -26,7 +26,7 @@ export default class ObjectPath {
     const prePath = path.slice();
     const lastPath = prePath.pop();
     const get = ObjectPath.get(prePath, obj, true);
-    if (typeof get === 'object') {
+    if (typeof get === "object") {
       get[lastPath] = value;
     }
     return value;

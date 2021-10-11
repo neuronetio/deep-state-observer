@@ -23,11 +23,11 @@ var ObjectPath = /** @class */ (function () {
         try {
             for (var path_1 = __values(path), path_1_1 = path_1.next(); !path_1_1.done; path_1_1 = path_1.next()) {
                 var currentPath = path_1_1.value;
-                if (currObj.hasOwnProperty(currentPath)) {
+                if (currentPath in currObj) {
                     currObj = currObj[currentPath];
                 }
                 else if (create) {
-                    currObj[currentPath] = {};
+                    currObj[currentPath] = Object.create({});
                     currObj = currObj[currentPath];
                 }
                 else {
@@ -56,7 +56,7 @@ var ObjectPath = /** @class */ (function () {
         var prePath = path.slice();
         var lastPath = prePath.pop();
         var get = ObjectPath.get(prePath, obj, true);
-        if (typeof get === 'object') {
+        if (typeof get === "object") {
             get[lastPath] = value;
         }
         return value;

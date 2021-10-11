@@ -24,7 +24,7 @@ function __awaiter(thisArg, _arguments, P, generator) {
 }
 
 // forked from https://github.com/joonhocho/superwild
-function Match(pattern, match, wchar = '*') {
+function Match(pattern, match, wchar = "*") {
     if (pattern === wchar) {
         return true;
     }
@@ -95,98 +95,162 @@ function Match(pattern, match, wchar = '*') {
     return true;
 }
 
-function WildcardObject(obj, delimiter, wildcard, is_match = undefined) {
-    this.obj = obj;
-    this.delimiter = delimiter;
-    this.wildcard = wildcard;
-    this.is_match = is_match;
-}
-WildcardObject.prototype.simpleMatch = function simpleMatch(first, second) {
-    if (first === second)
-        return true;
-    if (first === this.wildcard)
-        return true;
-    if (this.is_match)
-        return this.is_match(first, second);
-    const index = first.indexOf(this.wildcard);
-    if (index > -1) {
-        const end = first.substr(index + 1);
-        if (index === 0 ||
-            second.substring(0, index) === first.substring(0, index)) {
-            const len = end.length;
-            if (len > 0) {
-                return second.substr(-len) === end;
-            }
+class WildcardObject {
+    constructor(obj, delimiter, wildcard, objectMap = null, is_match = undefined) {
+        this.objectMap = null;
+        this.obj = obj;
+        this.delimiter = delimiter;
+        this.wildcard = wildcard;
+        this.is_match = is_match;
+        this.objectMap = objectMap;
+    }
+    shortMatch(first, second) {
+        if (first === second)
             return true;
+        if (first === this.wildcard)
+            return true;
+        if (this.is_match)
+            return this.is_match(first, second);
+        const index = first.indexOf(this.wildcard);
+        if (index > -1) {
+            const end = first.substr(index + 1);
+            if (index === 0 || second.substring(0, index) === first.substring(0, index)) {
+                const len = end.length;
+                if (len > 0) {
+                    return second.substr(-len) === end;
+                }
+                return true;
+            }
         }
+        return false;
     }
-    return false;
-};
-WildcardObject.prototype.match = function match(first, second) {
-    if (this.is_match)
-        return this.is_match(first, second);
-    return (first === second ||
-        first === this.wildcard ||
-        second === this.wildcard ||
-        this.simpleMatch(first, second) ||
-        Match(first, second, this.wildcard));
-};
-WildcardObject.prototype.handleArray = function handleArray(wildcard, currentArr, partIndex, path, result = {}) {
-    let nextPartIndex = wildcard.indexOf(this.delimiter, partIndex);
-    let end = false;
-    if (nextPartIndex === -1) {
-        end = true;
-        nextPartIndex = wildcard.length;
+    match(first, second) {
+        if (this.is_match)
+            return this.is_match(first, second);
+        return (first === second ||
+            first === this.wildcard ||
+            second === this.wildcard ||
+            this.shortMatch(first, second) ||
+            Match(first, second, this.wildcard));
     }
-    const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
-    let index = 0;
-    for (const item of currentArr) {
-        const key = index.toString();
-        const currentPath = path === '' ? key : path + this.delimiter + index;
-        if (currentWildcardPath === this.wildcard ||
-            currentWildcardPath === key ||
-            this.simpleMatch(currentWildcardPath, key)) {
-            end
-                ? (result[currentPath] = item)
-                : this.goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
+    handleArray(wildcard, currentArr, partIndex, path, result = {}) {
+        let nextPartIndex = wildcard.indexOf(this.delimiter, partIndex);
+        let end = false;
+        if (nextPartIndex === -1) {
+            end = true;
+            nextPartIndex = wildcard.length;
         }
-        index++;
+        const currentWildcardPath = wildcard.substring(partIndex, nextPartIndex);
+        let index = 0;
+        for (const item of currentArr) {
+            const key = index.toString();
+            const currentPath = path === "" ? key : path + this.delimiter + index;
+            if (currentWildcardPath === this.wildcard ||
+                currentWildcardPath === key ||
+                this.shortMatch(currentWildcardPath, key)) {
+                end ? (result[currentPath] = item) : this.goFurther(wildcard, item, nextPartIndex + 1, currentPath, result);
+            }
+            index++;
+        }
+        return result;
     }
-    return result;
-};
-WildcardObject.prototype.handleObject = function handleObject(wildcardPath, currentObj, partIndex, path, result = {}) {
-    let nextPartIndex = wildcardPath.indexOf(this.delimiter, partIndex);
-    let end = false;
-    if (nextPartIndex === -1) {
-        end = true;
-        nextPartIndex = wildcardPath.length;
+    handleObject(wildcardPath, currentObj, partIndex, path, result = {}) {
+        let nextPartIndex = wildcardPath.indexOf(this.delimiter, partIndex);
+        let end = false;
+        if (nextPartIndex === -1) {
+            end = true;
+            nextPartIndex = wildcardPath.length;
+        }
+        const currentWildcardPath = wildcardPath.substring(partIndex, nextPartIndex);
+        for (let key in currentObj) {
+            key = key.toString();
+            const currentPath = path === "" ? key : path + this.delimiter + key;
+            if (currentWildcardPath === this.wildcard ||
+                currentWildcardPath === key ||
+                this.shortMatch(currentWildcardPath, key)) {
+                if (end) {
+                    result[currentPath] = currentObj[key];
+                }
+                else {
+                    this.goFurther(wildcardPath, currentObj[key], nextPartIndex + 1, currentPath, result);
+                }
+            }
+        }
+        return result;
     }
-    const currentWildcardPath = wildcardPath.substring(partIndex, nextPartIndex);
-    for (let key in currentObj) {
-        key = key.toString();
-        const currentPath = path === '' ? key : path + this.delimiter + key;
-        if (currentWildcardPath === this.wildcard ||
-            currentWildcardPath === key ||
-            this.simpleMatch(currentWildcardPath, key)) {
-            if (end) {
-                result[currentPath] = currentObj[key];
+    goFurther(path, currentObj, partIndex, currentPath, result = {}) {
+        if (Array.isArray(currentObj)) {
+            return this.handleArray(path, currentObj, partIndex, currentPath, result);
+        }
+        return this.handleObject(path, currentObj, partIndex, currentPath, result);
+    }
+    getIndicesCount(searchStr, str) {
+        const searchStrLen = searchStr.length;
+        if (searchStrLen == 0) {
+            return 0;
+        }
+        let startIndex = 0, index, indices = 0;
+        while ((index = str.indexOf(searchStr, startIndex)) > -1) {
+            indices++;
+            startIndex = index + searchStrLen;
+        }
+        return indices;
+    }
+    getFromMap(path) {
+        const result = {};
+        const pathDelimitersCount = this.getIndicesCount(this.delimiter, path);
+        for (const [key, value] of this.objectMap) {
+            if (this.getIndicesCount(this.delimiter, key) === pathDelimitersCount && this.match(path, key)) {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+    get(path) {
+        if (this.objectMap) {
+            return this.getFromMap(path);
+        }
+        return this.goFurther(path, this.obj, 0, "");
+    }
+}
+
+class ObjectPath {
+    static get(path, obj, create = false) {
+        if (!obj)
+            return;
+        let currObj = obj;
+        for (const currentPath of path) {
+            if (currentPath in currObj) {
+                currObj = currObj[currentPath];
+            }
+            else if (create) {
+                currObj[currentPath] = Object.create({});
+                currObj = currObj[currentPath];
             }
             else {
-                this.goFurther(wildcardPath, currentObj[key], nextPartIndex + 1, currentPath, result);
+                return;
             }
         }
+        return currObj;
     }
-    return result;
-};
-WildcardObject.prototype.goFurther = function goFurther(path, currentObj, partIndex, currentPath, result = {}) {
-    if (Array.isArray(currentObj)) {
-        return this.handleArray(path, currentObj, partIndex, currentPath, result);
+    static set(path, value, obj) {
+        if (!obj)
+            return;
+        if (path.length === 0) {
+            for (const key in value) {
+                obj[key] = value[key];
+            }
+            return;
+        }
+        const prePath = path.slice();
+        const lastPath = prePath.pop();
+        const get = ObjectPath.get(prePath, obj, true);
+        if (typeof get === "object") {
+            get[lastPath] = value;
+        }
+        return value;
     }
-    return this.handleObject(path, currentObj, partIndex, currentPath, result);
-};
-WildcardObject.prototype.get = function get(path) {
-    return this.goFurther(path, this.obj, 0, '');
-};
+}
 
 let wasm;
 
@@ -342,6 +406,8 @@ function getDefaultOptions() {
         param: `:`,
         wildcard: `*`,
         experimentalMatch: false,
+        useObjectMaps: true,
+        useProxy: true,
         maxSimultaneousJobs: 1000,
         maxQueueRuns: 1000,
         log,
@@ -379,32 +445,37 @@ class DeepState {
             },
         };
         this.handler = {
-            set: (parent, prop, value, proxy) => {
+            set: (obj, prop, value, proxy) => {
                 if (prop === this.proxyProperty)
                     return true;
-                if (prop in parent && parent[prop] === value)
+                if (prop in obj && (this.same(obj[prop], value) || (this.isProxy(value) && obj[prop] === value)))
                     return true;
-                if (!parent[this.proxyProperty].saving.includes(prop)) {
-                    const path = parent[this.proxyProperty].path
-                        ? parent[this.proxyProperty].path + this.options.delimiter + prop
-                        : prop;
-                    if (!this.isSaving(parent[this.proxyProperty].pathChunks, parent)) {
-                        this.update(path, value);
+                if (!obj[this.proxyProperty].saving.includes(prop)) {
+                    // we are not fired this from update
+                    // change from proxy
+                    const path = obj[this.proxyProperty].path ? obj[this.proxyProperty].path + this.options.delimiter + prop : prop;
+                    // check if any parent property is currently saving this node - if yes we are not going to notify
+                    if (!this.isSaving(obj[this.proxyProperty].pathChunks, obj)) {
+                        this.update(path, value); // fire update to notify listeners and set isSaving
                     }
                     else {
                         // if parent node is saving current node and in meanwhile someone updates nodes below - just update it - do not notify
+                        // we are not generating new map because update fn will do it for us on final object
+                        const currentValue = this.pathGet(path);
                         if (typeof value === "function") {
-                            const currentValue = this.pathGet(path);
                             value = value(currentValue);
                         }
+                        if ((this.isProxy(value) && value === currentValue) || this.same(value, currentValue))
+                            return true;
                         if (isObject(value) || Array.isArray(value)) {
-                            value = this.makeObservable(value, path, parent);
+                            value = this.makeObservable(value, path, obj);
                         }
-                        parent[prop] = value;
+                        obj[prop] = value;
                     }
                 }
                 else {
-                    parent[prop] = value;
+                    // change from update
+                    obj[prop] = value;
                 }
                 return true;
             },
@@ -414,12 +485,34 @@ class DeepState {
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
         this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
-        this.data = this.updateMapDown("", data, this.rootProxyNode, false);
-        this.proxy = this.data;
-        this.$$$ = this.proxy;
+        if (this.options.useProxy) {
+            if (this.options.useObjectMaps) {
+                this.data = this.updateMapDown("", data, this.rootProxyNode, false);
+            }
+            else {
+                this.data = this.makeObservable(this.data, "", this.rootProxyNode);
+            }
+            this.proxy = this.data;
+            this.$$$ = this.proxy;
+        }
+        else {
+            this.data = data;
+            this.isSaving = () => true;
+            this.addSaving = () => true;
+            this.setNodeSaving = () => true;
+            this.unsetNodeSaving = () => true;
+            this.removeSaving = () => true;
+            this.getParent = () => null;
+        }
         this.id = 0;
-        // this.pathGet = Path.get;
-        // this.pathSet = Path.set;
+        if (!this.options.useObjectMaps) {
+            this.pathGet = (path) => {
+                return ObjectPath.get(this.split(path), this.data);
+            };
+            this.pathSet = (pathChunks, value) => {
+                return ObjectPath.set(pathChunks, value, this.data);
+            };
+        }
         if (options.Promise) {
             this.resolved = options.Promise.resolve();
         }
@@ -428,29 +521,34 @@ class DeepState {
         }
         this.muted = new Set();
         this.mutedListeners = new Set();
-        this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
+        if (this.options.useObjectMaps) {
+            this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.map);
+        }
+        else {
+            this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
+        }
         this.destroyed = false;
     }
-    updateMapDown(fullPath, value, parent, deleteReferences = true) {
+    updateMapDown(fullPath, value, parent, deleteReferences = true, map = this.map) {
         if (deleteReferences) {
-            for (const key of this.map.keys()) {
+            for (const key of map.keys()) {
                 if (key.startsWith(fullPath))
-                    this.map.delete(key);
+                    map.delete(key);
             }
         }
         if (isObject(value)) {
             value = this.makeObservable(value, fullPath, parent);
             for (const prop in value) {
-                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + prop : prop, value[prop], value);
+                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + prop : prop, value[prop], value, false, map);
             }
         }
         else if (Array.isArray(value)) {
             value = this.makeObservable(value, fullPath, parent);
             for (let i = 0, len = value.length; i < len; i++) {
-                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + String(i) : String(i), value[i], value);
+                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + String(i) : String(i), value[i], value, false, map);
             }
         }
-        this.map.set(fullPath, value);
+        map.set(fullPath, value);
         return value;
     }
     deleteMapReferences(path) {
@@ -482,7 +580,7 @@ class DeepState {
                 continue;
             }
             // property doesn't exists
-            obj[prop] = this.makeObservable({}, currentPath, obj);
+            obj[prop] = this.makeObservable(Object.create(null), currentPath, obj);
             this.setNodeSaving(obj[prop], pathChunks[i + 1]); // do not notify anything now
             removeSavings.push([obj[prop], pathChunks[i + 1]]);
             if (!referencesDeleted) {
@@ -499,8 +597,8 @@ class DeepState {
             currentPath = last;
         }
         // update down if needed
-        value = this.updateMapDown(currentPath, value, obj, !referencesDeleted);
         this.setNodeSaving(obj, last);
+        value = this.updateMapDown(currentPath, value, obj, !referencesDeleted);
         obj[last] = value;
         this.unsetNodeSaving(obj, last);
         for (const [obj, prop] of removeSavings) {
@@ -526,10 +624,15 @@ class DeepState {
         return false;
     }
     setNodeSaving(proxyNode, prop) {
-        proxyNode[this.proxyProperty].saving.push(prop);
+        proxyNode[this.proxyProperty].saving.push(String(prop));
     }
     unsetNodeSaving(proxyNode, prop) {
-        proxyNode[this.proxyProperty].saving = proxyNode[this.proxyProperty].saving.filter((current) => current !== prop);
+        const saving = [];
+        for (const currentProp of proxyNode[this.proxyProperty].saving) {
+            if (currentProp !== prop)
+                saving.push(currentProp);
+        }
+        proxyNode[this.proxyProperty].saving = saving;
     }
     addSaving(pathChunks, proxyNode) {
         const parent = this.getParent(pathChunks, proxyNode);
@@ -548,6 +651,8 @@ class DeepState {
         if (typeof target[this.proxyProperty] === "undefined") {
             Object.defineProperty(target, this.proxyProperty, {
                 enumerable: false,
+                writable: false,
+                configurable: false,
                 value: data,
             });
             return new Proxy(target, this.handler);
@@ -559,25 +664,48 @@ class DeepState {
         }
         return target;
     }
+    isProxy(target) {
+        return typeof target[this.proxyProperty] !== "undefined";
+    }
     makeObservable(target, path, parent) {
         if (isObject(target) || Array.isArray(target)) {
+            if (typeof target[this.proxyProperty] !== "undefined") {
+                const pp = target[this.proxyProperty];
+                if (pp.path === path && pp.parent === parent)
+                    return target;
+            }
             if (isObject(target)) {
                 for (const key in target) {
                     if (key === this.proxyProperty)
                         continue;
-                    if (isObject(target[key]) || Array.isArray(target[key])) {
+                    if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
+                        if (this.isProxy(target))
+                            this.setNodeSaving(target, key);
                         target[key] = this.makeObservable(target[key], `${path ? path + this.options.delimiter : ""}${key}`, target);
+                        if (this.isProxy(target))
+                            this.unsetNodeSaving(target, key);
                     }
                 }
             }
             else {
                 for (let key = 0, len = target.length; key < len; key++) {
-                    if (isObject(target[key]) || Array.isArray(target[key])) {
+                    if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
+                        if (this.isProxy(target))
+                            this.setNodeSaving(target, String(key));
                         target[key] = this.makeObservable(target[key], `${path ? path + this.options.delimiter : ""}${key}`, target);
+                        if (this.isProxy(target))
+                            this.unsetNodeSaving(target, String(key));
                     }
                 }
             }
-            target = this.setProxy(target, { path, pathChunks: this.split(path), saving: [], parent });
+            if (!this.isProxy(target)) {
+                const proxyObj = Object.create(null);
+                proxyObj.path = path;
+                proxyObj.pathChunks = this.split(path);
+                proxyObj.saving = [];
+                proxyObj.parent = parent;
+                target = this.setProxy(target, proxyObj);
+            }
         }
         return target;
     }
@@ -585,7 +713,7 @@ class DeepState {
         return __awaiter(this, void 0, void 0, function* () {
             yield init(pathToWasmFile);
             this.is_match = is_match;
-            this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.is_match);
+            this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.options.useObjectMaps ? this.map : null, this.is_match);
         });
     }
     same(newValue, oldValue) {
@@ -1089,14 +1217,20 @@ class DeepState {
     }
     getNestedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
         const listeners = {};
+        const restBelowValues = {};
         for (let [listenerPath, listenersCollection] of this.listeners) {
             if (!listenersCollection.isRecursive)
                 continue;
             listeners[listenerPath] = { single: [], bulk: [] };
-            const currentCutPath = this.cutPath(listenerPath, updatePath);
-            if (this.match(currentCutPath, updatePath)) {
-                const restPath = this.trimPath(listenerPath.substr(currentCutPath.length));
-                const wildcardNewValues = new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(restPath);
+            // listenerPath is longer and is shortened - because we want to get listeners underneath change
+            const currentAbovePathCut = this.cutPath(listenerPath, updatePath);
+            if (this.match(currentAbovePathCut, updatePath)) {
+                // listener is listening below updated node
+                const restBelowPathCut = this.trimPath(listenerPath.substr(currentAbovePathCut.length));
+                const wildcardNewValues = restBelowValues[restBelowPathCut]
+                    ? restBelowValues[restBelowPathCut] // if those values are already calculated use it
+                    : new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(restBelowPathCut);
+                restBelowValues[restBelowPathCut] = wildcardNewValues;
                 const params = listenersCollection.paramsInfo
                     ? this.getParams(listenersCollection.paramsInfo, updatePath)
                     : undefined;
@@ -1163,7 +1297,7 @@ class DeepState {
                         console.log("[getNestedListeners] Listener was not fired because there was no match.", {
                             listener,
                             listenersCollection,
-                            currentCutPath,
+                            currentCutPath: currentAbovePathCut,
                             updatePath,
                         });
                     }
@@ -1270,8 +1404,10 @@ class DeepState {
         if (typeof fn === "function") {
             newValue = fn(oldValue);
         }
-        if (isObject(newValue) || Array.isArray(newValue))
-            newValue = this.makeObservable(newValue, split.join(this.options.delimiter), parent);
+        if (this.options.useProxy) {
+            if (isObject(newValue) || Array.isArray(newValue))
+                newValue = this.makeObservable(newValue, split.join(this.options.delimiter), parent);
+        }
         return { newValue, oldValue };
     }
     wildcardNotify(groupedListenersPack) {
@@ -1457,9 +1593,11 @@ class DeepState {
                     if (typeof value === "function") {
                         value = value(currentValue);
                     }
-                    if (isObject(value) || Array.isArray(value)) {
-                        const parent = self.getParent(split, currentValue);
-                        value = self.makeObservable(value, updatePath, parent);
+                    if (self.options.useProxy) {
+                        if (isObject(value) || Array.isArray(value)) {
+                            const parent = self.getParent(split, currentValue);
+                            value = self.makeObservable(value, updatePath, parent);
+                        }
                     }
                     self.pathSet(split, value);
                     self.removeSaving(split, currentValue);
