@@ -1353,8 +1353,11 @@
             }
             this.pathSet(split, newValue, this.data);
             // if we are saving a parent node - do not notify about changes
+            // because someone may modify object which is given as argument
+            // and will fire subscriptions immediately which is not intended
             if (currentlySaving && !options.force) {
-                return this.removeSaving(split, newValue);
+                this.removeSaving(split, newValue);
+                return newValue;
             }
             options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
             if (options.only === null) {

@@ -1359,7 +1359,8 @@ class DeepState<T> {
     // because someone may modify object which is given as argument
     // and will fire subscriptions immediately which is not intended
     if (currentlySaving && !options.force) {
-      return this.removeSaving(split, newValue);
+      this.removeSaving(split, newValue);
+      return newValue;
     }
 
     options = { ...defaultUpdateOptions, ...options };
