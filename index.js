@@ -347,7 +347,14 @@ var DeepState = /** @class */ (function () {
         }
         // update down if needed
         this.setNodeSaving(obj, last);
-        value = this.updateMapDown(currentPath, value, obj, !referencesDeleted);
+        var parent;
+        if (!currentPath) {
+            parent = this.rootProxyNode;
+        }
+        else {
+            parent = obj;
+        }
+        value = this.updateMapDown(currentPath, value, parent, !referencesDeleted);
         if (last) {
             obj[last] = value;
         }

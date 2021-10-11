@@ -460,7 +460,13 @@ class DeepState {
     }
     // update down if needed
     this.setNodeSaving(obj as ProxyNode, last);
-    value = this.updateMapDown(currentPath, value, obj as ProxyNode, !referencesDeleted);
+    let parent;
+    if (!currentPath) {
+      parent = this.rootProxyNode;
+    } else {
+      parent = obj;
+    }
+    value = this.updateMapDown(currentPath, value, parent as ProxyNode, !referencesDeleted);
     if (last) {
       obj[last] = value;
     } else {
