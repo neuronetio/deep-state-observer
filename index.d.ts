@@ -3,15 +3,15 @@ export interface PathInfo {
     update: string | undefined;
     resolved: string | undefined;
 }
-export interface ListenerFunctionEventInfo<T> {
+export interface ListenerFunctionEventInfo {
     type: string;
-    listener: Listener<T>;
-    listenersCollection: ListenersCollection<T>;
+    listener: Listener;
+    listenersCollection: ListenersCollection;
     path: PathInfo;
     params: Params;
     options: ListenerOptions | UpdateOptions | undefined;
 }
-export declare type ListenerFunction<T> = (value: T, eventInfo: ListenerFunctionEventInfo<T>) => void;
+export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
 export declare type Match = (path: string, debug?: boolean) => boolean;
 export interface Options {
     delimiter?: string;
@@ -45,40 +45,40 @@ export interface UpdateOptions {
     queue?: boolean;
     force?: boolean;
 }
-export interface Listener<T> {
-    fn: ListenerFunction<T>;
+export interface Listener {
+    fn: ListenerFunction;
     options: ListenerOptions;
     id?: number;
     groupId: number | null;
 }
-export interface Queue<T> {
+export interface Queue {
     id: number;
     resolvedPath: string;
     resolvedIdPath: string;
     fn: () => void;
-    originalFn: ListenerFunction<T>;
+    originalFn: ListenerFunction;
     options: ListenerOptions;
     groupId: number;
 }
-export interface GroupedListener<T> {
-    listener: Listener<PathValue<T, PossiblePath<T>>>;
-    listenersCollection: ListenersCollection<T>;
-    eventInfo: ListenerFunctionEventInfo<T>;
+export interface GroupedListener {
+    listener: Listener;
+    listenersCollection: ListenersCollection;
+    eventInfo: ListenerFunctionEventInfo;
     value: any;
 }
-export interface GroupedListenerContainer<T> {
-    single: GroupedListener<T>[];
-    bulk: GroupedListener<T>[];
+export interface GroupedListenerContainer {
+    single: GroupedListener[];
+    bulk: GroupedListener[];
 }
-export interface GroupedListeners<T> {
-    [path: string]: GroupedListenerContainer<T>;
+export interface GroupedListeners {
+    [path: string]: GroupedListenerContainer;
 }
 export declare type Updater = (value: any) => any;
-export declare type ListenersObject<T> = Map<string | number, Listener<T>>;
-export interface ListenersCollection<T> {
+export declare type ListenersObject = Map<string | number, Listener>;
+export interface ListenersCollection {
     path: string;
     originalPath: string;
-    listeners: ListenersObject<PathValue<T, PossiblePath<T>>>;
+    listeners: ListenersObject;
     isWildcard: boolean;
     isRecursive: boolean;
     hasParams: boolean;
@@ -86,7 +86,7 @@ export interface ListenersCollection<T> {
     match: Match;
     count: number;
 }
-export declare type Listeners<T> = Map<string, ListenersCollection<T>>;
+export declare type Listeners = Map<string, ListenersCollection>;
 export interface WaitingPath {
     dirty: boolean;
     isWildcard: boolean;
@@ -145,9 +145,6 @@ export interface Multi {
     done: () => void;
     getStack: () => UpdateStack[];
 }
-declare type PathImpl<T, K extends keyof T> = K extends string ? T[K] extends Record<string, any> ? T[K] extends ArrayLike<any> ? K | `${K}.${PathImpl<T[K], Exclude<keyof T[K], keyof any[]>>}` : K | `${K}.${PathImpl<T[K], keyof T[K]>}` : K : any;
-declare type PossiblePath<T> = PathImpl<T, keyof T> | keyof T | string;
-declare type PathValue<T, P extends PossiblePath<T>> = P extends `${infer K}.${infer Rest}` ? K extends keyof T ? Rest extends PossiblePath<T[K]> ? PathValue<T[K], Rest> : any : any : P extends keyof T ? T[P] : any;
 export interface UnknownObject {
     [key: string]: unknown;
 }
@@ -162,7 +159,7 @@ export interface ProxyData {
     saving: string[];
     parent: ProxyNode | null;
 }
-declare class DeepState<T> {
+declare class DeepState {
     private listeners;
     private data;
     private options;
@@ -185,13 +182,13 @@ declare class DeepState<T> {
     readonly proxyProperty = "___deep_state_observer___";
     private rootProxyNode;
     private handler;
-    proxy: T;
+    proxy: object;
     /**
      * @property $$$ proxy shorthand
      */
-    $$$: T;
+    $$$: object;
     private map;
-    constructor(data?: T | object, options?: Options);
+    constructor(data?: object, options?: Options);
     private updateMapDown;
     private deleteMapReferences;
     private pathGet;
@@ -207,7 +204,7 @@ declare class DeepState<T> {
     private makeObservable;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
-    getListeners(): Listeners<T>;
+    getListeners(): Listeners;
     destroy(): void;
     private match;
     private getIndicesOf;
@@ -221,12 +218,12 @@ declare class DeepState<T> {
     private hasParams;
     private getParamsInfo;
     private getParams;
-    subscribeAll(userPaths: string[], fn: ListenerFunction<PathValue<T, PossiblePath<T>>>, options?: ListenerOptions): () => void;
+    subscribeAll(userPaths: string[], fn: ListenerFunction, options?: ListenerOptions): () => void;
     private getCleanListenersCollection;
     private getCleanListener;
     private getListenerCollectionMatch;
     private getListenersCollection;
-    subscribe<P extends PossiblePath<T>>(listenerPath: P, fn: ListenerFunction<PathValue<T, P>>, options?: ListenerOptions, subscribeAllOptions?: SubscribeAllOptions): () => void;
+    subscribe(listenerPath: string, fn: ListenerFunction, options?: ListenerOptions, subscribeAllOptions?: SubscribeAllOptions): () => void;
     private unsubscribe;
     private runQueuedListeners;
     private getQueueNotifyListeners;
@@ -252,13 +249,13 @@ declare class DeepState<T> {
     executeCollected(): void;
     getCollectedCount(): number;
     getCollectedStack(): UpdateStack[];
-    get<P extends PossiblePath<T>>(userPath: P): PathValue<T, P>;
+    get(userPath: string): object;
     private lastExecs;
     last(callback: () => void): void;
-    isMuted(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
-    isMutedListener(listenerFunc: ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
-    mute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): Set<ListenerFunction<(string extends keyof T ? T[keyof T & string] : any) | PathValue<T, keyof T> | PathValue<T, PathImpl<T, keyof T>>>>;
-    unmute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean;
+    isMuted(pathOrListenerFunction: string | ListenerFunction): boolean;
+    isMutedListener(listenerFunc: ListenerFunction): boolean;
+    mute(pathOrListenerFunction: string | ListenerFunction): Set<ListenerFunction>;
+    unmute(pathOrListenerFunction: string | ListenerFunction): boolean;
     private debugSubscribe;
     private debugListener;
     private debugTime;

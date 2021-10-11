@@ -8,16 +8,16 @@ export interface PathInfo {
   resolved: string | undefined;
 }
 
-export interface ListenerFunctionEventInfo<T> {
+export interface ListenerFunctionEventInfo {
   type: string;
-  listener: Listener<T>;
-  listenersCollection: ListenersCollection<T>;
+  listener: Listener;
+  listenersCollection: ListenersCollection;
   path: PathInfo;
   params: Params;
   options: ListenerOptions | UpdateOptions | undefined;
 }
 
-export type ListenerFunction<T> = (value: T, eventInfo: ListenerFunctionEventInfo<T>) => void;
+export type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
 export type Match = (path: string, debug?: boolean) => boolean;
 
 export interface Options {
@@ -55,47 +55,47 @@ export interface UpdateOptions {
   force?: boolean;
 }
 
-export interface Listener<T> {
-  fn: ListenerFunction<T>;
+export interface Listener {
+  fn: ListenerFunction;
   options: ListenerOptions;
   id?: number;
   groupId: number | null;
 }
 
-export interface Queue<T> {
+export interface Queue {
   id: number;
   resolvedPath: string;
   resolvedIdPath: string;
   fn: () => void;
-  originalFn: ListenerFunction<T>;
+  originalFn: ListenerFunction;
   options: ListenerOptions;
   groupId: number;
 }
 
-export interface GroupedListener<T> {
-  listener: Listener<PathValue<T, PossiblePath<T>>>;
-  listenersCollection: ListenersCollection<T>;
-  eventInfo: ListenerFunctionEventInfo<T>;
+export interface GroupedListener {
+  listener: Listener;
+  listenersCollection: ListenersCollection;
+  eventInfo: ListenerFunctionEventInfo;
   value: any;
 }
 
-export interface GroupedListenerContainer<T> {
-  single: GroupedListener<T>[];
-  bulk: GroupedListener<T>[];
+export interface GroupedListenerContainer {
+  single: GroupedListener[];
+  bulk: GroupedListener[];
 }
 
-export interface GroupedListeners<T> {
-  [path: string]: GroupedListenerContainer<T>;
+export interface GroupedListeners {
+  [path: string]: GroupedListenerContainer;
 }
 
 export type Updater = (value: any) => any;
 
-export type ListenersObject<T> = Map<string | number, Listener<T>>;
+export type ListenersObject = Map<string | number, Listener>;
 
-export interface ListenersCollection<T> {
+export interface ListenersCollection {
   path: string;
   originalPath: string;
-  listeners: ListenersObject<PathValue<T, PossiblePath<T>>>;
+  listeners: ListenersObject;
   isWildcard: boolean;
   isRecursive: boolean;
   hasParams: boolean;
@@ -104,7 +104,7 @@ export interface ListenersCollection<T> {
   count: number;
 }
 
-export type Listeners<T> = Map<string, ListenersCollection<T>>;
+export type Listeners = Map<string, ListenersCollection>;
 
 export interface WaitingPath {
   dirty: boolean;
@@ -264,22 +264,19 @@ const defaultListenerOptions: ListenerOptions = {
   group: false,
 };
 
-class DeepState<T> {
-  private listeners: Listeners<PathValue<T, PossiblePath<T>> | string>;
-  private data: T | object;
+class DeepState {
+  private listeners: Listeners;
+  private data: object;
   private options: Options;
   private id: number;
   private scan: any;
   private subscribeQueue = [];
-  private listenersIgnoreCache: WeakMap<
-    Listener<PathValue<T, PossiblePath<T>>>,
-    { truthy: string[]; falsy: string[] }
-  > = new WeakMap();
+  private listenersIgnoreCache: WeakMap<Listener, { truthy: string[]; falsy: string[] }> = new WeakMap();
   private is_match: any;
   private destroyed = false;
   private resolved: Promise<unknown> | any;
   private muted: Set<string>;
-  private mutedListeners: Set<ListenerFunction<PathValue<T, PossiblePath<T>>>>;
+  private mutedListeners: Set<ListenerFunction>;
   private groupId: number = 0;
   private traceId: number = 0;
   // private pathGet: any;
@@ -330,14 +327,14 @@ class DeepState<T> {
       return true;
     },
   };
-  public proxy: T;
+  public proxy: object;
   /**
    * @property $$$ proxy shorthand
    */
-  public $$$: T;
+  public $$$: object;
   private map: Map<string, any> = new Map();
 
-  constructor(data: T | object = {}, options: Options = {}) {
+  constructor(data: object = {}, options: Options = {}) {
     this.listeners = new Map();
     this.handler.set = this.handler.set.bind(this);
     this.options = { ...getDefaultOptions(), ...options };
@@ -348,7 +345,7 @@ class DeepState<T> {
       } else {
         this.data = this.makeObservable(data, "", this.rootProxyNode);
       }
-      this.proxy = this.data as T;
+      this.proxy = this.data;
       this.$$$ = this.proxy;
     } else {
       this.data = data;
@@ -371,9 +368,9 @@ class DeepState<T> {
     this.muted = new Set();
     this.mutedListeners = new Set();
     if (this.options.useObjectMaps) {
-      this.scan = new WildcardObject<T>(this.data, this.options.delimiter, this.options.wildcard, this.map);
+      this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.map);
     } else {
-      this.scan = new WildcardObject<T>(this.data, this.options.delimiter, this.options.wildcard);
+      this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
     }
     this.destroyed = false;
   }
@@ -427,7 +424,10 @@ class DeepState<T> {
       obj = this.data;
     if (!Array.isArray(pathChunks)) throw new Error("Invalid path chunks");
     const chunks = pathChunks.slice();
-    const last = chunks.pop();
+    let last = "";
+    if (chunks.length) {
+      last = chunks.pop();
+    }
     let referencesDeleted = false;
     const removeSavings = [];
     // create nodes if needed
@@ -603,7 +603,7 @@ class DeepState<T> {
     );
   }
 
-  public getListeners(): Listeners<T> {
+  public getListeners(): Listeners {
     return this.listeners;
   }
 
@@ -736,11 +736,7 @@ class DeepState<T> {
     return result;
   }
 
-  public subscribeAll(
-    userPaths: string[],
-    fn: ListenerFunction<PathValue<T, PossiblePath<T>>>,
-    options: ListenerOptions = defaultListenerOptions
-  ) {
+  public subscribeAll(userPaths: string[], fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions) {
     if (this.destroyed) return () => {};
     let unsubscribers = [];
     let index = 0;
@@ -765,7 +761,7 @@ class DeepState<T> {
     };
   }
 
-  private getCleanListenersCollection(values = {}): ListenersCollection<T> {
+  private getCleanListenersCollection(values = {}): ListenersCollection {
     return {
       listeners: new Map(),
       isRecursive: false,
@@ -780,10 +776,7 @@ class DeepState<T> {
     };
   }
 
-  private getCleanListener(
-    fn: ListenerFunction<PathValue<T, PossiblePath<T>>>,
-    options: ListenerOptions = defaultListenerOptions
-  ): Listener<PathValue<T, PossiblePath<T>>> {
+  private getCleanListener(fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions): Listener {
     return {
       fn,
       options: { ...defaultListenerOptions, ...options },
@@ -815,10 +808,7 @@ class DeepState<T> {
     };
   }
 
-  private getListenersCollection(
-    listenerPath: string,
-    listener: Listener<PathValue<T, PossiblePath<T>>>
-  ): ListenersCollection<PathValue<T, PossiblePath<T>>> {
+  private getListenersCollection(listenerPath: string, listener: Listener): ListenersCollection {
     if (this.listeners.has(listenerPath)) {
       let listenersCollection = this.listeners.get(listenerPath);
       listenersCollection.listeners.set(++this.id, listener);
@@ -852,9 +842,9 @@ class DeepState<T> {
     return listenersCollection;
   }
 
-  public subscribe<P extends PossiblePath<T>>(
-    listenerPath: P,
-    fn: ListenerFunction<PathValue<T, P>>,
+  public subscribe(
+    listenerPath: string,
+    fn: ListenerFunction,
     options: ListenerOptions = defaultListenerOptions,
     subscribeAllOptions: SubscribeAllOptions = {
       all: [listenerPath as string],
@@ -961,10 +951,7 @@ class DeepState<T> {
     this.subscribeQueue.length = 0;
   }
 
-  private getQueueNotifyListeners(
-    groupedListeners: GroupedListeners<PathValue<T, PossiblePath<T>>>,
-    queue: Queue<PathValue<T, PossiblePath<T>>>[] = []
-  ): Queue<PathValue<T, PossiblePath<T>>>[] {
+  private getQueueNotifyListeners(groupedListeners: GroupedListeners, queue: Queue[] = []): Queue[] {
     for (const path in groupedListeners) {
       if (this.isMuted(path)) continue;
       let { single, bulk } = groupedListeners[path];
@@ -1042,7 +1029,7 @@ class DeepState<T> {
     return queue;
   }
 
-  private shouldIgnore(listener: Listener<PathValue<T, PossiblePath<T>>>, updatePath: string): boolean {
+  private shouldIgnore(listener: Listener, updatePath: string): boolean {
     if (!listener.options.ignore) return false;
     for (const ignorePath of listener.options.ignore) {
       if (updatePath.startsWith(ignorePath)) {
@@ -1066,7 +1053,7 @@ class DeepState<T> {
     options: UpdateOptions,
     type: string = "update",
     originalPath: string = null
-  ): GroupedListeners<PathValue<T, PossiblePath<T>>> {
+  ): GroupedListeners {
     options = { ...defaultUpdateOptions, ...options };
     const listeners = {};
     for (let [listenerPath, listenersCollection] of this.listeners) {
@@ -1152,7 +1139,7 @@ class DeepState<T> {
     options: UpdateOptions,
     type: string = "update",
     originalPath: string = null
-  ): Queue<PathValue<T, PossiblePath<T>>>[] {
+  ): Queue[] {
     return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
   }
 
@@ -1162,8 +1149,8 @@ class DeepState<T> {
     options: UpdateOptions,
     type: string = "update",
     originalPath: string = null
-  ): GroupedListeners<PathValue<T, PossiblePath<T>>> {
-    const listeners: GroupedListeners<PathValue<T, PossiblePath<T>>> = {};
+  ): GroupedListeners {
+    const listeners: GroupedListeners = {};
     const restBelowValues = {};
     for (let [listenerPath, listenersCollection] of this.listeners) {
       if (!listenersCollection.isRecursive) continue;
@@ -1255,9 +1242,9 @@ class DeepState<T> {
     newValue,
     options: UpdateOptions,
     type: string = "update",
-    queue: Queue<PathValue<T, PossiblePath<T>>>[],
+    queue: Queue[],
     originalPath: string = null
-  ): Queue<PathValue<T, PossiblePath<T>>>[] {
+  ): Queue[] {
     return this.getQueueNotifyListeners(
       this.getNestedListeners(updatePath, newValue, options, type, originalPath),
       queue
@@ -1270,7 +1257,7 @@ class DeepState<T> {
     options: UpdateOptions,
     type: string = "update",
     originalPath: string = null
-  ): GroupedListeners<PathValue<T, PossiblePath<T>>> {
+  ): GroupedListeners {
     const listeners = {};
     if (
       typeof options.only !== "object" ||
@@ -1333,7 +1320,7 @@ class DeepState<T> {
     return listeners;
   }
 
-  private runQueue(queue: Queue<PathValue<T, PossiblePath<T>>>[]) {
+  private runQueue(queue: Queue[]) {
     const firedGroups = [];
     for (const q of queue) {
       if (q.options.group) {
@@ -1347,7 +1334,7 @@ class DeepState<T> {
     }
   }
 
-  private sortAndRunQueue(queue: Queue<PathValue<T, PossiblePath<T>>>[], path: string) {
+  private sortAndRunQueue(queue: Queue[], path: string) {
     queue.sort(function (a, b) {
       return a.id - b.id;
     });
@@ -1646,7 +1633,7 @@ class DeepState<T> {
     return this.collection.getStack();
   }
 
-  public get<P extends PossiblePath<T>>(userPath: P): PathValue<T, P> {
+  public get(userPath: string) {
     if (this.destroyed) return;
     if (typeof userPath === "undefined" || userPath === "") {
       return this.data;
@@ -1670,7 +1657,7 @@ class DeepState<T> {
     });
   }
 
-  public isMuted(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean {
+  public isMuted(pathOrListenerFunction: string | ListenerFunction): boolean {
     if (!this.options.useMute) return false;
     if (typeof pathOrListenerFunction === "function") {
       return this.isMutedListener(pathOrListenerFunction);
@@ -1689,29 +1676,25 @@ class DeepState<T> {
     return false;
   }
 
-  public isMutedListener(listenerFunc: ListenerFunction<PathValue<T, PossiblePath<T>>>): boolean {
+  public isMutedListener(listenerFunc: ListenerFunction): boolean {
     return this.mutedListeners.has(listenerFunc);
   }
 
-  public mute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>) {
+  public mute(pathOrListenerFunction: string | ListenerFunction) {
     if (typeof pathOrListenerFunction === "function") {
       return this.mutedListeners.add(pathOrListenerFunction);
     }
     this.muted.add(pathOrListenerFunction);
   }
 
-  public unmute(pathOrListenerFunction: string | ListenerFunction<PathValue<T, PossiblePath<T>>>) {
+  public unmute(pathOrListenerFunction: string | ListenerFunction) {
     if (typeof pathOrListenerFunction === "function") {
       return this.mutedListeners.delete(pathOrListenerFunction);
     }
     this.muted.delete(pathOrListenerFunction);
   }
 
-  private debugSubscribe(
-    listener: Listener<PathValue<T, PossiblePath<T>>>,
-    listenersCollection: ListenersCollection<T>,
-    listenerPath: string
-  ) {
+  private debugSubscribe(listener: Listener, listenersCollection: ListenersCollection, listenerPath: string) {
     if (listener.options.debug) {
       this.options.log("listener subscribed", {
         listenerPath,
@@ -1721,7 +1704,7 @@ class DeepState<T> {
     }
   }
 
-  private debugListener(time: number, groupedListener: GroupedListener<PathValue<T, PossiblePath<T>>>) {
+  private debugListener(time: number, groupedListener: GroupedListener) {
     if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
       this.options.log("Listener fired", {
         time: Date.now() - time,
@@ -1730,7 +1713,7 @@ class DeepState<T> {
     }
   }
 
-  private debugTime(groupedListener: GroupedListener<PathValue<T, PossiblePath<T>>>): number {
+  private debugTime(groupedListener: GroupedListener): number {
     return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
   }
 

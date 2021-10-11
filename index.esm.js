@@ -572,7 +572,10 @@ class DeepState {
         if (!Array.isArray(pathChunks))
             throw new Error("Invalid path chunks");
         const chunks = pathChunks.slice();
-        const last = chunks.pop();
+        let last = "";
+        if (chunks.length) {
+            last = chunks.pop();
+        }
         let referencesDeleted = false;
         const removeSavings = [];
         // create nodes if needed

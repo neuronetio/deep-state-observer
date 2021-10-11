@@ -3,7 +3,7 @@ export interface wildcardResult {
   [key: string]: any;
 }
 
-class WildcardObject<T> {
+class WildcardObject {
   private obj;
   private delimiter;
   private wildcard;
@@ -11,7 +11,7 @@ class WildcardObject<T> {
   private objectMap: Map<string, any> = null;
 
   constructor(
-    obj: T | object,
+    obj: object,
     delimiter: string,
     wildcard: string,
     objectMap: Map<string, any> = null,

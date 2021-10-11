@@ -1,6 +1,6 @@
 const State = require("../index.cjs.js");
 
-const options = { useProxy: true, useObjectMaps: true };
+const options = { useProxy: true, useObjectMaps: false };
 
 describe("Proxy", () => {
   it("should get value by proxy", () => {
@@ -278,5 +278,44 @@ describe("Proxy", () => {
 
     state.proxy.root = { left: { l: "lll" } };
     expect(values[2]).toEqual("lll");
+  });
+
+  it("should update root node", () => {
+    const state = new State({ x: { y: { z: 1 } } }, options);
+    const values = [];
+    state.subscribe("x.y.z", (val) => {
+      values.push(val);
+    });
+    expect(values[0]).toEqual(1);
+    state.update("", (oldValue) => {
+      return { x: oldValue.x, xx: { yy: { zz: 1 } } };
+    });
+    expect(state.data[undefined]).toBeFalsy();
+    expect(state.get("x.y.z")).toEqual(1);
+    expect(state.get("xx.yy.zz")).toEqual(1);
+  });
+
+  it("should save function", () => {
+    const values = [];
+    const state = new State(
+      {
+        x: { y: { z: 1 } },
+        fn: () => {
+          values.push("fn");
+        },
+      },
+      options
+    );
+    expect(values.length).toEqual(0);
+    const fn = state.get("fn");
+    expect(typeof fn).toEqual("function");
+    fn();
+    expect(values[0]).toEqual("fn");
+    state.update("fff", () => {
+      return () => {
+        values.push("fff");
+      };
+    });
+    expect(values.length).toEqual(1);
   });
 });
