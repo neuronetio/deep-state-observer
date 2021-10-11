@@ -348,7 +348,12 @@ var DeepState = /** @class */ (function () {
         // update down if needed
         this.setNodeSaving(obj, last);
         value = this.updateMapDown(currentPath, value, obj, !referencesDeleted);
-        obj[last] = value;
+        if (last) {
+            obj[last] = value;
+        }
+        else {
+            obj = value;
+        }
         this.unsetNodeSaving(obj, last);
         try {
             for (var removeSavings_1 = __values(removeSavings), removeSavings_1_1 = removeSavings_1.next(); !removeSavings_1_1.done; removeSavings_1_1 = removeSavings_1.next()) {

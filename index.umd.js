@@ -617,7 +617,12 @@
             // update down if needed
             this.setNodeSaving(obj, last);
             value = this.updateMapDown(currentPath, value, obj, !referencesDeleted);
-            obj[last] = value;
+            if (last) {
+                obj[last] = value;
+            }
+            else {
+                obj = value;
+            }
             this.unsetNodeSaving(obj, last);
             for (const [obj, prop] of removeSavings) {
                 this.unsetNodeSaving(obj, prop);

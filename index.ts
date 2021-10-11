@@ -461,7 +461,11 @@ class DeepState {
     // update down if needed
     this.setNodeSaving(obj as ProxyNode, last);
     value = this.updateMapDown(currentPath, value, obj as ProxyNode, !referencesDeleted);
-    obj[last] = value;
+    if (last) {
+      obj[last] = value;
+    } else {
+      obj = value;
+    }
     this.unsetNodeSaving(obj as ProxyNode, last);
     for (const [obj, prop] of removeSavings) {
       this.unsetNodeSaving(obj, prop);
