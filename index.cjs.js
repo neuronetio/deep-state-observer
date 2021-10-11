@@ -1225,7 +1225,8 @@ class DeepState {
         for (const path in scanned) {
             const split = this.split(path);
             const parent = this.getParent(path);
-            parent[this.proxyProperty].saving = true;
+            if (parent)
+                parent[this.proxyProperty].saving = true;
             const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn);
             if (!this.same(newValue, oldValue) || options.force) {
                 this.pathSet(split, newValue, this.data);
@@ -1253,7 +1254,8 @@ class DeepState {
                 self.sortAndRunQueue(queue, updatePath);
                 for (const path in scanned) {
                     const parent = self.getParent(path);
-                    parent[self.proxyProperty].saving = false;
+                    if (parent)
+                        parent[self.proxyProperty].saving = false;
                 }
             };
         }
@@ -1261,7 +1263,8 @@ class DeepState {
         this.sortAndRunQueue(queue, updatePath);
         for (const path in scanned) {
             const parent = this.getParent(path);
-            parent[this.proxyProperty].saving = false;
+            if (parent)
+                parent[this.proxyProperty].saving = false;
         }
     }
     updateNotify(updatePath, newValue, options) {
@@ -1314,7 +1317,8 @@ class DeepState {
         const split = this.split(updatePath);
         const currentValue = this.pathGet(split, this.data);
         const parent = this.getParent(updatePath);
-        parent[this.proxyProperty].saving = true; // parent here because getUpdateValues will fire update fn
+        if (parent)
+            parent[this.proxyProperty].saving = true; // parent here because getUpdateValues will fire update fn
         let { oldValue, newValue } = this.getUpdateValues(currentValue, split, fnOrValue);
         if (options.debug) {
             this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ""}`, {
@@ -1334,7 +1338,8 @@ class DeepState {
         if (options.only === null) {
             if (multi)
                 return function () { };
-            parent[this.proxyProperty].saving = false;
+            if (parent)
+                parent[this.proxyProperty].saving = false;
             return newValue;
         }
         if (options.only.length) {
@@ -1342,24 +1347,28 @@ class DeepState {
                 const self = this;
                 return function () {
                     const result = self.updateNotifyOnly(updatePath, newValue, options);
-                    parent[self.proxyProperty].saving = false;
+                    if (parent)
+                        parent[self.proxyProperty].saving = false;
                     return result;
                 };
             }
             this.updateNotifyOnly(updatePath, newValue, options);
-            parent[this.proxyProperty].saving = false;
+            if (parent)
+                parent[this.proxyProperty].saving = false;
             return newValue;
         }
         if (multi) {
             const self = this;
             return function multiUpdate() {
                 const result = self.updateNotify(updatePath, newValue, options);
-                parent[self.proxyProperty].saving = false;
+                if (parent)
+                    parent[self.proxyProperty].saving = false;
                 return result;
             };
         }
         this.updateNotify(updatePath, newValue, options);
-        parent[this.proxyProperty].saving = false;
+        if (parent)
+            parent[this.proxyProperty].saving = false;
         return newValue;
     }
     multi(grouped = false) {

@@ -1237,7 +1237,8 @@ var DeepState = /** @class */ (function () {
         for (var path in scanned) {
             var split = this.split(path);
             var parent_1 = this.getParent(path);
-            parent_1[this.proxyProperty].saving = true;
+            if (parent_1)
+                parent_1[this.proxyProperty].saving = true;
             var _a = this.getUpdateValues(scanned[path], split, fn), oldValue = _a.oldValue, newValue = _a.newValue;
             if (!this.same(newValue, oldValue) || options.force) {
                 this.pathSet(split, newValue, this.data);
@@ -1265,7 +1266,8 @@ var DeepState = /** @class */ (function () {
                 self_1.sortAndRunQueue(queue, updatePath);
                 for (var path in scanned) {
                     var parent_2 = self_1.getParent(path);
-                    parent_2[self_1.proxyProperty].saving = false;
+                    if (parent_2)
+                        parent_2[self_1.proxyProperty].saving = false;
                 }
             };
         }
@@ -1273,7 +1275,8 @@ var DeepState = /** @class */ (function () {
         this.sortAndRunQueue(queue, updatePath);
         for (var path in scanned) {
             var parent_3 = this.getParent(path);
-            parent_3[this.proxyProperty].saving = false;
+            if (parent_3)
+                parent_3[this.proxyProperty].saving = false;
         }
     };
     DeepState.prototype.updateNotify = function (updatePath, newValue, options) {
@@ -1339,7 +1342,8 @@ var DeepState = /** @class */ (function () {
         var split = this.split(updatePath);
         var currentValue = this.pathGet(split, this.data);
         var parent = this.getParent(updatePath);
-        parent[this.proxyProperty].saving = true; // parent here because getUpdateValues will fire update fn
+        if (parent)
+            parent[this.proxyProperty].saving = true; // parent here because getUpdateValues will fire update fn
         var _a = this.getUpdateValues(currentValue, split, fnOrValue), oldValue = _a.oldValue, newValue = _a.newValue;
         if (options.debug) {
             this.options.log("Updating " + updatePath + " " + (options.source ? "from " + options.source : ""), {
@@ -1359,7 +1363,8 @@ var DeepState = /** @class */ (function () {
         if (options.only === null) {
             if (multi)
                 return function () { };
-            parent[this.proxyProperty].saving = false;
+            if (parent)
+                parent[this.proxyProperty].saving = false;
             return newValue;
         }
         if (options.only.length) {
@@ -1367,24 +1372,28 @@ var DeepState = /** @class */ (function () {
                 var self_2 = this;
                 return function () {
                     var result = self_2.updateNotifyOnly(updatePath, newValue, options);
-                    parent[self_2.proxyProperty].saving = false;
+                    if (parent)
+                        parent[self_2.proxyProperty].saving = false;
                     return result;
                 };
             }
             this.updateNotifyOnly(updatePath, newValue, options);
-            parent[this.proxyProperty].saving = false;
+            if (parent)
+                parent[this.proxyProperty].saving = false;
             return newValue;
         }
         if (multi) {
             var self_3 = this;
             return function multiUpdate() {
                 var result = self_3.updateNotify(updatePath, newValue, options);
-                parent[self_3.proxyProperty].saving = false;
+                if (parent)
+                    parent[self_3.proxyProperty].saving = false;
                 return result;
             };
         }
         this.updateNotify(updatePath, newValue, options);
-        parent[this.proxyProperty].saving = false;
+        if (parent)
+            parent[this.proxyProperty].saving = false;
         return newValue;
     };
     DeepState.prototype.multi = function (grouped) {
