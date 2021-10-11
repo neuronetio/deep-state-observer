@@ -412,7 +412,7 @@ class DeepState {
     }
   }
 
-  private pathGet(path: string): ProxyNode {
+  private pathGet(path: string) {
     if (!this.options.useObjectMaps) return Path.get(this.split(path), this.data);
     return this.map.get(path);
   }

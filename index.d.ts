@@ -249,7 +249,7 @@ declare class DeepState {
     executeCollected(): void;
     getCollectedCount(): number;
     getCollectedStack(): UpdateStack[];
-    get(userPath: string): object;
+    get(userPath: string): any;
     private lastExecs;
     last(callback: () => void): void;
     isMuted(pathOrListenerFunction: string | ListenerFunction): boolean;
