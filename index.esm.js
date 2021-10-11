@@ -468,11 +468,12 @@ class DeepState {
     }
     parentIsSaving(path) {
         const split = this.split(path);
-        let parent;
-        while ((parent = this.getParent(split.join(this.options.delimiter)))) {
-            split.pop();
-            if (parent[this.proxyProperty].saving)
+        let parent = this.getParent(split.join(this.options.delimiter));
+        if (parent) {
+            if (parent && parent[this.proxyProperty].saving)
                 return true;
+            split.pop();
+            return this.parentIsSaving(split.join(this.options.delimiter));
         }
         return false;
     }

@@ -206,11 +206,12 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.parentIsSaving = function (path) {
         var split = this.split(path);
-        var parent;
-        while ((parent = this.getParent(split.join(this.options.delimiter)))) {
-            split.pop();
-            if (parent[this.proxyProperty].saving)
+        var parent = this.getParent(split.join(this.options.delimiter));
+        if (parent) {
+            if (parent && parent[this.proxyProperty].saving)
                 return true;
+            split.pop();
+            return this.parentIsSaving(split.join(this.options.delimiter));
         }
         return false;
     };
