@@ -210,12 +210,6 @@ var DeepState = /** @class */ (function () {
         }
         else {
             this.data = data;
-            this.isSaving = function () { return true; };
-            this.addSaving = function () { return true; };
-            this.setNodeSaving = function () { return true; };
-            this.unsetNodeSaving = function () { return true; };
-            this.removeSaving = function () { return true; };
-            this.getParent = function () { return null; };
         }
         this.id = 0;
         if (!this.options.useObjectMaps) {
@@ -303,10 +297,14 @@ var DeepState = /** @class */ (function () {
         }
     };
     DeepState.prototype.pathGet = function (path) {
+        if (!this.options.useObjectMaps)
+            return ObjectPath_1["default"].get(this.split(path), this.data);
         return this.map.get(path);
     };
     DeepState.prototype.pathSet = function (pathChunks, value) {
         var e_3, _a;
+        if (!this.options.useObjectMaps)
+            return ObjectPath_1["default"].set(pathChunks, value, this.data);
         var prop, currentPath = "", obj = this.data;
         if (!Array.isArray(pathChunks))
             throw new Error("Invalid path chunks");

@@ -498,12 +498,6 @@ class DeepState {
         }
         else {
             this.data = data;
-            this.isSaving = () => true;
-            this.addSaving = () => true;
-            this.setNodeSaving = () => true;
-            this.unsetNodeSaving = () => true;
-            this.removeSaving = () => true;
-            this.getParent = () => null;
         }
         this.id = 0;
         if (!this.options.useObjectMaps) {
@@ -567,9 +561,13 @@ class DeepState {
         }
     }
     pathGet(path) {
+        if (!this.options.useObjectMaps)
+            return ObjectPath.get(this.split(path), this.data);
         return this.map.get(path);
     }
     pathSet(pathChunks, value) {
+        if (!this.options.useObjectMaps)
+            return ObjectPath.set(pathChunks, value, this.data);
         let prop, currentPath = "", obj = this.data;
         if (!Array.isArray(pathChunks))
             throw new Error("Invalid path chunks");

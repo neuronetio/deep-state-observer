@@ -352,12 +352,6 @@ class DeepState<T> {
       this.$$$ = this.proxy;
     } else {
       this.data = data;
-      this.isSaving = () => true;
-      this.addSaving = () => true;
-      this.setNodeSaving = () => true;
-      this.unsetNodeSaving = () => true;
-      this.removeSaving = () => true;
-      this.getParent = () => null;
     }
 
     this.id = 0;
@@ -422,10 +416,12 @@ class DeepState<T> {
   }
 
   private pathGet(path: string): ProxyNode {
+    if (!this.options.useObjectMaps) return Path.get(this.split(path), this.data);
     return this.map.get(path);
   }
 
   private pathSet(pathChunks: string[], value: any) {
+    if (!this.options.useObjectMaps) return Path.set(pathChunks, value, this.data);
     let prop,
       currentPath = "",
       obj = this.data;
