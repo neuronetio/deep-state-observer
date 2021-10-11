@@ -190,44 +190,6 @@ WildcardObject.prototype.get = function get(path) {
     return this.goFurther(path, this.obj, 0, '');
 };
 
-class ObjectPath {
-    static get(path, obj, create = false) {
-        if (!obj)
-            return;
-        let currObj = obj;
-        for (const currentPath of path) {
-            if (currObj.hasOwnProperty(currentPath)) {
-                currObj = currObj[currentPath];
-            }
-            else if (create) {
-                currObj[currentPath] = {};
-                currObj = currObj[currentPath];
-            }
-            else {
-                return;
-            }
-        }
-        return currObj;
-    }
-    static set(path, value, obj) {
-        if (!obj)
-            return;
-        if (path.length === 0) {
-            for (const key in value) {
-                obj[key] = value[key];
-            }
-            return;
-        }
-        const prePath = path.slice();
-        const lastPath = prePath.pop();
-        const get = ObjectPath.get(prePath, obj, true);
-        if (typeof get === 'object') {
-            get[lastPath] = value;
-        }
-        return value;
-    }
-}
-
 let wasm;
 
 let WASM_VECTOR_LEN = 0;
@@ -402,6 +364,8 @@ class DeepState {
         this.destroyed = false;
         this.groupId = 0;
         this.traceId = 0;
+        // private pathGet: any;
+        // private pathSet: any;
         this.traceMap = new Map();
         this.tracing = [];
         this.savedTrace = [];
@@ -420,6 +384,8 @@ class DeepState {
             set: (parent, prop, value, proxy) => {
                 if (prop === this.proxyProperty)
                     return true;
+                if (prop in parent && parent[prop] === value)
+                    return true;
                 if (!parent[this.proxyProperty].saving.includes(prop)) {
                     const path = parent[this.proxyProperty].path
                         ? parent[this.proxyProperty].path + this.options.delimiter + prop
@@ -430,7 +396,7 @@ class DeepState {
                     else {
                         // if parent node is saving current node and in meanwhile someone updates nodes below - just update it - do not notify
                         if (typeof value === "function") {
-                            const currentValue = this.pathGet(this.split(path), this.data);
+                            const currentValue = this.pathGet(path);
                             value = value(currentValue);
                         }
                         if (isObject(value) || Array.isArray(value)) {
@@ -450,12 +416,12 @@ class DeepState {
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
         this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
-        this.data = this.makeObservable(data, "", this.rootProxyNode);
+        this.data = this.updateMapDown("", data, this.rootProxyNode, false);
         this.proxy = this.data;
         this.$$$ = this.proxy;
         this.id = 0;
-        this.pathGet = ObjectPath.get;
-        this.pathSet = ObjectPath.set;
+        // this.pathGet = Path.get;
+        // this.pathSet = Path.set;
         if (options.Promise) {
             this.resolved = options.Promise.resolve();
         }
@@ -467,8 +433,82 @@ class DeepState {
         this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
         this.destroyed = false;
     }
-    // private pathGet(pathChunks: string[]) {}
-    // private pathSet(pathChunks: string[], value: any) {}
+    updateMapDown(fullPath, value, parent, deleteReferences = true) {
+        if (deleteReferences) {
+            for (const key of this.map.keys()) {
+                if (key.startsWith(fullPath))
+                    this.map.delete(key);
+            }
+        }
+        if (isObject(value)) {
+            value = this.makeObservable(value, fullPath, parent);
+            for (const prop in value) {
+                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + prop : prop, value[prop], value);
+            }
+        }
+        else if (Array.isArray(value)) {
+            value = this.makeObservable(value, fullPath, parent);
+            for (let i = 0, len = value.length; i < len; i++) {
+                this.updateMapDown(fullPath ? fullPath + this.options.delimiter + String(i) : String(i), value[i], value);
+            }
+        }
+        this.map.set(fullPath, value);
+        return value;
+    }
+    deleteMapReferences(path) {
+        for (const key of this.map.keys()) {
+            if (key.startsWith(path))
+                this.map.delete(key);
+        }
+    }
+    pathGet(path) {
+        return this.map.get(path);
+    }
+    pathSet(pathChunks, value) {
+        let prop, currentPath = "", obj = this.data;
+        const chunks = pathChunks.slice();
+        const last = chunks.pop();
+        let referencesDeleted = false;
+        const removeSavings = [];
+        // create nodes if needed
+        for (let i = 0, len = chunks.length; i < len; i++) {
+            prop = chunks[i];
+            if (currentPath) {
+                currentPath += this.options.delimiter + prop;
+            }
+            else {
+                currentPath = prop;
+            }
+            if (prop in obj) {
+                obj = obj[prop];
+                continue;
+            }
+            // property doesn't exists
+            obj[prop] = this.makeObservable({}, currentPath, obj);
+            this.setNodeSaving(obj[prop], pathChunks[i + 1]); // do not notify anything now
+            removeSavings.push([obj[prop], pathChunks[i + 1]]);
+            if (!referencesDeleted) {
+                this.deleteMapReferences(currentPath);
+                referencesDeleted = true;
+            }
+            this.map.set(currentPath, obj[prop]);
+            obj = obj[prop];
+        }
+        if (currentPath) {
+            currentPath += this.options.delimiter + last;
+        }
+        else {
+            currentPath = last;
+        }
+        // update down if needed
+        value = this.updateMapDown(currentPath, value, obj, !referencesDeleted);
+        this.setNodeSaving(obj, last);
+        obj[last] = value;
+        this.unsetNodeSaving(obj, last);
+        for (const [obj, prop] of removeSavings) {
+            this.unsetNodeSaving(obj, prop);
+        }
+    }
     getParent(pathChunks, proxyNode) {
         if (proxyNode && typeof proxyNode[this.proxyProperty] !== "undefined")
             return proxyNode[this.proxyProperty].parent;
@@ -476,7 +516,7 @@ class DeepState {
             return this.rootProxyNode;
         const split = pathChunks.slice();
         split.pop();
-        return this.pathGet(split, this.data);
+        return this.pathGet(split.join(this.options.delimiter));
     }
     isSaving(pathChunks, proxyNode) {
         let parent = this.getParent(pathChunks, proxyNode);
@@ -487,17 +527,23 @@ class DeepState {
         }
         return false;
     }
+    setNodeSaving(proxyNode, prop) {
+        proxyNode[this.proxyProperty].saving.push(prop);
+    }
+    unsetNodeSaving(proxyNode, prop) {
+        proxyNode[this.proxyProperty].saving = proxyNode[this.proxyProperty].saving.filter((current) => current !== prop);
+    }
     addSaving(pathChunks, proxyNode) {
         const parent = this.getParent(pathChunks, proxyNode);
         const changedProp = pathChunks[pathChunks.length - 1];
         if (parent)
-            parent[this.proxyProperty].saving.push(changedProp);
+            this.setNodeSaving(parent, changedProp);
     }
     removeSaving(pathChunks, proxyNode) {
         const parent = this.getParent(pathChunks, proxyNode);
         if (parent) {
             const changedProp = pathChunks[pathChunks.length - 1];
-            parent[this.proxyProperty].saving = parent[this.proxyProperty].saving.filter((current) => current !== changedProp);
+            this.unsetNodeSaving(parent, changedProp);
         }
     }
     setProxy(target, data) {
@@ -775,7 +821,7 @@ class DeepState {
             const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
             if (!listenersCollection.isWildcard) {
                 if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
-                    fn(this.pathGet(this.split(cleanPath), this.data), {
+                    fn(this.pathGet(cleanPath), {
                         type,
                         listener,
                         listenersCollection,
@@ -1247,7 +1293,7 @@ class DeepState {
             this.addSaving(split, scanned[path]);
             const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn, parent);
             if (!this.same(newValue, oldValue) || options.force) {
-                this.pathSet(split, newValue, this.data);
+                this.pathSet(split, newValue);
                 updated[path] = newValue;
             }
         }
@@ -1329,7 +1375,7 @@ class DeepState {
             return this.wildcardUpdate(updatePath, fnOrValue, options, multi);
         }
         const split = this.split(updatePath);
-        const currentValue = this.pathGet(split, this.data);
+        const currentValue = this.pathGet(updatePath);
         const currentlySaving = this.isSaving(split, currentValue);
         this.addSaving(split, currentValue);
         const parent = this.getParent(split, currentValue);
@@ -1347,7 +1393,7 @@ class DeepState {
                 };
             return newValue;
         }
-        this.pathSet(split, newValue, this.data);
+        this.pathSet(split, newValue);
         // if we are saving a parent node - do not notify about changes
         // because someone may modify object which is given as argument
         // and will fire subscriptions immediately which is not intended
@@ -1408,7 +1454,7 @@ class DeepState {
                 if (grouped) {
                     const split = self.split(updatePath);
                     let value = fnOrValue;
-                    const currentValue = self.pathGet(split, self.data);
+                    const currentValue = self.pathGet(updatePath);
                     self.addSaving(split, currentValue);
                     if (typeof value === "function") {
                         value = value(currentValue);
@@ -1417,7 +1463,7 @@ class DeepState {
                         const parent = self.getParent(split, currentValue);
                         value = self.makeObservable(value, updatePath, parent);
                     }
-                    self.pathSet(split, value, self.data);
+                    self.pathSet(split, value);
                     self.removeSaving(split, currentValue);
                     updateStack.push({ updatePath, newValue: value, options });
                 }
@@ -1475,7 +1521,7 @@ class DeepState {
         if (typeof userPath === "undefined" || userPath === "") {
             return this.data;
         }
-        return this.pathGet(this.split(userPath), this.data);
+        return this.pathGet(userPath);
     }
     last(callback) {
         let last = this.lastExecs.get(callback);

@@ -165,8 +165,6 @@ declare class DeepState<T> {
     private data;
     private options;
     private id;
-    private pathGet;
-    private pathSet;
     private scan;
     private subscribeQueue;
     private listenersIgnoreCache;
@@ -192,8 +190,14 @@ declare class DeepState<T> {
     $$$: T;
     private map;
     constructor(data?: T | object, options?: Options);
+    private updateMapDown;
+    private deleteMapReferences;
+    private pathGet;
+    private pathSet;
     private getParent;
     private isSaving;
+    private setNodeSaving;
+    private unsetNodeSaving;
     private addSaving;
     private removeSaving;
     private setProxy;
