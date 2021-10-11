@@ -346,7 +346,6 @@ var DeepState = /** @class */ (function () {
             currentPath = last;
         }
         // update down if needed
-        this.setNodeSaving(obj, last);
         var parent;
         if (!currentPath) {
             parent = this.rootProxyNode;
@@ -354,6 +353,7 @@ var DeepState = /** @class */ (function () {
         else {
             parent = obj;
         }
+        this.setNodeSaving(parent, last);
         value = this.updateMapDown(currentPath, value, parent, !referencesDeleted);
         if (last) {
             obj[last] = value;
@@ -361,7 +361,7 @@ var DeepState = /** @class */ (function () {
         else {
             obj = value;
         }
-        this.unsetNodeSaving(obj, last);
+        this.unsetNodeSaving(parent, last);
         try {
             for (var removeSavings_1 = __values(removeSavings), removeSavings_1_1 = removeSavings_1.next(); !removeSavings_1_1.done; removeSavings_1_1 = removeSavings_1.next()) {
                 var _b = __read(removeSavings_1_1.value, 2), obj_1 = _b[0], prop_1 = _b[1];

@@ -609,7 +609,6 @@ class DeepState {
             currentPath = last;
         }
         // update down if needed
-        this.setNodeSaving(obj, last);
         let parent;
         if (!currentPath) {
             parent = this.rootProxyNode;
@@ -617,6 +616,7 @@ class DeepState {
         else {
             parent = obj;
         }
+        this.setNodeSaving(parent, last);
         value = this.updateMapDown(currentPath, value, parent, !referencesDeleted);
         if (last) {
             obj[last] = value;
@@ -624,7 +624,7 @@ class DeepState {
         else {
             obj = value;
         }
-        this.unsetNodeSaving(obj, last);
+        this.unsetNodeSaving(parent, last);
         for (const [obj, prop] of removeSavings) {
             this.unsetNodeSaving(obj, prop);
         }
