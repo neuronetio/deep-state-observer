@@ -143,33 +143,38 @@ var DeepState = /** @class */ (function () {
         this.savedTrace = [];
         this.collection = null;
         this.collections = 0;
-        this.silent = false;
         this.proxyProperty = "___deep_state_observer___";
+        this.rootProxyNode = {
+            ___deep_state_observer___: {
+                path: "___deep_state_observer___",
+                pathChunks: ["___deep_state_observer___"],
+                saving: false,
+                parent: null
+            }
+        };
         this.handler = {
-            set: function (obj, prop, value, proxy) {
+            set: function (parent, prop, value, proxy) {
                 if (prop === _this.proxyProperty)
                     return true;
-                if (!obj[_this.proxyProperty].saving) {
-                    var path = obj[_this.proxyProperty]
-                        ? obj[_this.proxyProperty].path
-                            ? obj[_this.proxyProperty].path + _this.options.delimiter + prop
-                            : prop
-                        : prop;
-                    if (!_this.silent && !_this.parentIsSaving(path)) {
+                if (!parent[_this.proxyProperty].saving) {
+                    var path = parent[_this.proxyProperty].path + _this.options.delimiter + prop;
+                    if (!_this.isSaving(parent[_this.proxyProperty].pathChunks, parent)) {
                         _this.update(path, value);
                     }
                     else {
+                        parent[_this.proxyProperty].saving = true;
                         if (typeof value === "function") {
                             value = value(_this.pathGet(_this.split(path), _this.data));
                         }
                         if (isObject(value) || Array.isArray(value)) {
-                            value = _this.makeObservable(value, path);
+                            value = _this.makeObservable(value, path, parent);
                         }
-                        obj[prop] = value;
+                        parent[prop] = value;
+                        parent[_this.proxyProperty].saving = false;
                     }
                 }
                 else {
-                    obj[prop] = value;
+                    parent[prop] = value;
                 }
                 return true;
             }
@@ -178,7 +183,7 @@ var DeepState = /** @class */ (function () {
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
         this.options = __assign(__assign({}, getDefaultOptions()), options);
-        this.data = this.makeObservable(data, "");
+        this.data = this.makeObservable(data, "", this.rootProxyNode);
         this.proxy = this.data;
         this.$$$ = this.proxy;
         this.id = 0;
@@ -195,25 +200,28 @@ var DeepState = /** @class */ (function () {
         this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard);
         this.destroyed = false;
     }
-    DeepState.prototype.getParent = function (path) {
-        if (path) {
-            var split = this.split(path);
-            split.pop();
-            if (!split.length)
-                return this.data;
-            return this.pathGet(split, this.data);
-        }
+    DeepState.prototype.getParent = function (pathChunks, proxyNode) {
+        if (proxyNode && typeof proxyNode[this.proxyProperty] !== "undefined")
+            return proxyNode[this.proxyProperty].parent;
+        if (pathChunks.length === 0)
+            return this.rootProxyNode;
+        var split = pathChunks.slice();
+        split.pop();
+        return this.pathGet(split, this.data);
     };
-    DeepState.prototype.parentIsSaving = function (path) {
-        var split = this.split(path);
-        var parent = this.getParent(split.join(this.options.delimiter));
+    DeepState.prototype.isSaving = function (pathChunks, proxyNode) {
+        var parent = this.getParent(pathChunks, proxyNode);
         if (parent) {
-            if (parent && parent[this.proxyProperty].saving)
+            if (parent[this.proxyProperty].saving)
                 return true;
-            split.pop();
-            return this.parentIsSaving(split.join(this.options.delimiter));
+            return this.isSaving(parent[this.proxyProperty].pathChunks, parent);
         }
         return false;
+    };
+    DeepState.prototype.setSaving = function (pathChunks, proxyNode, saving) {
+        var parent = this.getParent(pathChunks, proxyNode);
+        if (parent)
+            parent[this.proxyProperty].saving = saving;
     };
     DeepState.prototype.setProxy = function (target, data) {
         if (typeof target[this.proxyProperty] === "undefined") {
@@ -230,25 +238,25 @@ var DeepState = /** @class */ (function () {
         }
         return target;
     };
-    DeepState.prototype.makeObservable = function (target, path) {
+    DeepState.prototype.makeObservable = function (target, path, parent) {
         if (isObject(target) || Array.isArray(target)) {
             if (isObject(target)) {
                 for (var key in target) {
                     if (key === this.proxyProperty)
                         continue;
                     if (isObject(target[key]) || Array.isArray(target[key])) {
-                        target[key] = this.makeObservable(target[key], "" + (path ? path + this.options.delimiter : "") + key);
+                        target[key] = this.makeObservable(target[key], "" + (path ? path + this.options.delimiter : "") + key, target);
                     }
                 }
             }
             else {
                 for (var key = 0, len = target.length; key < len; key++) {
                     if (isObject(target[key]) || Array.isArray(target[key])) {
-                        target[key] = this.makeObservable(target[key], "" + (path ? path + this.options.delimiter : "") + key);
+                        target[key] = this.makeObservable(target[key], "" + (path ? path + this.options.delimiter : "") + key, target);
                     }
                 }
             }
-            target = this.setProxy(target, { path: path, saving: false });
+            target = this.setProxy(target, { path: path, pathChunks: this.split(path), saving: false, parent: parent });
         }
         return target;
     };
@@ -530,7 +538,7 @@ var DeepState = /** @class */ (function () {
         this.listenersIgnoreCache.set(listener, { truthy: [], falsy: [] });
         var listenersCollection = this.getListenersCollection(listenerPath, listener);
         if (options.debug) {
-            console.log();
+            console.log("[subscribe]", { listenerPath: listenerPath, options: options });
         }
         listenersCollection.count++;
         if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
@@ -1199,16 +1207,13 @@ var DeepState = /** @class */ (function () {
     DeepState.prototype.canBeNested = function (newValue) {
         return typeof newValue === "object" && newValue !== null;
     };
-    DeepState.prototype.getUpdateValues = function (oldValue, split, fn) {
+    DeepState.prototype.getUpdateValues = function (oldValue, split, fn, parent) {
         var newValue = fn;
         if (typeof fn === "function") {
-            var silent = this.silent;
-            this.silent = true;
-            newValue = fn(this.pathGet(split, this.data));
-            this.silent = silent;
+            newValue = fn(oldValue);
         }
         if (isObject(newValue) || Array.isArray(newValue))
-            newValue = this.makeObservable(newValue, split.join(this.options.delimiter));
+            newValue = this.makeObservable(newValue, split.join(this.options.delimiter), parent);
         return { newValue: newValue, oldValue: oldValue };
     };
     DeepState.prototype.wildcardNotify = function (groupedListenersPack) {
@@ -1237,10 +1242,9 @@ var DeepState = /** @class */ (function () {
         var updated = {};
         for (var path in scanned) {
             var split = this.split(path);
-            var parent_1 = this.getParent(path);
-            if (parent_1)
-                parent_1[this.proxyProperty].saving = true;
-            var _a = this.getUpdateValues(scanned[path], split, fn), oldValue = _a.oldValue, newValue = _a.newValue;
+            var parent_1 = this.getParent(split, scanned[path]);
+            this.setSaving(split, scanned[path], true);
+            var _a = this.getUpdateValues(scanned[path], split, fn, parent_1), oldValue = _a.oldValue, newValue = _a.newValue;
             if (!this.same(newValue, oldValue) || options.force) {
                 this.pathSet(split, newValue, this.data);
                 updated[path] = newValue;
@@ -1266,18 +1270,14 @@ var DeepState = /** @class */ (function () {
                 var queue = self_1.wildcardNotify(groupedListenersPack);
                 self_1.sortAndRunQueue(queue, updatePath);
                 for (var path in scanned) {
-                    var parent_2 = self_1.getParent(path);
-                    if (parent_2)
-                        parent_2[self_1.proxyProperty].saving = false;
+                    self_1.setSaving(self_1.split(path), scanned[path], false);
                 }
             };
         }
         var queue = this.wildcardNotify(groupedListenersPack);
         this.sortAndRunQueue(queue, updatePath);
         for (var path in scanned) {
-            var parent_3 = this.getParent(path);
-            if (parent_3)
-                parent_3[this.proxyProperty].saving = false;
+            this.setSaving(this.split(path), scanned[path], false);
         }
     };
     DeepState.prototype.updateNotify = function (updatePath, newValue, options) {
@@ -1342,10 +1342,9 @@ var DeepState = /** @class */ (function () {
         }
         var split = this.split(updatePath);
         var currentValue = this.pathGet(split, this.data);
-        var parent = this.getParent(updatePath);
-        if (parent)
-            parent[this.proxyProperty].saving = true; // parent here because getUpdateValues will fire update fn
-        var _a = this.getUpdateValues(currentValue, split, fnOrValue), oldValue = _a.oldValue, newValue = _a.newValue;
+        this.setSaving(split, currentValue, true);
+        var parent = this.getParent(split, currentValue);
+        var _a = this.getUpdateValues(currentValue, split, fnOrValue, parent), oldValue = _a.oldValue, newValue = _a.newValue;
         if (options.debug) {
             this.options.log("Updating " + updatePath + " " + (options.source ? "from " + options.source : ""), {
                 oldValue: oldValue,
@@ -1364,8 +1363,7 @@ var DeepState = /** @class */ (function () {
         if (options.only === null) {
             if (multi)
                 return function () { };
-            if (parent)
-                parent[this.proxyProperty].saving = false;
+            this.setSaving(split, newValue, false);
             return newValue;
         }
         if (options.only.length) {
@@ -1373,28 +1371,24 @@ var DeepState = /** @class */ (function () {
                 var self_2 = this;
                 return function () {
                     var result = self_2.updateNotifyOnly(updatePath, newValue, options);
-                    if (parent)
-                        parent[self_2.proxyProperty].saving = false;
+                    self_2.setSaving(split, newValue, false);
                     return result;
                 };
             }
             this.updateNotifyOnly(updatePath, newValue, options);
-            if (parent)
-                parent[this.proxyProperty].saving = false;
+            this.setSaving(split, newValue, false);
             return newValue;
         }
         if (multi) {
             var self_3 = this;
             return function multiUpdate() {
                 var result = self_3.updateNotify(updatePath, newValue, options);
-                if (parent)
-                    parent[self_3.proxyProperty].saving = false;
+                self_3.setSaving(split, newValue, false);
                 return result;
             };
         }
         this.updateNotify(updatePath, newValue, options);
-        if (parent)
-            parent[this.proxyProperty].saving = false;
+        this.setSaving(split, newValue, false);
         return newValue;
     };
     DeepState.prototype.multi = function (grouped) {
@@ -1420,16 +1414,17 @@ var DeepState = /** @class */ (function () {
                 if (grouped) {
                     var split = self.split(updatePath);
                     var value = fnOrValue;
+                    var currentValue = self.pathGet(split, self.data);
+                    self.setSaving(split, currentValue, true);
                     if (typeof value === "function") {
-                        value = value(self.pathGet(split, self.data));
+                        value = value(currentValue);
                     }
                     if (isObject(value) || Array.isArray(value)) {
-                        value = self.makeObservable(value, updatePath);
+                        var parent_2 = self.getParent(split, currentValue);
+                        value = self.makeObservable(value, updatePath, parent_2);
                     }
-                    var parent_4 = self.getParent(updatePath);
-                    parent_4[self.proxyProperty].saving = true;
                     self.pathSet(split, value, self.data);
-                    parent_4[self.proxyProperty].saving = false;
+                    self.setSaving(split, currentValue, false);
                     updateStack.push({ updatePath: updatePath, newValue: value, options: options });
                 }
                 else {

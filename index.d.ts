@@ -149,6 +149,17 @@ declare type PathValue<T, P extends PossiblePath<T>> = P extends `${infer K}.${i
 export interface UnknownObject {
     [key: string]: unknown;
 }
+export interface ProxyNode {
+    [key: string]: unknown;
+    [n: number]: unknown;
+    ___deep_state_observer___: ProxyData;
+}
+export interface ProxyData {
+    path: string;
+    pathChunks: string[];
+    saving: boolean;
+    parent: ProxyNode | null;
+}
 declare class DeepState<T> {
     private listeners;
     private data;
@@ -171,8 +182,8 @@ declare class DeepState<T> {
     private savedTrace;
     private collection;
     private collections;
-    silent: boolean;
     readonly proxyProperty = "___deep_state_observer___";
+    private rootProxyNode;
     private handler;
     proxy: T;
     /**
@@ -181,7 +192,8 @@ declare class DeepState<T> {
     $$$: T;
     constructor(data?: T | object, options?: Options);
     private getParent;
-    private parentIsSaving;
+    private isSaving;
+    private setSaving;
     private setProxy;
     private makeObservable;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
