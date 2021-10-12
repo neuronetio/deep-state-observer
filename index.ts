@@ -251,7 +251,7 @@ function getDefaultOptions(): Options {
     param: `:`,
     wildcard: `*`,
     experimentalMatch: false,
-    useObjectMaps: true,
+    useObjectMaps: false,
     useProxy: false,
     maxSimultaneousJobs: 1000,
     maxQueueRuns: 1000,

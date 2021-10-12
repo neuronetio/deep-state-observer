@@ -84,65 +84,6 @@ onDestroy(() => {
 });
 ```
 
-## Update and proxy
-
-You can use proxy instead of `state.update` function.
-Proxy is better because values are linted;
-
-```js
-const state = new State({ x: { y: { z: 10 } } });
-
-state.update("x.y.z", 20);
-// is equivalent of
-state.proxy.x.y.z = 20;
-// is equivalent of (state.$$$ is just shorthand for state.proxy)
-state.$$$.x.y.z = 20;
-
-// and with function
-
-state.update("x.y.z", (value) => {
-  return value + 10;
-});
-// is equivalent of
-state.proxy.x.y.z = (value) => {
-  return value + 10;
-};
-// is equivalent of
-state.$$$.x.y.z = (value) => {
-  return value + 10;
-};
-```
-
-## All objects and arrays are reactive (proxies)
-
-```js
-const state = new State({ x: { y: { z: 10 } } });
-let counter = 0;
-state.subscribe("x.y.z", () => {
-  counter++;
-});
-
-// counter === 1
-// x.y.z === 10
-
-const z = state.get("x.y.z");
-z = 20;
-
-// counter === 1
-// x.y.z === 10 because it is not an object or array
-
-const y = state.get("x.y"); // object
-y.z = 20; // change detected
-
-// counter === 2
-// x.y.z === 20
-
-state.proxy.x = { y: { z: 30 } };
-
-// counter === 3
-// x.y.z === 30
-```
-
 ## Wildcards
 
 ```javascript
@@ -497,7 +438,7 @@ multi.done(); // notify all listeners about updates - fire only once grouped lis
 // values[3] === 'all'
 ```
 
-## group
+## group - very useful if you want to join couple of changes into one
 
 With subscribeAll you can group listeners to fire only once if one of the path is changed.
 Grouped listeners always are bulk listeners.
