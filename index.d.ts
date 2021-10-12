@@ -182,6 +182,7 @@ declare class DeepState {
     readonly proxyProperty = "___deep_state_observer___";
     private rootProxyNode;
     private handler;
+    private objectMapOnlyHandler;
     proxy: object;
     /**
      * @property $$$ proxy shorthand
@@ -200,8 +201,10 @@ declare class DeepState {
     private addSaving;
     private removeSaving;
     private setProxy;
+    private setProxyForMapOnly;
     private isProxy;
     private makeObservable;
+    private makeProxyForMapOnly;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
     getListeners(): Listeners;

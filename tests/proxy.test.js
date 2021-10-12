@@ -329,6 +329,25 @@ describe("Proxy", () => {
     expect(state.data.e.tu).toEqual("tu");
   });
 
+  it("should update map when we are changing update property (only maps)", () => {
+    const state = new State({ x: { y: { z: 1 } } }, { useObjectMaps: true, useProxy: false });
+    const values = [];
+    state.subscribe("x.y.z", (val) => {
+      values.push(val);
+    });
+    expect(values[0]).toEqual(1);
+    state.update("", (oldValue) => {
+      oldValue.xx = { yy: 10 };
+      return oldValue;
+    });
+    expect(state.data.xx.yy).toEqual(10);
+    expect(state.get("xx.yy")).toEqual(10);
+    const root = state.get("");
+    root.oo = { ww: 10 };
+    expect(state.data.oo.ww).toEqual(10);
+    expect(state.get("oo.ww")).toEqual(10);
+  });
+
   it("should save function", () => {
     const values = [];
     const state = new State(

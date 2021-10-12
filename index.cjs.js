@@ -482,10 +482,24 @@ class DeepState {
                 return true;
             },
         };
+        this.objectMapOnlyHandler = {
+            set(obj, prop, value) {
+                if (prop === this.proxyProperty)
+                    return true;
+                if (prop in obj && (this.same(obj[prop], value) || (this.isProxy(value) && obj[prop] === value))) {
+                    return true;
+                }
+                const path = obj[this.proxyProperty].path ? obj[this.proxyProperty].path + this.options.delimiter + prop : prop;
+                this.updateMapDown(path, value, obj);
+                obj[prop] = value;
+                return true;
+            },
+        };
         this.map = new Map();
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
+        this.objectMapOnlyHandler.set = this.objectMapOnlyHandler.set.bind(this);
         this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
         if (this.options.useObjectMaps) {
             this.data = this.updateMapDown("", data, this.rootProxyNode, false);
@@ -731,10 +745,31 @@ class DeepState {
         }
         return target;
     }
+    setProxyForMapOnly(target, data) {
+        if (!this.options.useObjectMaps)
+            return target;
+        if (typeof target[this.proxyProperty] === "undefined") {
+            Object.defineProperty(target, this.proxyProperty, {
+                enumerable: false,
+                writable: false,
+                configurable: false,
+                value: data,
+            });
+            return new Proxy(target, this.objectMapOnlyHandler);
+        }
+        else {
+            for (const key in data) {
+                target[this.proxyProperty][key] = data[key];
+            }
+        }
+        return target;
+    }
     isProxy(target) {
         return typeof target[this.proxyProperty] !== "undefined";
     }
     makeObservable(target, path, parent) {
+        if (!this.options.useProxy && this.options.useObjectMaps)
+            return this.makeProxyForMapOnly(target, path, parent);
         if (!this.options.useProxy)
             return target;
         if (isObject(target) || Array.isArray(target)) {
@@ -774,6 +809,42 @@ class DeepState {
                 proxyObj.saving = [];
                 proxyObj.parent = parent;
                 target = this.setProxy(target, proxyObj);
+            }
+        }
+        return target;
+    }
+    makeProxyForMapOnly(target, path, parent) {
+        if (!this.options.useObjectMaps)
+            return target;
+        if (isObject(target) || Array.isArray(target)) {
+            if (typeof target[this.proxyProperty] !== "undefined") {
+                const pp = target[this.proxyProperty];
+                if (pp.path === path && pp.parent === parent)
+                    return target;
+            }
+            if (isObject(target)) {
+                for (const key in target) {
+                    if (key === this.proxyProperty)
+                        continue;
+                    if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
+                        target[key] = this.makeProxyForMapOnly(target[key], `${path ? path + this.options.delimiter : ""}${key}`, target);
+                    }
+                }
+            }
+            else {
+                for (let key = 0, len = target.length; key < len; key++) {
+                    if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
+                        target[key] = this.makeProxyForMapOnly(target[key], `${path ? path + this.options.delimiter : ""}${key}`, target);
+                    }
+                }
+            }
+            if (!this.isProxy(target)) {
+                const proxyObj = Object.create(null);
+                proxyObj.path = path;
+                proxyObj.pathChunks = this.split(path);
+                proxyObj.saving = [];
+                proxyObj.parent = parent;
+                target = this.setProxyForMapOnly(target, proxyObj);
             }
         }
         return target;

@@ -3,6 +3,7 @@ const State = require("./index.cjs.js");
 
 const width = 10;
 const height = 1000;
+const subs = 100;
 
 function getObj() {
   const obj = {};
@@ -16,12 +17,24 @@ function getObj() {
   return obj;
 }
 
-const noProxyNoMaps = new State(getObj(), { useProxy: false, useObjectMaps: false });
-const ProxyNoMaps = new State(getObj(), { useProxy: true, useObjectMaps: false });
-const noProxyMaps = new State(getObj(), { useProxy: false, useObjectMaps: true });
-const ProxyMaps = new State(getObj(), { useProxy: true, useObjectMaps: true });
-
 const item = `h${Math.round(height / 2)}.w${Math.round(width / 2)}`;
+
+function generateSubs(state) {
+  for (let i = 0; i < subs; i++) {
+    state.subscribe(item, () => {
+      const x = 1 + Math.random();
+    });
+  }
+}
+
+const noProxyNoMaps = new State(getObj(), { useProxy: false, useObjectMaps: false });
+generateSubs(noProxyNoMaps);
+const ProxyNoMaps = new State(getObj(), { useProxy: true, useObjectMaps: false });
+generateSubs(ProxyNoMaps);
+const noProxyMaps = new State(getObj(), { useProxy: false, useObjectMaps: true });
+generateSubs(noProxyMaps);
+const ProxyMaps = new State(getObj(), { useProxy: true, useObjectMaps: true });
+generateSubs(ProxyMaps);
 
 console.log("update & get");
 new Benchmark.Suite("update get")
