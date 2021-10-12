@@ -149,6 +149,7 @@ var WildcardObject = /** @class */ (function () {
         var e_2, _a;
         var result = {};
         var pathDelimitersCount = this.getIndicesCount(this.delimiter, path);
+        var len = path.length;
         try {
             for (var _b = __values(this.objectMap), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var _d = __read(_c.value, 2), key = _d[0], value = _d[1];

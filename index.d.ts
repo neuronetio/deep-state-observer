@@ -193,7 +193,6 @@ declare class DeepState {
     constructor(data?: object, options?: Options);
     private deleteFromMap;
     private updateMapDown;
-    private deleteMapReferences;
     private pathGet;
     private pathSet;
     private getParent;

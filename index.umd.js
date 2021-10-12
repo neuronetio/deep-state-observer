@@ -205,6 +205,7 @@
         getFromMap(path) {
             const result = {};
             const pathDelimitersCount = this.getIndicesCount(this.delimiter, path);
+            path.length;
             for (const [key, value] of this.objectMap) {
                 if (this.getIndicesCount(this.delimiter, key) === pathDelimitersCount && this.match(path, key)) {
                     result[key] = value;
@@ -416,7 +417,7 @@
             wildcard: `*`,
             experimentalMatch: false,
             useObjectMaps: true,
-            useProxy: true,
+            useProxy: false,
             maxSimultaneousJobs: 1000,
             maxQueueRuns: 1000,
             log,
@@ -506,7 +507,12 @@
                         return true;
                     }
                     const path = obj[this.proxyProperty].path ? obj[this.proxyProperty].path + this.options.delimiter + prop : prop;
-                    obj[prop] = this.updateMapDown(path, value, obj);
+                    if (!this.isSaving(this.split(path), obj)) {
+                        obj[prop] = this.updateMapDown(path, value, obj);
+                    }
+                    else {
+                        obj[prop] = value;
+                    }
                     return true;
                 },
                 deleteProperty: (obj, prop) => {
@@ -526,7 +532,9 @@
             this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
             if (this.options.useObjectMaps) {
                 // updateMapDown will check if we are using proxy or not
+                this.setNodeSaving(this.rootProxyNode, "");
                 this.data = this.updateMapDown("", data, this.rootProxyNode, false);
+                this.unsetNodeSaving(this.rootProxyNode, "");
             }
             else if (this.options.useProxy) {
                 this.data = this.makeObservable(data, "", this.rootProxyNode);
@@ -563,8 +571,6 @@
         }
         deleteFromMap(fullPath, map = this.map) {
             for (const key of map.keys()) {
-                if (key === this.proxyProperty)
-                    continue;
                 if (key.startsWith(fullPath))
                     map.delete(key);
             }
@@ -601,14 +607,6 @@
             }
             map.set(fullPath, value);
             return value;
-        }
-        deleteMapReferences(path) {
-            if (!this.options.useObjectMaps)
-                return;
-            for (const key of this.map.keys()) {
-                if (key.startsWith(path))
-                    this.map.delete(key);
-            }
         }
         pathGet(path) {
             if (!this.options.useObjectMaps)
@@ -648,7 +646,7 @@
                 this.setNodeSaving(obj[prop], pathChunks[i + 1]); // do not notify anything now
                 removeSavings.push([obj[prop], pathChunks[i + 1]]);
                 if (!referencesDeleted) {
-                    this.deleteMapReferences(currentPath);
+                    this.deleteFromMap(currentPath);
                     referencesDeleted = true;
                 }
                 this.map.set(currentPath, obj[prop]);
@@ -667,9 +665,6 @@
             }
             else {
                 parent = obj;
-            }
-            if (!parent) {
-                console.log("pathSet", pathChunks, obj, this.rootProxyNode, this.data);
             }
             if (this.options.useProxy) {
                 // NOTICE: we are using objectMaps because this method is fired otherwise it is replaced by object traverse pathSet

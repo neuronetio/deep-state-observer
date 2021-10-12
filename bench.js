@@ -27,14 +27,35 @@ function generateSubs(state) {
   }
 }
 
-const noProxyNoMaps = new State(getObj(), { useProxy: false, useObjectMaps: false });
-generateSubs(noProxyNoMaps);
-const ProxyNoMaps = new State(getObj(), { useProxy: true, useObjectMaps: false });
-generateSubs(ProxyNoMaps);
-const noProxyMaps = new State(getObj(), { useProxy: false, useObjectMaps: true });
-generateSubs(noProxyMaps);
-const ProxyMaps = new State(getObj(), { useProxy: true, useObjectMaps: true });
-generateSubs(ProxyMaps);
+let noProxyNoMaps;
+let ProxyNoMaps;
+let noProxyMaps;
+let ProxyMaps;
+
+new Benchmark.Suite("create")
+  .add("no proxy no maps", function () {
+    noProxyNoMaps = new State(getObj(), { useProxy: false, useObjectMaps: false });
+    generateSubs(noProxyNoMaps);
+  })
+  .add("proxy no maps", function () {
+    ProxyNoMaps = new State(getObj(), { useProxy: true, useObjectMaps: false });
+    generateSubs(ProxyNoMaps);
+  })
+  .add("no proxy with maps", function () {
+    noProxyMaps = new State(getObj(), { useProxy: false, useObjectMaps: true });
+    generateSubs(noProxyMaps);
+  })
+  .add("proxy & maps", function () {
+    ProxyMaps = new State(getObj(), { useProxy: true, useObjectMaps: true });
+    generateSubs(ProxyMaps);
+  })
+  .on("cycle", function (event) {
+    console.log(String(event.target));
+  })
+  .on("complete", function () {
+    console.log(`Fastest is '${this.filter("fastest").map("name")}'`);
+  })
+  .run();
 
 console.log("update & get");
 new Benchmark.Suite("update get")

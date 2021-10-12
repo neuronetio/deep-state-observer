@@ -128,6 +128,7 @@ class WildcardObject {
   getFromMap(path: string) {
     const result = {};
     const pathDelimitersCount = this.getIndicesCount(this.delimiter, path);
+    const len = path.length;
     for (const [key, value] of this.objectMap) {
       if (this.getIndicesCount(this.delimiter, key) === pathDelimitersCount && this.match(path, key)) {
         result[key] = value;

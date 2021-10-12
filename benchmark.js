@@ -30,7 +30,7 @@ function prepareData() {
 }
 
 const data = prepareData();
-const state = new State(data, { useObjectMap: false, useProxy: false });
+const state = new State(data, { useObjectMap: true, useProxy: false });
 
 console.log("Data generated.", Object.keys(data.nested.values.basic.data).length);
 
@@ -100,7 +100,7 @@ t1 = Date.now();
 for (let i = 0; i < iterations; i++) {
   subscribers.push(state.subscribe("nested.*.basic.data.*.value", (value) => {}));
   const time = { start: Date.now() };
-  state.update(`nested.*.basic.data.${Math.round(Math.random() * dataItemsCount)}.value`, () => i + " mod");
+  state.update(`nested.values.basic.data.${Math.round(Math.random() * dataItemsCount)}.value`, () => i + " mod");
   time.end = Date.now();
   time.result = time.end - time.start;
   times.basic.subscribe.push(time);
