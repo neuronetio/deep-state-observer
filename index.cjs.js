@@ -487,20 +487,17 @@ class DeepState {
         this.listeners = new Map();
         this.handler.set = this.handler.set.bind(this);
         this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
-        //if (this.options.useProxy) this.options.useObjectMaps = true;
-        if (this.options.useProxy) {
-            if (this.options.useObjectMaps) {
-                this.data = this.updateMapDown("", data, this.rootProxyNode, false);
-            }
-            else {
-                this.data = this.makeObservable(data, "", this.rootProxyNode);
-            }
-            this.proxy = this.data;
-            this.$$$ = this.proxy;
+        if (this.options.useObjectMaps) {
+            this.data = this.updateMapDown("", data, this.rootProxyNode, false);
         }
-        else {
+        if (this.options.useProxy && !this.options.useObjectMaps) {
+            this.data = this.makeObservable(data, "", this.rootProxyNode);
+        }
+        if (!this.options.useObjectMaps && !this.options.useProxy) {
             this.data = data;
         }
+        this.proxy = this.data;
+        this.$$$ = this.proxy;
         this.id = 0;
         if (!this.options.useObjectMaps) {
             this.pathGet = (path) => {
@@ -565,6 +562,8 @@ class DeepState {
     pathGet(path) {
         if (!this.options.useObjectMaps)
             return ObjectPath.get(this.split(path), this.data);
+        if (!path)
+            return this.data;
         return this.map.get(path);
     }
     pathSet(pathChunks, value) {

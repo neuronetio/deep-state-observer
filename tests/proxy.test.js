@@ -305,6 +305,30 @@ describe("Proxy", () => {
     expect(state.data.e.tu).toEqual("tu");
   });
 
+  it("should update root node (only maps)", () => {
+    const state = new State({ x: { y: { z: 1 } } }, { useObjectMaps: true, useProxy: false });
+    const values = [];
+    state.subscribe("x.y.z", (val) => {
+      values.push(val);
+    });
+    expect(values[0]).toEqual(1);
+    state.update("", (oldValue) => {
+      return { x: oldValue.x, xx: { yy: { zz: 1 } } };
+    });
+    expect(state.data.xx.yy.zz).toEqual(1);
+    expect(state.data[undefined]).toBeFalsy();
+    expect(state.get("x.y.z")).toEqual(1);
+    expect(state.get("xx.yy.zz")).toEqual(1);
+    state.update("yy.zz", 22);
+    expect(state.get("yy.zz")).toEqual(22);
+    expect(state.data.yy.zz).toEqual(22);
+    state.collect();
+    state.multi(true).update("e.as", "as").update("e.tu", "tu").done();
+    state.executeCollected();
+    expect(state.data.e.as).toEqual("as");
+    expect(state.data.e.tu).toEqual("tu");
+  });
+
   it("should save function", () => {
     const values = [];
     const state = new State(
