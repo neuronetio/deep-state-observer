@@ -156,7 +156,7 @@ export interface ProxyNode {
 export interface ProxyData {
     path: string;
     pathChunks: string[];
-    saving: string[];
+    saving: (string | number)[];
     parent: ProxyNode | null;
 }
 declare class DeepState {

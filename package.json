@@ -48,6 +48,7 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^11.0.2",
     "@rollup/plugin-node-resolve": "^7.1.1",
+    "benchmark": "^2.1.4",
     "jasmine": "^3.4.0",
     "loglevel": "^1.6.4",
     "prettier": "^2.0.5",

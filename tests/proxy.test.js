@@ -1,6 +1,6 @@
 const State = require("../index.cjs.js");
 
-const options = { useProxy: true, useObjectMaps: false };
+const options = { useProxy: true, useObjectMaps: true };
 
 describe("Proxy", () => {
   it("should get value by proxy", () => {
@@ -290,9 +290,19 @@ describe("Proxy", () => {
     state.update("", (oldValue) => {
       return { x: oldValue.x, xx: { yy: { zz: 1 } } };
     });
+    expect(state.isProxy(state.data.xx.yy)).toEqual(true);
+    expect(state.isProxy(state.data)).toEqual(true);
     expect(state.data[undefined]).toBeFalsy();
     expect(state.get("x.y.z")).toEqual(1);
     expect(state.get("xx.yy.zz")).toEqual(1);
+    state.update("yy.zz", 22);
+    expect(state.get("yy.zz")).toEqual(22);
+    expect(state.data.yy.zz).toEqual(22);
+    state.collect();
+    state.multi(true).update("e.as", "as").update("e.tu", "tu").done();
+    state.executeCollected();
+    expect(state.data.e.as).toEqual("as");
+    expect(state.data.e.tu).toEqual("tu");
   });
 
   it("should save function", () => {
