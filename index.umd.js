@@ -485,30 +485,50 @@
                     }
                     return true;
                 },
+                deleteProperty: (obj, prop) => {
+                    if (!(prop in obj))
+                        return false;
+                    // delete property comes only from proxy
+                    const parentPath = obj[this.proxyProperty].path;
+                    delete obj[prop];
+                    this.update(parentPath, (currentValue) => {
+                        // only notification because value is already deleted
+                        return currentValue;
+                    });
+                    return true;
+                },
             };
             this.objectMapOnlyHandler = {
-                set(obj, prop, value) {
+                set: (obj, prop, value) => {
                     if (prop === this.proxyProperty)
                         return true;
                     if (prop in obj && (this.same(obj[prop], value) || (this.isProxy(value) && obj[prop] === value))) {
                         return true;
                     }
                     const path = obj[this.proxyProperty].path ? obj[this.proxyProperty].path + this.options.delimiter + prop : prop;
-                    this.updateMapDown(path, value, obj);
-                    obj[prop] = value;
+                    obj[prop] = this.updateMapDown(path, value, obj);
+                    return true;
+                },
+                deleteProperty: (obj, prop) => {
+                    if (!(prop in obj))
+                        return false;
+                    const path = obj[this.proxyProperty].path ? obj[this.proxyProperty].path + this.options.delimiter + prop : prop;
+                    this.deleteFromMap(path);
+                    // here we only deleting - we don't fire update because we are not using proxy observable
+                    // just object actualization
+                    delete obj[prop];
                     return true;
                 },
             };
             this.map = new Map();
             this.lastExecs = new WeakMap();
             this.listeners = new Map();
-            this.handler.set = this.handler.set.bind(this);
-            this.objectMapOnlyHandler.set = this.objectMapOnlyHandler.set.bind(this);
             this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
             if (this.options.useObjectMaps) {
+                // updateMapDown will check if we are using proxy or not
                 this.data = this.updateMapDown("", data, this.rootProxyNode, false);
             }
-            if (this.options.useProxy && !this.options.useObjectMaps) {
+            else if (this.options.useProxy) {
                 this.data = this.makeObservable(data, "", this.rootProxyNode);
             }
             if (!this.options.useObjectMaps && !this.options.useProxy) {
@@ -541,29 +561,42 @@
             }
             this.destroyed = false;
         }
+        deleteFromMap(fullPath, map = this.map) {
+            for (const key of map.keys()) {
+                if (key === this.proxyProperty)
+                    continue;
+                if (key.startsWith(fullPath))
+                    map.delete(key);
+            }
+        }
         updateMapDown(fullPath, value, parent, deleteReferences = true, map = this.map) {
             if (!this.options.useObjectMaps)
                 return value;
             if (deleteReferences) {
-                for (const key of map.keys()) {
-                    if (key === this.proxyProperty)
-                        continue;
-                    if (key.startsWith(fullPath))
-                        map.delete(key);
-                }
+                this.deleteFromMap(fullPath);
             }
             if (isObject(value)) {
                 value = this.makeObservable(value, fullPath, parent);
                 for (const prop in value) {
                     if (prop === this.proxyProperty)
                         continue;
-                    this.updateMapDown(fullPath ? fullPath + this.options.delimiter + prop : prop, value[prop], value, false, map);
+                    if (this.isProxy(parent) && this.options.useProxy)
+                        this.setNodeSaving(value, prop);
+                    const valuePropWithProxy = this.updateMapDown(fullPath ? fullPath + this.options.delimiter + prop : prop, value[prop], value, false, map);
+                    value[prop] = valuePropWithProxy;
+                    if (this.isProxy(parent) && this.options.useProxy)
+                        this.unsetNodeSaving(value, prop);
                 }
             }
             else if (Array.isArray(value)) {
                 value = this.makeObservable(value, fullPath, parent);
                 for (let i = 0, len = value.length; i < len; i++) {
-                    this.updateMapDown(fullPath ? fullPath + this.options.delimiter + String(i) : String(i), value[i], value, false, map);
+                    if (this.isProxy(parent) && this.options.useProxy)
+                        this.setNodeSaving(value, i);
+                    const valueWithProxy = this.updateMapDown(fullPath ? fullPath + this.options.delimiter + String(i) : String(i), value[i], value, false, map);
+                    value[i] = valueWithProxy;
+                    if (this.isProxy(parent) && this.options.useProxy)
+                        this.unsetNodeSaving(value, i);
                 }
             }
             map.set(fullPath, value);
@@ -634,6 +667,9 @@
             }
             else {
                 parent = obj;
+            }
+            if (!parent) {
+                console.log("pathSet", pathChunks, obj, this.rootProxyNode, this.data);
             }
             value = this.updateMapDown(currentPath, value, parent, !referencesDeleted);
             if (last) {
@@ -753,6 +789,7 @@
             if (!this.options.useObjectMaps)
                 return target;
             if (typeof target[this.proxyProperty] === "undefined") {
+                data.mapOnly = true;
                 Object.defineProperty(target, this.proxyProperty, {
                     enumerable: false,
                     writable: false,
@@ -769,7 +806,7 @@
             return target;
         }
         isProxy(target) {
-            return typeof target[this.proxyProperty] !== "undefined";
+            return target && typeof target[this.proxyProperty] !== "undefined";
         }
         makeObservable(target, path, parent) {
             if (!this.options.useProxy && this.options.useObjectMaps)
@@ -1552,6 +1589,7 @@
                 if (isObject(newValue) || Array.isArray(newValue))
                     newValue = this.makeObservable(newValue, split.join(this.options.delimiter), parent);
             }
+            // here we don't want to update maps if only maps are enabled because PathSet will update everything for us
             return { newValue, oldValue };
         }
         wildcardNotify(groupedListenersPack) {

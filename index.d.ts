@@ -158,6 +158,7 @@ export interface ProxyData {
     pathChunks: string[];
     saving: (string | number)[];
     parent: ProxyNode | null;
+    mapOnly?: boolean;
 }
 declare class DeepState {
     private listeners;
@@ -190,6 +191,7 @@ declare class DeepState {
     $$$: object;
     private map;
     constructor(data?: object, options?: Options);
+    private deleteFromMap;
     private updateMapDown;
     private deleteMapReferences;
     private pathGet;

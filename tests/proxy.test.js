@@ -312,9 +312,46 @@ describe("Proxy", () => {
       values.push(val);
     });
     expect(values[0]).toEqual(1);
+    //console.log("updating all");
     state.update("", (oldValue) => {
+      oldValue.x.byProxy = { test: 2 };
+      oldValue.aaa = { bbb: { ccc: { ddd: 10 } } };
+      oldValue.aaa.xxx = { test: 12 };
+      expect(state.isProxy(oldValue)).toEqual(true);
+      expect(oldValue[state.proxyProperty].mapOnly).toEqual(true);
+      expect(state.isProxy(oldValue.aaa)).toEqual(true);
+      expect(oldValue.aaa[state.proxyProperty].mapOnly).toEqual(true);
+      expect(state.isProxy(oldValue.aaa.bbb)).toEqual(true);
+      expect(oldValue.aaa.bbb[state.proxyProperty].mapOnly).toEqual(true);
+      // console.log(
+      //   "aaa === aaa from parent?",
+      //   oldValue.aaa === oldValue.aaa[state.proxyProperty].parent.aaa,
+      //   state.get("aaa") === oldValue.aaa,
+      //   state.data.aaa === oldValue.aaa
+      // );
+      delete oldValue.aaa.bbb.ccc.ddd;
+      delete oldValue.aaa.bbb.ccc;
+      delete oldValue.aaa.bbb;
+      delete oldValue.aaa.xxx.test;
+      delete oldValue.aaa.xxx;
+      delete oldValue.aaa;
       return { x: oldValue.x, xx: { yy: { zz: 1 } } };
     });
+    expect(state.data.byProxy).toEqual(undefined); // because old value is stored in x and whole data is replaced
+    expect(state.get("x.byProxy.test")).toEqual(2);
+    expect(state.isProxy(state.data.x.byProxy)).toEqual(true);
+    expect(state.isProxy(state.get("x.byProxy"))).toEqual(true);
+    expect(state.data.x.byProxy[state.proxyProperty].mapOnly).toEqual(true);
+    expect(state.data.x[state.proxyProperty].mapOnly).toEqual(true);
+    expect(state.data[state.proxyProperty].mapOnly).toEqual(true);
+    const root = state.get("");
+    expect(state.isProxy(root.x.byProxy)).toEqual(true);
+    delete root.x.byProxy.test;
+    expect("test" in state.data.x.byProxy).toEqual(false);
+    expect(state.get("x.byProxy.test")).toEqual(undefined);
+    delete root.x.byProxy;
+    expect("byProxy" in state.data.x).toEqual(false);
+    expect(state.get("x.byProxy")).toEqual(undefined);
     expect(state.data.xx.yy.zz).toEqual(1);
     expect(state.data[undefined]).toBeFalsy();
     expect(state.get("x.y.z")).toEqual(1);
