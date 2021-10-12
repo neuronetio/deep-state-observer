@@ -519,7 +519,11 @@ class DeepState {
     if (!parent) {
       console.log("pathSet", pathChunks, obj, this.rootProxyNode, this.data);
     }
-    value = this.updateMapDown(currentPath, value, parent as ProxyNode, !referencesDeleted);
+    if (this.options.useProxy) {
+      // NOTICE: we are using objectMaps because this method is fired otherwise it is replaced by object traverse pathSet
+      // if not using proxy objectMaps will update map down inside handler
+      value = this.updateMapDown(currentPath, value, parent as ProxyNode, !referencesDeleted);
+    }
     if (last) {
       this.setNodeSaving(parent, last);
       obj[last] = value;
