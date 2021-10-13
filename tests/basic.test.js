@@ -879,6 +879,15 @@ describe('State', () => {
     expect(state.listeners.get('one.two;').count).toEqual(1);
   });
 
+  it('should change data without update', () => {
+    const state = new State({ x: { y: { z: 2 } }, xx: 22 });
+    expect(state.get('x.y.z')).toEqual(2);
+    const y = state.get('x.y');
+    y.z = 22;
+    expect(state.get('x.y.z')).toEqual(22);
+    expect(state.data.x.y.z).toEqual(22);
+  });
+
   it('should ignore ignored changes', () => {
     const state = new State({ one: { two: { three: { four: { five: 0 } } } } });
     const values = [];

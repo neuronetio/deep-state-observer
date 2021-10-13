@@ -210,6 +210,15 @@ var DeepState = /** @class */ (function () {
         }
         return ObjectPath_1["default"].set(pathChunks, value, data);
     };
+    /**
+     * Silently update data
+     * @param path string
+     * @param value any
+     * @returns
+     */
+    DeepState.prototype.silentSet = function (path, value) {
+        return this.pathSet(this.split(path), value, this.data);
+    };
     DeepState.prototype.loadWasmMatcher = function (pathToWasmFile) {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {

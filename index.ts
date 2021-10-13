@@ -362,6 +362,16 @@ class DeepState {
     return Path.set(pathChunks, value, data);
   }
 
+  /**
+   * Silently update data
+   * @param path string
+   * @param value any
+   * @returns
+   */
+  public silentSet(path: string, value: any) {
+    return this.pathSet(this.split(path), value, this.data);
+  }
+
   public async loadWasmMatcher(pathToWasmFile: string) {
     await init(pathToWasmFile);
     this.is_match = is_match;

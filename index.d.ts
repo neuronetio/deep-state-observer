@@ -179,6 +179,13 @@ declare class DeepState {
     constructor(data?: object, options?: Options);
     private cacheGet;
     private cacheSet;
+    /**
+     * Silently update data
+     * @param path string
+     * @param value any
+     * @returns
+     */
+    silentSet(path: string, value: any): any;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
     getListeners(): Listeners;

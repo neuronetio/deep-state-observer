@@ -469,6 +469,15 @@ class DeepState {
         }
         return ObjectPath.set(pathChunks, value, data);
     }
+    /**
+     * Silently update data
+     * @param path string
+     * @param value any
+     * @returns
+     */
+    silentSet(path, value) {
+        return this.pathSet(this.split(path), value, this.data);
+    }
     loadWasmMatcher(pathToWasmFile) {
         return __awaiter(this, void 0, void 0, function* () {
             yield init(pathToWasmFile);
