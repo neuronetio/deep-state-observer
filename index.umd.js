@@ -389,6 +389,7 @@
         source: "",
         debug: false,
         data: undefined,
+        queue: false,
         force: false,
     };
     function log(message, info) {
@@ -416,6 +417,7 @@
             param: `:`,
             wildcard: `*`,
             experimentalMatch: false,
+            queue: false,
             useObjectMaps: false,
             useProxy: false,
             maxSimultaneousJobs: 1000,
@@ -429,14 +431,18 @@
         debug: false,
         source: "",
         data: undefined,
+        queue: false,
         group: false,
     };
     class DeepState {
         constructor(data = {}, options = {}) {
+            this.jobsRunning = 0;
+            this.updateQueue = [];
             this.subscribeQueue = [];
             this.listenersIgnoreCache = new WeakMap();
             this.is_match = null;
             this.destroyed = false;
+            this.queueRuns = 0;
             this.groupId = 0;
             this.traceId = 0;
             // private pathGet: any;
@@ -529,6 +535,7 @@
             this.map = new Map();
             this.lastExecs = new WeakMap();
             this.listeners = new Map();
+            this.waitingListeners = new Map();
             this.options = Object.assign(Object.assign({}, getDefaultOptions()), options);
             if (this.options.useObjectMaps) {
                 // updateMapDown will check if we are using proxy or not
@@ -907,6 +914,9 @@
             this.destroyed = true;
             this.data = undefined;
             this.listeners = new Map();
+            this.waitingListeners = new Map();
+            this.updateQueue = [];
+            this.jobsRunning = 0;
         }
         match(first, second, nested = true) {
             if (this.is_match)
@@ -1018,6 +1028,51 @@
             }
             return result;
         }
+        waitForAll(userPaths, fn) {
+            const paths = {};
+            for (let path of userPaths) {
+                paths[path] = { dirty: false };
+                if (this.hasParams(path)) {
+                    paths[path].paramsInfo = this.getParamsInfo(path);
+                }
+                paths[path].isWildcard = this.isWildcard(path);
+                paths[path].isRecursive = !this.isNotRecursive(path);
+            }
+            this.waitingListeners.set(userPaths, { fn, paths });
+            fn(paths);
+            return function unsubscribe() {
+                this.waitingListeners.delete(userPaths);
+            };
+        }
+        executeWaitingListeners(updatePath) {
+            if (this.destroyed)
+                return;
+            for (const waitingListener of this.waitingListeners.values()) {
+                const { fn, paths } = waitingListener;
+                let dirty = 0;
+                let all = 0;
+                for (let path in paths) {
+                    const pathInfo = paths[path];
+                    let match = false;
+                    if (pathInfo.isRecursive)
+                        updatePath = this.cutPath(updatePath, path);
+                    if (pathInfo.isWildcard && this.match(path, updatePath))
+                        match = true;
+                    if (updatePath === path)
+                        match = true;
+                    if (match) {
+                        pathInfo.dirty = true;
+                    }
+                    if (pathInfo.dirty) {
+                        dirty++;
+                    }
+                    all++;
+                }
+                if (dirty === all) {
+                    fn(paths);
+                }
+            }
+        }
         subscribeAll(userPaths, fn, options = defaultListenerOptions) {
             if (this.destroyed)
                 return () => { };
@@ -1113,6 +1168,7 @@
         }) {
             if (this.destroyed)
                 return () => { };
+            this.jobsRunning++;
             const type = "subscribe";
             let listener = this.getCleanListener(fn, options);
             if (options.group)
@@ -1190,6 +1246,7 @@
                 }
             }
             this.debugSubscribe(listener, listenersCollection, listenerPath);
+            this.jobsRunning--;
             return this.unsubscribe(listenerPath, this.id);
         }
         unsubscribe(path, id) {
@@ -1208,11 +1265,28 @@
                 return;
             if (this.subscribeQueue.length === 0)
                 return;
-            const queue = [...this.subscribeQueue];
-            for (let i = 0, len = queue.length; i < len; i++) {
-                queue[i]();
+            if (this.jobsRunning === 0) {
+                this.queueRuns = 0;
+                const queue = [...this.subscribeQueue];
+                for (let i = 0, len = queue.length; i < len; i++) {
+                    queue[i]();
+                }
+                this.subscribeQueue.length = 0;
             }
-            this.subscribeQueue.length = 0;
+            else {
+                this.queueRuns++;
+                if (this.queueRuns >= this.options.maxQueueRuns) {
+                    this.queueRuns = 0;
+                    throw new Error("Maximal number of queue runs exhausted.");
+                }
+                else {
+                    Promise.resolve()
+                        .then(() => this.runQueuedListeners())
+                        .catch((e) => {
+                        throw e;
+                    });
+                }
+            }
         }
         getQueueNotifyListeners(groupedListeners, queue = []) {
             for (const path in groupedListeners) {
@@ -1236,21 +1310,28 @@
                     }
                     const time = this.debugTime(singleListener);
                     if (!this.isMuted(singleListener.listener.fn)) {
-                        let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
-                        if (!singleListener.eventInfo.path.resolved) {
-                            resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
-                        }
-                        queue.push({
-                            id: singleListener.listener.id,
-                            resolvedPath: singleListener.eventInfo.path.resolved,
-                            resolvedIdPath,
-                            originalFn: singleListener.listener.fn,
-                            fn: () => {
+                        if (singleListener.listener.options.queue && this.jobsRunning) {
+                            this.subscribeQueue.push(() => {
                                 singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
-                            },
-                            options: singleListener.listener.options,
-                            groupId: singleListener.listener.groupId,
-                        });
+                            });
+                        }
+                        else {
+                            let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                            if (!singleListener.eventInfo.path.resolved) {
+                                resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                            }
+                            queue.push({
+                                id: singleListener.listener.id,
+                                resolvedPath: singleListener.eventInfo.path.resolved,
+                                resolvedIdPath,
+                                originalFn: singleListener.listener.fn,
+                                fn: () => {
+                                    singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                                },
+                                options: singleListener.listener.options,
+                                groupId: singleListener.listener.groupId,
+                            });
+                        }
                     }
                     this.debugListener(time, singleListener);
                 }
@@ -1270,21 +1351,32 @@
                         bulkValue.push(Object.assign(Object.assign({}, bulk), { value: bulk.value() }));
                     }
                     if (!this.isMuted(bulkListener.listener.fn)) {
-                        let resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
-                        if (!bulkListener.eventInfo.path.resolved) {
-                            resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+                        if (bulkListener.listener.options.queue && this.jobsRunning) {
+                            this.subscribeQueue.push(() => {
+                                if (!this.jobsRunning) {
+                                    bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                                    return true;
+                                }
+                                return false;
+                            });
                         }
-                        queue.push({
-                            id: bulkListener.listener.id,
-                            resolvedPath: bulkListener.eventInfo.path.resolved,
-                            resolvedIdPath,
-                            originalFn: bulkListener.listener.fn,
-                            fn: () => {
-                                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
-                            },
-                            options: bulkListener.listener.options,
-                            groupId: bulkListener.listener.groupId,
-                        });
+                        else {
+                            let resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
+                            if (!bulkListener.eventInfo.path.resolved) {
+                                resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+                            }
+                            queue.push({
+                                id: bulkListener.listener.id,
+                                resolvedPath: bulkListener.eventInfo.path.resolved,
+                                resolvedIdPath,
+                                originalFn: bulkListener.listener.fn,
+                                fn: () => {
+                                    bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                                },
+                                options: bulkListener.listener.options,
+                                groupId: bulkListener.listener.groupId,
+                            });
+                        }
                     }
                     this.debugListener(time, bulkListener);
                 }
@@ -1591,14 +1683,19 @@
             // here we don't want to update maps if only maps are enabled because PathSet will update everything for us
             return { newValue, oldValue };
         }
-        wildcardNotify(groupedListenersPack) {
+        wildcardNotify(groupedListenersPack, waitingPaths) {
             let queue = [];
             for (const groupedListeners of groupedListenersPack) {
                 this.getQueueNotifyListeners(groupedListeners, queue);
             }
+            for (const path of waitingPaths) {
+                this.executeWaitingListeners(path);
+            }
+            this.jobsRunning--;
             return queue;
         }
         wildcardUpdate(updatePath, fn, options = defaultUpdateOptions, multi = false) {
+            ++this.jobsRunning;
             options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
             const scanned = this.scan.get(updatePath);
             const updated = {};
@@ -1613,6 +1710,7 @@
                 }
             }
             const groupedListenersPack = [];
+            const waitingPaths = [];
             for (const path in updated) {
                 const newValue = updated[path];
                 if (options.only.length) {
@@ -1625,21 +1723,31 @@
                     }
                 }
                 options.debug && this.options.log("Wildcard update", { path, newValue });
+                waitingPaths.push(path);
             }
             if (multi) {
                 const self = this;
                 return function () {
-                    const queue = self.wildcardNotify(groupedListenersPack);
+                    const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
                     self.sortAndRunQueue(queue, updatePath);
                     for (const path in scanned) {
                         self.removeSaving(self.split(path), scanned[path]);
                     }
                 };
             }
-            const queue = this.wildcardNotify(groupedListenersPack);
+            const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
             this.sortAndRunQueue(queue, updatePath);
             for (const path in scanned) {
                 this.removeSaving(this.split(path), scanned[path]);
+            }
+        }
+        runUpdateQueue() {
+            if (this.destroyed)
+                return;
+            while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
+                const params = this.updateQueue.shift();
+                params.options.queue = false; // prevent infinite loop
+                this.update(params.updatePath, params.fnOrValue, params.options, params.multi);
             }
         }
         updateNotify(updatePath, newValue, options) {
@@ -1648,6 +1756,7 @@
                 this.notifyNestedListeners(updatePath, newValue, options, "update", queue);
             }
             this.sortAndRunQueue(queue, updatePath);
+            this.executeWaitingListeners(updatePath);
         }
         updateNotifyAll(updateStack) {
             let queue = [];
@@ -1673,6 +1782,7 @@
         }
         updateNotifyOnly(updatePath, newValue, options) {
             this.notifyOnly(updatePath, newValue, options);
+            this.executeWaitingListeners(updatePath);
         }
         update(updatePath, fnOrValue, options = Object.assign({}, defaultUpdateOptions), multi = false) {
             if (this.destroyed)
@@ -1686,9 +1796,26 @@
                 trace.changed.push({ traceId, updatePath, fnOrValue, options });
                 this.traceMap.set(traceId, trace);
             }
+            const jobsRunning = this.jobsRunning;
+            if ((this.options.queue || options.queue) && jobsRunning) {
+                if (jobsRunning > this.options.maxSimultaneousJobs) {
+                    throw new Error("Maximal simultaneous jobs limit reached.");
+                }
+                this.updateQueue.push({ updatePath, fnOrValue, options, multi });
+                const result = Promise.resolve().then(() => {
+                    this.runUpdateQueue();
+                });
+                if (multi) {
+                    return function () {
+                        return result;
+                    };
+                }
+                return result;
+            }
             if (this.isWildcard(updatePath)) {
                 return this.wildcardUpdate(updatePath, fnOrValue, options, multi);
             }
+            ++this.jobsRunning;
             const split = this.split(updatePath);
             const currentValue = this.pathGet(updatePath);
             const currentlySaving = this.isSaving(split, currentValue);
@@ -1702,6 +1829,7 @@
                 });
             }
             if (this.same(newValue, oldValue) && !options.force) {
+                --this.jobsRunning;
                 if (multi)
                     return function () {
                         return newValue;
@@ -1718,12 +1846,14 @@
             }
             options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
             if (options.only === null) {
+                --this.jobsRunning;
                 if (multi)
                     return function () { };
                 this.removeSaving(split, newValue);
                 return newValue;
             }
             if (options.only.length) {
+                --this.jobsRunning;
                 if (multi) {
                     const self = this;
                     return function () {
@@ -1737,6 +1867,7 @@
                 return newValue;
             }
             if (multi) {
+                --this.jobsRunning;
                 const self = this;
                 return function multiUpdate() {
                     const result = self.updateNotify(updatePath, newValue, options);
@@ -1746,6 +1877,7 @@
             }
             this.updateNotify(updatePath, newValue, options);
             this.removeSaving(split, newValue);
+            --this.jobsRunning;
             return newValue;
         }
         multi(grouped = false) {

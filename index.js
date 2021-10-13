@@ -91,6 +91,7 @@ var defaultUpdateOptions = {
     source: "",
     debug: false,
     data: undefined,
+    queue: false,
     force: false
 };
 function log(message, info) {
@@ -118,6 +119,7 @@ function getDefaultOptions() {
         param: ":",
         wildcard: "*",
         experimentalMatch: false,
+        queue: false,
         useObjectMaps: false,
         useProxy: false,
         maxSimultaneousJobs: 1000,
@@ -131,6 +133,7 @@ var defaultListenerOptions = {
     debug: false,
     source: "",
     data: undefined,
+    queue: false,
     group: false
 };
 var DeepState = /** @class */ (function () {
@@ -138,10 +141,13 @@ var DeepState = /** @class */ (function () {
         var _this = this;
         if (data === void 0) { data = {}; }
         if (options === void 0) { options = {}; }
+        this.jobsRunning = 0;
+        this.updateQueue = [];
         this.subscribeQueue = [];
         this.listenersIgnoreCache = new WeakMap();
         this.is_match = null;
         this.destroyed = false;
+        this.queueRuns = 0;
         this.groupId = 0;
         this.traceId = 0;
         // private pathGet: any;
@@ -234,6 +240,7 @@ var DeepState = /** @class */ (function () {
         this.map = new Map();
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
+        this.waitingListeners = new Map();
         this.options = __assign(__assign({}, getDefaultOptions()), options);
         if (this.options.useObjectMaps) {
             // updateMapDown will check if we are using proxy or not
@@ -655,6 +662,9 @@ var DeepState = /** @class */ (function () {
         this.destroyed = true;
         this.data = undefined;
         this.listeners = new Map();
+        this.waitingListeners = new Map();
+        this.updateQueue = [];
+        this.jobsRunning = 0;
     };
     DeepState.prototype.match = function (first, second, nested) {
         if (nested === void 0) { nested = true; }
@@ -778,8 +788,75 @@ var DeepState = /** @class */ (function () {
         }
         return result;
     };
-    DeepState.prototype.subscribeAll = function (userPaths, fn, options) {
+    DeepState.prototype.waitForAll = function (userPaths, fn) {
         var e_5, _a;
+        var paths = {};
+        try {
+            for (var userPaths_1 = __values(userPaths), userPaths_1_1 = userPaths_1.next(); !userPaths_1_1.done; userPaths_1_1 = userPaths_1.next()) {
+                var path = userPaths_1_1.value;
+                paths[path] = { dirty: false };
+                if (this.hasParams(path)) {
+                    paths[path].paramsInfo = this.getParamsInfo(path);
+                }
+                paths[path].isWildcard = this.isWildcard(path);
+                paths[path].isRecursive = !this.isNotRecursive(path);
+            }
+        }
+        catch (e_5_1) { e_5 = { error: e_5_1 }; }
+        finally {
+            try {
+                if (userPaths_1_1 && !userPaths_1_1.done && (_a = userPaths_1["return"])) _a.call(userPaths_1);
+            }
+            finally { if (e_5) throw e_5.error; }
+        }
+        this.waitingListeners.set(userPaths, { fn: fn, paths: paths });
+        fn(paths);
+        return function unsubscribe() {
+            this.waitingListeners["delete"](userPaths);
+        };
+    };
+    DeepState.prototype.executeWaitingListeners = function (updatePath) {
+        var e_6, _a;
+        if (this.destroyed)
+            return;
+        try {
+            for (var _b = __values(this.waitingListeners.values()), _c = _b.next(); !_c.done; _c = _b.next()) {
+                var waitingListener = _c.value;
+                var fn = waitingListener.fn, paths = waitingListener.paths;
+                var dirty = 0;
+                var all = 0;
+                for (var path in paths) {
+                    var pathInfo = paths[path];
+                    var match = false;
+                    if (pathInfo.isRecursive)
+                        updatePath = this.cutPath(updatePath, path);
+                    if (pathInfo.isWildcard && this.match(path, updatePath))
+                        match = true;
+                    if (updatePath === path)
+                        match = true;
+                    if (match) {
+                        pathInfo.dirty = true;
+                    }
+                    if (pathInfo.dirty) {
+                        dirty++;
+                    }
+                    all++;
+                }
+                if (dirty === all) {
+                    fn(paths);
+                }
+            }
+        }
+        catch (e_6_1) { e_6 = { error: e_6_1 }; }
+        finally {
+            try {
+                if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
+            }
+            finally { if (e_6) throw e_6.error; }
+        }
+    };
+    DeepState.prototype.subscribeAll = function (userPaths, fn, options) {
+        var e_7, _a;
         if (options === void 0) { options = defaultListenerOptions; }
         if (this.destroyed)
             return function () { };
@@ -790,8 +867,8 @@ var DeepState = /** @class */ (function () {
             options.bulk = true;
         }
         try {
-            for (var userPaths_1 = __values(userPaths), userPaths_1_1 = userPaths_1.next(); !userPaths_1_1.done; userPaths_1_1 = userPaths_1.next()) {
-                var userPath = userPaths_1_1.value;
+            for (var userPaths_2 = __values(userPaths), userPaths_2_1 = userPaths_2.next(); !userPaths_2_1.done; userPaths_2_1 = userPaths_2.next()) {
+                var userPath = userPaths_2_1.value;
                 unsubscribers.push(this.subscribe(userPath, fn, options, {
                     all: userPaths,
                     index: index,
@@ -800,27 +877,27 @@ var DeepState = /** @class */ (function () {
                 index++;
             }
         }
-        catch (e_5_1) { e_5 = { error: e_5_1 }; }
+        catch (e_7_1) { e_7 = { error: e_7_1 }; }
         finally {
             try {
-                if (userPaths_1_1 && !userPaths_1_1.done && (_a = userPaths_1["return"])) _a.call(userPaths_1);
+                if (userPaths_2_1 && !userPaths_2_1.done && (_a = userPaths_2["return"])) _a.call(userPaths_2);
             }
-            finally { if (e_5) throw e_5.error; }
+            finally { if (e_7) throw e_7.error; }
         }
         return function unsubscribe() {
-            var e_6, _a;
+            var e_8, _a;
             try {
                 for (var unsubscribers_1 = __values(unsubscribers), unsubscribers_1_1 = unsubscribers_1.next(); !unsubscribers_1_1.done; unsubscribers_1_1 = unsubscribers_1.next()) {
                     var unsubscribe_1 = unsubscribers_1_1.value;
                     unsubscribe_1();
                 }
             }
-            catch (e_6_1) { e_6 = { error: e_6_1 }; }
+            catch (e_8_1) { e_8 = { error: e_8_1 }; }
             finally {
                 try {
                     if (unsubscribers_1_1 && !unsubscribers_1_1.done && (_a = unsubscribers_1["return"])) _a.call(unsubscribers_1);
                 }
-                finally { if (e_6) throw e_6.error; }
+                finally { if (e_8) throw e_8.error; }
             }
         };
     };
@@ -901,6 +978,7 @@ var DeepState = /** @class */ (function () {
         }; }
         if (this.destroyed)
             return function () { };
+        this.jobsRunning++;
         var type = "subscribe";
         var listener = this.getCleanListener(fn, options);
         if (options.group)
@@ -978,6 +1056,7 @@ var DeepState = /** @class */ (function () {
             }
         }
         this.debugSubscribe(listener, listenersCollection, listenerPath);
+        this.jobsRunning--;
         return this.unsubscribe(listenerPath, this.id);
     };
     DeepState.prototype.unsubscribe = function (path, id) {
@@ -992,18 +1071,35 @@ var DeepState = /** @class */ (function () {
         };
     };
     DeepState.prototype.runQueuedListeners = function () {
+        var _this = this;
         if (this.destroyed)
             return;
         if (this.subscribeQueue.length === 0)
             return;
-        var queue = __spreadArray([], __read(this.subscribeQueue), false);
-        for (var i = 0, len = queue.length; i < len; i++) {
-            queue[i]();
+        if (this.jobsRunning === 0) {
+            this.queueRuns = 0;
+            var queue = __spreadArray([], __read(this.subscribeQueue), false);
+            for (var i = 0, len = queue.length; i < len; i++) {
+                queue[i]();
+            }
+            this.subscribeQueue.length = 0;
         }
-        this.subscribeQueue.length = 0;
+        else {
+            this.queueRuns++;
+            if (this.queueRuns >= this.options.maxQueueRuns) {
+                this.queueRuns = 0;
+                throw new Error("Maximal number of queue runs exhausted.");
+            }
+            else {
+                Promise.resolve()
+                    .then(function () { return _this.runQueuedListeners(); })["catch"](function (e) {
+                    throw e;
+                });
+            }
+        }
     };
     DeepState.prototype.getQueueNotifyListeners = function (groupedListeners, queue) {
-        var e_7, _a, e_8, _b;
+        var e_9, _a, e_10, _b;
         var _this = this;
         if (queue === void 0) { queue = []; }
         for (var path in groupedListeners) {
@@ -1011,14 +1107,14 @@ var DeepState = /** @class */ (function () {
                 continue;
             var _c = groupedListeners[path], single = _c.single, bulk = _c.bulk;
             var _loop_1 = function (singleListener) {
-                var e_9, _d;
+                var e_11, _d;
                 var alreadyInQueue = false;
                 var resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
                 if (!singleListener.eventInfo.path.resolved) {
                     resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
                 }
                 try {
-                    for (var queue_1 = (e_9 = void 0, __values(queue)), queue_1_1 = queue_1.next(); !queue_1_1.done; queue_1_1 = queue_1.next()) {
+                    for (var queue_1 = (e_11 = void 0, __values(queue)), queue_1_1 = queue_1.next(); !queue_1_1.done; queue_1_1 = queue_1.next()) {
                         var excludedListener = queue_1_1.value;
                         if (resolvedIdPath === excludedListener.resolvedIdPath) {
                             alreadyInQueue = true;
@@ -1026,55 +1122,62 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_9_1) { e_9 = { error: e_9_1 }; }
+                catch (e_11_1) { e_11 = { error: e_11_1 }; }
                 finally {
                     try {
                         if (queue_1_1 && !queue_1_1.done && (_d = queue_1["return"])) _d.call(queue_1);
                     }
-                    finally { if (e_9) throw e_9.error; }
+                    finally { if (e_11) throw e_11.error; }
                 }
                 if (alreadyInQueue) {
                     return "continue";
                 }
                 var time = this_1.debugTime(singleListener);
                 if (!this_1.isMuted(singleListener.listener.fn)) {
-                    var resolvedIdPath_1 = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
-                    if (!singleListener.eventInfo.path.resolved) {
-                        resolvedIdPath_1 = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
-                    }
-                    queue.push({
-                        id: singleListener.listener.id,
-                        resolvedPath: singleListener.eventInfo.path.resolved,
-                        resolvedIdPath: resolvedIdPath_1,
-                        originalFn: singleListener.listener.fn,
-                        fn: function () {
+                    if (singleListener.listener.options.queue && this_1.jobsRunning) {
+                        this_1.subscribeQueue.push(function () {
                             singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
-                        },
-                        options: singleListener.listener.options,
-                        groupId: singleListener.listener.groupId
-                    });
+                        });
+                    }
+                    else {
+                        var resolvedIdPath_1 = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+                        if (!singleListener.eventInfo.path.resolved) {
+                            resolvedIdPath_1 = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+                        }
+                        queue.push({
+                            id: singleListener.listener.id,
+                            resolvedPath: singleListener.eventInfo.path.resolved,
+                            resolvedIdPath: resolvedIdPath_1,
+                            originalFn: singleListener.listener.fn,
+                            fn: function () {
+                                singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                            },
+                            options: singleListener.listener.options,
+                            groupId: singleListener.listener.groupId
+                        });
+                    }
                 }
                 this_1.debugListener(time, singleListener);
             };
             var this_1 = this;
             try {
-                for (var single_1 = (e_7 = void 0, __values(single)), single_1_1 = single_1.next(); !single_1_1.done; single_1_1 = single_1.next()) {
+                for (var single_1 = (e_9 = void 0, __values(single)), single_1_1 = single_1.next(); !single_1_1.done; single_1_1 = single_1.next()) {
                     var singleListener = single_1_1.value;
                     _loop_1(singleListener);
                 }
             }
-            catch (e_7_1) { e_7 = { error: e_7_1 }; }
+            catch (e_9_1) { e_9 = { error: e_9_1 }; }
             finally {
                 try {
                     if (single_1_1 && !single_1_1.done && (_a = single_1["return"])) _a.call(single_1);
                 }
-                finally { if (e_7) throw e_7.error; }
+                finally { if (e_9) throw e_9.error; }
             }
             var _loop_2 = function (bulkListener) {
-                var e_10, _e, e_11, _f;
+                var e_12, _e, e_13, _f;
                 var alreadyInQueue = false;
                 try {
-                    for (var queue_2 = (e_10 = void 0, __values(queue)), queue_2_1 = queue_2.next(); !queue_2_1.done; queue_2_1 = queue_2.next()) {
+                    for (var queue_2 = (e_12 = void 0, __values(queue)), queue_2_1 = queue_2.next(); !queue_2_1.done; queue_2_1 = queue_2.next()) {
                         var excludedListener = queue_2_1.value;
                         if (excludedListener.id === bulkListener.listener.id) {
                             alreadyInQueue = true;
@@ -1082,69 +1185,80 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_10_1) { e_10 = { error: e_10_1 }; }
+                catch (e_12_1) { e_12 = { error: e_12_1 }; }
                 finally {
                     try {
                         if (queue_2_1 && !queue_2_1.done && (_e = queue_2["return"])) _e.call(queue_2);
                     }
-                    finally { if (e_10) throw e_10.error; }
+                    finally { if (e_12) throw e_12.error; }
                 }
                 if (alreadyInQueue)
                     return "continue";
                 var time = this_2.debugTime(bulkListener);
                 var bulkValue = [];
                 try {
-                    for (var _g = (e_11 = void 0, __values(bulkListener.value)), _h = _g.next(); !_h.done; _h = _g.next()) {
+                    for (var _g = (e_13 = void 0, __values(bulkListener.value)), _h = _g.next(); !_h.done; _h = _g.next()) {
                         var bulk_2 = _h.value;
                         bulkValue.push(__assign(__assign({}, bulk_2), { value: bulk_2.value() }));
                     }
                 }
-                catch (e_11_1) { e_11 = { error: e_11_1 }; }
+                catch (e_13_1) { e_13 = { error: e_13_1 }; }
                 finally {
                     try {
                         if (_h && !_h.done && (_f = _g["return"])) _f.call(_g);
                     }
-                    finally { if (e_11) throw e_11.error; }
+                    finally { if (e_13) throw e_13.error; }
                 }
                 if (!this_2.isMuted(bulkListener.listener.fn)) {
-                    var resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
-                    if (!bulkListener.eventInfo.path.resolved) {
-                        resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+                    if (bulkListener.listener.options.queue && this_2.jobsRunning) {
+                        this_2.subscribeQueue.push(function () {
+                            if (!_this.jobsRunning) {
+                                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                                return true;
+                            }
+                            return false;
+                        });
                     }
-                    queue.push({
-                        id: bulkListener.listener.id,
-                        resolvedPath: bulkListener.eventInfo.path.resolved,
-                        resolvedIdPath: resolvedIdPath,
-                        originalFn: bulkListener.listener.fn,
-                        fn: function () {
-                            bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
-                        },
-                        options: bulkListener.listener.options,
-                        groupId: bulkListener.listener.groupId
-                    });
+                    else {
+                        var resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
+                        if (!bulkListener.eventInfo.path.resolved) {
+                            resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+                        }
+                        queue.push({
+                            id: bulkListener.listener.id,
+                            resolvedPath: bulkListener.eventInfo.path.resolved,
+                            resolvedIdPath: resolvedIdPath,
+                            originalFn: bulkListener.listener.fn,
+                            fn: function () {
+                                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                            },
+                            options: bulkListener.listener.options,
+                            groupId: bulkListener.listener.groupId
+                        });
+                    }
                 }
                 this_2.debugListener(time, bulkListener);
             };
             var this_2 = this;
             try {
-                for (var bulk_1 = (e_8 = void 0, __values(bulk)), bulk_1_1 = bulk_1.next(); !bulk_1_1.done; bulk_1_1 = bulk_1.next()) {
+                for (var bulk_1 = (e_10 = void 0, __values(bulk)), bulk_1_1 = bulk_1.next(); !bulk_1_1.done; bulk_1_1 = bulk_1.next()) {
                     var bulkListener = bulk_1_1.value;
                     _loop_2(bulkListener);
                 }
             }
-            catch (e_8_1) { e_8 = { error: e_8_1 }; }
+            catch (e_10_1) { e_10 = { error: e_10_1 }; }
             finally {
                 try {
                     if (bulk_1_1 && !bulk_1_1.done && (_b = bulk_1["return"])) _b.call(bulk_1);
                 }
-                finally { if (e_8) throw e_8.error; }
+                finally { if (e_10) throw e_10.error; }
             }
         }
         Promise.resolve().then(function () { return _this.runQueuedListeners(); });
         return queue;
     };
     DeepState.prototype.shouldIgnore = function (listener, updatePath) {
-        var e_12, _a;
+        var e_14, _a;
         if (!listener.options.ignore)
             return false;
         try {
@@ -1164,24 +1278,24 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_12_1) { e_12 = { error: e_12_1 }; }
+        catch (e_14_1) { e_14 = { error: e_14_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_12) throw e_12.error; }
+            finally { if (e_14) throw e_14.error; }
         }
         return false;
     };
     DeepState.prototype.getSubscribedListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_13, _a;
+        var e_15, _a;
         var _this = this;
         if (type === void 0) { type = "update"; }
         if (originalPath === void 0) { originalPath = null; }
         options = __assign(__assign({}, defaultUpdateOptions), options);
         var listeners = {};
         var _loop_3 = function (listenerPath, listenersCollection) {
-            var e_14, _e, e_15, _f;
+            var e_16, _e, e_17, _f;
             listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
             if (listenersCollection.match(updatePath)) {
                 var params = listenersCollection.paramsInfo
@@ -1192,7 +1306,7 @@ var DeepState = /** @class */ (function () {
                 var value = traverse ? function () { return _this.get(cutPath_1); } : function () { return newValue; };
                 var bulkValue = [{ value: value, path: updatePath, params: params }];
                 try {
-                    for (var _g = (e_14 = void 0, __values(listenersCollection.listeners.values())), _h = _g.next(); !_h.done; _h = _g.next()) {
+                    for (var _g = (e_16 = void 0, __values(listenersCollection.listeners.values())), _h = _g.next(); !_h.done; _h = _g.next()) {
                         var listener = _h.value;
                         if (this_3.shouldIgnore(listener, updatePath)) {
                             if (listener.options.debug) {
@@ -1241,19 +1355,19 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_14_1) { e_14 = { error: e_14_1 }; }
+                catch (e_16_1) { e_16 = { error: e_16_1 }; }
                 finally {
                     try {
                         if (_h && !_h.done && (_e = _g["return"])) _e.call(_g);
                     }
-                    finally { if (e_14) throw e_14.error; }
+                    finally { if (e_16) throw e_16.error; }
                 }
             }
             else if (this_3.options.extraDebug) {
                 // debug
                 var showMatch = false;
                 try {
-                    for (var _j = (e_15 = void 0, __values(listenersCollection.listeners.values())), _k = _j.next(); !_k.done; _k = _j.next()) {
+                    for (var _j = (e_17 = void 0, __values(listenersCollection.listeners.values())), _k = _j.next(); !_k.done; _k = _j.next()) {
                         var listener = _k.value;
                         if (listener.options.debug) {
                             showMatch = true;
@@ -1265,12 +1379,12 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_15_1) { e_15 = { error: e_15_1 }; }
+                catch (e_17_1) { e_17 = { error: e_17_1 }; }
                 finally {
                     try {
                         if (_k && !_k.done && (_f = _j["return"])) _f.call(_j);
                     }
-                    finally { if (e_15) throw e_15.error; }
+                    finally { if (e_17) throw e_17.error; }
                 }
                 if (showMatch) {
                     listenersCollection.match(updatePath, true);
@@ -1284,12 +1398,12 @@ var DeepState = /** @class */ (function () {
                 _loop_3(listenerPath, listenersCollection);
             }
         }
-        catch (e_13_1) { e_13 = { error: e_13_1 }; }
+        catch (e_15_1) { e_15 = { error: e_15_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_13) throw e_13.error; }
+            finally { if (e_15) throw e_15.error; }
         }
         return listeners;
     };
@@ -1299,13 +1413,13 @@ var DeepState = /** @class */ (function () {
         return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
     };
     DeepState.prototype.getNestedListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_16, _a;
+        var e_18, _a;
         if (type === void 0) { type = "update"; }
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
         var restBelowValues = {};
         var _loop_4 = function (listenerPath, listenersCollection) {
-            var e_17, _e;
+            var e_19, _e;
             if (!listenersCollection.isRecursive)
                 return "continue";
             listeners[listenerPath] = { single: [], bulk: [] };
@@ -1324,11 +1438,11 @@ var DeepState = /** @class */ (function () {
                 var bulk = [];
                 var bulkListeners = {};
                 var _loop_5 = function (currentRestPath) {
-                    var e_18, _h;
+                    var e_20, _h;
                     var value = function () { return wildcardNewValues_1[currentRestPath]; };
                     var fullPath = [updatePath, currentRestPath].join(this_4.options.delimiter);
                     try {
-                        for (var _j = (e_18 = void 0, __values(listenersCollection.listeners)), _k = _j.next(); !_k.done; _k = _j.next()) {
+                        for (var _j = (e_20 = void 0, __values(listenersCollection.listeners)), _k = _j.next(); !_k.done; _k = _j.next()) {
                             var _l = __read(_k.value, 2), listenerId = _l[0], listener = _l[1];
                             var eventInfo = {
                                 type: type,
@@ -1358,12 +1472,12 @@ var DeepState = /** @class */ (function () {
                             }
                         }
                     }
-                    catch (e_18_1) { e_18 = { error: e_18_1 }; }
+                    catch (e_20_1) { e_20 = { error: e_20_1 }; }
                     finally {
                         try {
                             if (_k && !_k.done && (_h = _j["return"])) _h.call(_j);
                         }
-                        finally { if (e_18) throw e_18.error; }
+                        finally { if (e_20) throw e_20.error; }
                     }
                 };
                 for (var currentRestPath in wildcardNewValues_1) {
@@ -1394,7 +1508,7 @@ var DeepState = /** @class */ (function () {
             else if (this_4.options.extraDebug) {
                 try {
                     // debug
-                    for (var _f = (e_17 = void 0, __values(listenersCollection.listeners.values())), _g = _f.next(); !_g.done; _g = _f.next()) {
+                    for (var _f = (e_19 = void 0, __values(listenersCollection.listeners.values())), _g = _f.next(); !_g.done; _g = _f.next()) {
                         var listener = _g.value;
                         if (listener.options.debug) {
                             console.log("[getNestedListeners] Listener was not fired because there was no match.", {
@@ -1406,12 +1520,12 @@ var DeepState = /** @class */ (function () {
                         }
                     }
                 }
-                catch (e_17_1) { e_17 = { error: e_17_1 }; }
+                catch (e_19_1) { e_19 = { error: e_19_1 }; }
                 finally {
                     try {
                         if (_g && !_g.done && (_e = _f["return"])) _e.call(_f);
                     }
-                    finally { if (e_17) throw e_17.error; }
+                    finally { if (e_19) throw e_19.error; }
                 }
             }
         };
@@ -1422,12 +1536,12 @@ var DeepState = /** @class */ (function () {
                 _loop_4(listenerPath, listenersCollection);
             }
         }
-        catch (e_16_1) { e_16 = { error: e_16_1 }; }
+        catch (e_18_1) { e_18 = { error: e_18_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_16) throw e_16.error; }
+            finally { if (e_18) throw e_18.error; }
         }
         return listeners;
     };
@@ -1437,7 +1551,7 @@ var DeepState = /** @class */ (function () {
         return this.getQueueNotifyListeners(this.getNestedListeners(updatePath, newValue, options, type, originalPath), queue);
     };
     DeepState.prototype.getNotifyOnlyListeners = function (updatePath, newValue, options, type, originalPath) {
-        var e_19, _a;
+        var e_21, _a;
         if (type === void 0) { type = "update"; }
         if (originalPath === void 0) { originalPath = null; }
         var listeners = {};
@@ -1451,10 +1565,10 @@ var DeepState = /** @class */ (function () {
             var wildcardScanNewValue = new wildcard_object_scan_1["default"](newValue, this_5.options.delimiter, this_5.options.wildcard).get(notifyPath);
             listeners[notifyPath] = { bulk: [], single: [] };
             var _loop_7 = function (wildcardPath) {
-                var e_20, _d, e_21, _e;
+                var e_22, _d, e_23, _e;
                 var fullPath = updatePath + this_5.options.delimiter + wildcardPath;
                 try {
-                    for (var _f = (e_20 = void 0, __values(this_5.listeners)), _g = _f.next(); !_g.done; _g = _f.next()) {
+                    for (var _f = (e_22 = void 0, __values(this_5.listeners)), _g = _f.next(); !_g.done; _g = _f.next()) {
                         var _h = __read(_g.value, 2), listenerPath = _h[0], listenersCollection = _h[1];
                         var params = listenersCollection.paramsInfo
                             ? this_5.getParams(listenersCollection.paramsInfo, fullPath)
@@ -1497,27 +1611,27 @@ var DeepState = /** @class */ (function () {
                                 }
                             };
                             try {
-                                for (var _j = (e_21 = void 0, __values(listenersCollection.listeners.values())), _k = _j.next(); !_k.done; _k = _j.next()) {
+                                for (var _j = (e_23 = void 0, __values(listenersCollection.listeners.values())), _k = _j.next(); !_k.done; _k = _j.next()) {
                                     var listener = _k.value;
                                     _loop_8(listener);
                                 }
                             }
-                            catch (e_21_1) { e_21 = { error: e_21_1 }; }
+                            catch (e_23_1) { e_23 = { error: e_23_1 }; }
                             finally {
                                 try {
                                     if (_k && !_k.done && (_e = _j["return"])) _e.call(_j);
                                 }
-                                finally { if (e_21) throw e_21.error; }
+                                finally { if (e_23) throw e_23.error; }
                             }
                         }
                     }
                 }
-                catch (e_20_1) { e_20 = { error: e_20_1 }; }
+                catch (e_22_1) { e_22 = { error: e_22_1 }; }
                 finally {
                     try {
                         if (_g && !_g.done && (_d = _f["return"])) _d.call(_f);
                     }
-                    finally { if (e_20) throw e_20.error; }
+                    finally { if (e_22) throw e_22.error; }
                 }
             };
             for (var wildcardPath in wildcardScanNewValue) {
@@ -1531,17 +1645,17 @@ var DeepState = /** @class */ (function () {
                 _loop_6(notifyPath);
             }
         }
-        catch (e_19_1) { e_19 = { error: e_19_1 }; }
+        catch (e_21_1) { e_21 = { error: e_21_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_19) throw e_19.error; }
+            finally { if (e_21) throw e_21.error; }
         }
         return listeners;
     };
     DeepState.prototype.runQueue = function (queue) {
-        var e_22, _a;
+        var e_24, _a;
         var firedGroups = [];
         try {
             for (var queue_3 = __values(queue), queue_3_1 = queue_3.next(); !queue_3_1.done; queue_3_1 = queue_3.next()) {
@@ -1557,12 +1671,12 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_22_1) { e_22 = { error: e_22_1 }; }
+        catch (e_24_1) { e_24 = { error: e_24_1 }; }
         finally {
             try {
                 if (queue_3_1 && !queue_3_1.done && (_a = queue_3["return"])) _a.call(queue_3);
             }
-            finally { if (e_22) throw e_22.error; }
+            finally { if (e_24) throw e_24.error; }
         }
     };
     DeepState.prototype.sortAndRunQueue = function (queue, path) {
@@ -1595,8 +1709,8 @@ var DeepState = /** @class */ (function () {
         // here we don't want to update maps if only maps are enabled because PathSet will update everything for us
         return { newValue: newValue, oldValue: oldValue };
     };
-    DeepState.prototype.wildcardNotify = function (groupedListenersPack) {
-        var e_23, _a;
+    DeepState.prototype.wildcardNotify = function (groupedListenersPack, waitingPaths) {
+        var e_25, _a, e_26, _b;
         var queue = [];
         try {
             for (var groupedListenersPack_1 = __values(groupedListenersPack), groupedListenersPack_1_1 = groupedListenersPack_1.next(); !groupedListenersPack_1_1.done; groupedListenersPack_1_1 = groupedListenersPack_1.next()) {
@@ -1604,18 +1718,33 @@ var DeepState = /** @class */ (function () {
                 this.getQueueNotifyListeners(groupedListeners, queue);
             }
         }
-        catch (e_23_1) { e_23 = { error: e_23_1 }; }
+        catch (e_25_1) { e_25 = { error: e_25_1 }; }
         finally {
             try {
                 if (groupedListenersPack_1_1 && !groupedListenersPack_1_1.done && (_a = groupedListenersPack_1["return"])) _a.call(groupedListenersPack_1);
             }
-            finally { if (e_23) throw e_23.error; }
+            finally { if (e_25) throw e_25.error; }
         }
+        try {
+            for (var waitingPaths_1 = __values(waitingPaths), waitingPaths_1_1 = waitingPaths_1.next(); !waitingPaths_1_1.done; waitingPaths_1_1 = waitingPaths_1.next()) {
+                var path = waitingPaths_1_1.value;
+                this.executeWaitingListeners(path);
+            }
+        }
+        catch (e_26_1) { e_26 = { error: e_26_1 }; }
+        finally {
+            try {
+                if (waitingPaths_1_1 && !waitingPaths_1_1.done && (_b = waitingPaths_1["return"])) _b.call(waitingPaths_1);
+            }
+            finally { if (e_26) throw e_26.error; }
+        }
+        this.jobsRunning--;
         return queue;
     };
     DeepState.prototype.wildcardUpdate = function (updatePath, fn, options, multi) {
         if (options === void 0) { options = defaultUpdateOptions; }
         if (multi === void 0) { multi = false; }
+        ++this.jobsRunning;
         options = __assign(__assign({}, defaultUpdateOptions), options);
         var scanned = this.scan.get(updatePath);
         var updated = {};
@@ -1630,6 +1759,7 @@ var DeepState = /** @class */ (function () {
             }
         }
         var groupedListenersPack = [];
+        var waitingPaths = [];
         for (var path in updated) {
             var newValue = updated[path];
             if (options.only.length) {
@@ -1642,21 +1772,31 @@ var DeepState = /** @class */ (function () {
                 }
             }
             options.debug && this.options.log("Wildcard update", { path: path, newValue: newValue });
+            waitingPaths.push(path);
         }
         if (multi) {
             var self_1 = this;
             return function () {
-                var queue = self_1.wildcardNotify(groupedListenersPack);
+                var queue = self_1.wildcardNotify(groupedListenersPack, waitingPaths);
                 self_1.sortAndRunQueue(queue, updatePath);
                 for (var path in scanned) {
                     self_1.removeSaving(self_1.split(path), scanned[path]);
                 }
             };
         }
-        var queue = this.wildcardNotify(groupedListenersPack);
+        var queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
         this.sortAndRunQueue(queue, updatePath);
         for (var path in scanned) {
             this.removeSaving(this.split(path), scanned[path]);
+        }
+    };
+    DeepState.prototype.runUpdateQueue = function () {
+        if (this.destroyed)
+            return;
+        while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
+            var params = this.updateQueue.shift();
+            params.options.queue = false; // prevent infinite loop
+            this.update(params.updatePath, params.fnOrValue, params.options, params.multi);
         }
     };
     DeepState.prototype.updateNotify = function (updatePath, newValue, options) {
@@ -1665,9 +1805,10 @@ var DeepState = /** @class */ (function () {
             this.notifyNestedListeners(updatePath, newValue, options, "update", queue);
         }
         this.sortAndRunQueue(queue, updatePath);
+        this.executeWaitingListeners(updatePath);
     };
     DeepState.prototype.updateNotifyAll = function (updateStack) {
-        var e_24, _a;
+        var e_27, _a;
         var queue = [];
         try {
             for (var updateStack_1 = __values(updateStack), updateStack_1_1 = updateStack_1.next(); !updateStack_1_1.done; updateStack_1_1 = updateStack_1.next()) {
@@ -1690,19 +1831,21 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_24_1) { e_24 = { error: e_24_1 }; }
+        catch (e_27_1) { e_27 = { error: e_27_1 }; }
         finally {
             try {
                 if (updateStack_1_1 && !updateStack_1_1.done && (_a = updateStack_1["return"])) _a.call(updateStack_1);
             }
-            finally { if (e_24) throw e_24.error; }
+            finally { if (e_27) throw e_27.error; }
         }
         this.runQueue(queue);
     };
     DeepState.prototype.updateNotifyOnly = function (updatePath, newValue, options) {
         this.notifyOnly(updatePath, newValue, options);
+        this.executeWaitingListeners(updatePath);
     };
     DeepState.prototype.update = function (updatePath, fnOrValue, options, multi) {
+        var _this = this;
         if (options === void 0) { options = __assign({}, defaultUpdateOptions); }
         if (multi === void 0) { multi = false; }
         if (this.destroyed)
@@ -1716,9 +1859,26 @@ var DeepState = /** @class */ (function () {
             trace.changed.push({ traceId: traceId, updatePath: updatePath, fnOrValue: fnOrValue, options: options });
             this.traceMap.set(traceId, trace);
         }
+        var jobsRunning = this.jobsRunning;
+        if ((this.options.queue || options.queue) && jobsRunning) {
+            if (jobsRunning > this.options.maxSimultaneousJobs) {
+                throw new Error("Maximal simultaneous jobs limit reached.");
+            }
+            this.updateQueue.push({ updatePath: updatePath, fnOrValue: fnOrValue, options: options, multi: multi });
+            var result_1 = Promise.resolve().then(function () {
+                _this.runUpdateQueue();
+            });
+            if (multi) {
+                return function () {
+                    return result_1;
+                };
+            }
+            return result_1;
+        }
         if (this.isWildcard(updatePath)) {
             return this.wildcardUpdate(updatePath, fnOrValue, options, multi);
         }
+        ++this.jobsRunning;
         var split = this.split(updatePath);
         var currentValue = this.pathGet(updatePath);
         var currentlySaving = this.isSaving(split, currentValue);
@@ -1732,6 +1892,7 @@ var DeepState = /** @class */ (function () {
             });
         }
         if (this.same(newValue, oldValue) && !options.force) {
+            --this.jobsRunning;
             if (multi)
                 return function () {
                     return newValue;
@@ -1748,12 +1909,14 @@ var DeepState = /** @class */ (function () {
         }
         options = __assign(__assign({}, defaultUpdateOptions), options);
         if (options.only === null) {
+            --this.jobsRunning;
             if (multi)
                 return function () { };
             this.removeSaving(split, newValue);
             return newValue;
         }
         if (options.only.length) {
+            --this.jobsRunning;
             if (multi) {
                 var self_2 = this;
                 return function () {
@@ -1767,6 +1930,7 @@ var DeepState = /** @class */ (function () {
             return newValue;
         }
         if (multi) {
+            --this.jobsRunning;
             var self_3 = this;
             return function multiUpdate() {
                 var result = self_3.updateNotify(updatePath, newValue, options);
@@ -1776,6 +1940,7 @@ var DeepState = /** @class */ (function () {
         }
         this.updateNotify(updatePath, newValue, options);
         this.removeSaving(split, newValue);
+        --this.jobsRunning;
         return newValue;
     };
     DeepState.prototype.multi = function (grouped) {
@@ -1822,7 +1987,7 @@ var DeepState = /** @class */ (function () {
                 return this;
             },
             done: function () {
-                var e_25, _a;
+                var e_28, _a;
                 if (self.collections !== 0) {
                     return;
                 }
@@ -1836,12 +2001,12 @@ var DeepState = /** @class */ (function () {
                             current();
                         }
                     }
-                    catch (e_25_1) { e_25 = { error: e_25_1 }; }
+                    catch (e_28_1) { e_28 = { error: e_28_1 }; }
                     finally {
                         try {
                             if (notifiers_1_1 && !notifiers_1_1.done && (_a = notifiers_1["return"])) _a.call(notifiers_1);
                         }
-                        finally { if (e_25) throw e_25.error; }
+                        finally { if (e_28) throw e_28.error; }
                     }
                 }
                 updateStack.length = 0;
@@ -1899,7 +2064,7 @@ var DeepState = /** @class */ (function () {
         });
     };
     DeepState.prototype.isMuted = function (pathOrListenerFunction) {
-        var e_26, _a;
+        var e_29, _a;
         if (!this.options.useMute)
             return false;
         if (typeof pathOrListenerFunction === "function") {
@@ -1923,12 +2088,12 @@ var DeepState = /** @class */ (function () {
                 }
             }
         }
-        catch (e_26_1) { e_26 = { error: e_26_1 }; }
+        catch (e_29_1) { e_29 = { error: e_29_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
             }
-            finally { if (e_26) throw e_26.error; }
+            finally { if (e_29) throw e_29.error; }
         }
         return false;
     };

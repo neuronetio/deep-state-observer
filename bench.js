@@ -2,8 +2,8 @@ const Benchmark = require("benchmark");
 const State = require("./index.cjs.js");
 
 const width = 10;
-const height = 1000;
-const subs = 100;
+const height = 10000;
+const subs = 1000;
 
 function getObj() {
   const obj = {};

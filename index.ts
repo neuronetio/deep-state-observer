@@ -27,6 +27,7 @@ export interface Options {
   param?: string;
   wildcard?: string;
   experimentalMatch?: boolean;
+  queue?: boolean;
   useObjectMaps?: boolean;
   useProxy?: boolean;
   maxSimultaneousJobs?: number;
@@ -42,6 +43,7 @@ export interface ListenerOptions {
   debug?: boolean;
   source?: string;
   data?: any;
+  queue?: boolean;
   ignore?: string[];
   group?: boolean;
 }
@@ -177,6 +179,7 @@ const defaultUpdateOptions: UpdateOptions = {
   source: "",
   debug: false,
   data: undefined,
+  queue: false,
   force: false,
 };
 
@@ -251,6 +254,7 @@ function getDefaultOptions(): Options {
     param: `:`,
     wildcard: `*`,
     experimentalMatch: false,
+    queue: false,
     useObjectMaps: false,
     useProxy: false,
     maxSimultaneousJobs: 1000,
@@ -265,19 +269,24 @@ const defaultListenerOptions: ListenerOptions = {
   debug: false,
   source: "",
   data: undefined,
+  queue: false,
   group: false,
 };
 
 class DeepState {
   private listeners: Listeners;
+  private waitingListeners: WaitingListeners;
   private data: object;
   private options: Options;
   private id: number;
   private scan: any;
+  private jobsRunning = 0;
+  private updateQueue = [];
   private subscribeQueue = [];
   private listenersIgnoreCache: WeakMap<Listener, { truthy: string[]; falsy: string[] }> = new WeakMap();
   private is_match: any = null;
   private destroyed = false;
+  private queueRuns = 0;
   private resolved: Promise<unknown> | any;
   private muted: Set<string>;
   private mutedListeners: Set<ListenerFunction>;
@@ -375,6 +384,7 @@ class DeepState {
 
   constructor(data: object = {}, options: Options = {}) {
     this.listeners = new Map();
+    this.waitingListeners = new Map();
     this.options = { ...getDefaultOptions(), ...options };
 
     if (this.options.useObjectMaps) {
@@ -764,6 +774,9 @@ class DeepState {
     this.destroyed = true;
     this.data = undefined;
     this.listeners = new Map();
+    this.waitingListeners = new Map();
+    this.updateQueue = [];
+    this.jobsRunning = 0;
   }
 
   private match(first: string, second: string, nested: boolean = true): boolean {
@@ -889,7 +902,54 @@ class DeepState {
     return result;
   }
 
-  public subscribeAll(userPaths: string[], fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions) {
+  public waitForAll(userPaths: string[], fn: WaitingListenerFunction) {
+    const paths = {};
+    for (let path of userPaths) {
+      paths[path] = { dirty: false };
+      if (this.hasParams(path)) {
+        paths[path].paramsInfo = this.getParamsInfo(path);
+      }
+      paths[path].isWildcard = this.isWildcard(path);
+      paths[path].isRecursive = !this.isNotRecursive(path);
+    }
+    this.waitingListeners.set(userPaths, { fn, paths });
+    fn(paths);
+    return function unsubscribe() {
+      this.waitingListeners.delete(userPaths);
+    };
+  }
+
+  private executeWaitingListeners(updatePath: string) {
+    if (this.destroyed) return;
+    for (const waitingListener of this.waitingListeners.values()) {
+      const { fn, paths } = waitingListener;
+      let dirty = 0;
+      let all = 0;
+      for (let path in paths) {
+        const pathInfo = paths[path];
+        let match = false;
+        if (pathInfo.isRecursive) updatePath = this.cutPath(updatePath, path);
+        if (pathInfo.isWildcard && this.match(path, updatePath)) match = true;
+        if (updatePath === path) match = true;
+        if (match) {
+          pathInfo.dirty = true;
+        }
+        if (pathInfo.dirty) {
+          dirty++;
+        }
+        all++;
+      }
+      if (dirty === all) {
+        fn(paths);
+      }
+    }
+  }
+
+  public subscribeAll(
+    userPaths: string[],
+    fn: ListenerFunction | WaitingListenerFunction,
+    options: ListenerOptions = defaultListenerOptions
+  ) {
     if (this.destroyed) return () => {};
     let unsubscribers = [];
     let index = 0;
@@ -899,7 +959,7 @@ class DeepState {
     }
     for (const userPath of userPaths) {
       unsubscribers.push(
-        this.subscribe(userPath as never, fn, options, {
+        this.subscribe(userPath, fn, options, {
           all: userPaths,
           index,
           groupId: options.group ? this.groupId : null,
@@ -1006,6 +1066,7 @@ class DeepState {
     }
   ) {
     if (this.destroyed) return () => {};
+    this.jobsRunning++;
     const type = "subscribe";
     let listener = this.getCleanListener(fn, options);
     if (options.group) listener.groupId = subscribeAllOptions.groupId;
@@ -1079,6 +1140,7 @@ class DeepState {
       }
     }
     this.debugSubscribe(listener, listenersCollection, listenerPath as string);
+    this.jobsRunning--;
     return this.unsubscribe(listenerPath as string, this.id);
   }
 
@@ -1097,11 +1159,26 @@ class DeepState {
   private runQueuedListeners() {
     if (this.destroyed) return;
     if (this.subscribeQueue.length === 0) return;
-    const queue = [...this.subscribeQueue];
-    for (let i = 0, len = queue.length; i < len; i++) {
-      queue[i]();
+    if (this.jobsRunning === 0) {
+      this.queueRuns = 0;
+      const queue = [...this.subscribeQueue];
+      for (let i = 0, len = queue.length; i < len; i++) {
+        queue[i]();
+      }
+      this.subscribeQueue.length = 0;
+    } else {
+      this.queueRuns++;
+      if (this.queueRuns >= this.options.maxQueueRuns) {
+        this.queueRuns = 0;
+        throw new Error("Maximal number of queue runs exhausted.");
+      } else {
+        Promise.resolve()
+          .then(() => this.runQueuedListeners())
+          .catch((e) => {
+            throw e;
+          });
+      }
     }
-    this.subscribeQueue.length = 0;
   }
 
   private getQueueNotifyListeners(groupedListeners: GroupedListeners, queue: Queue[] = []): Queue[] {
@@ -1125,21 +1202,27 @@ class DeepState {
         }
         const time = this.debugTime(singleListener);
         if (!this.isMuted(singleListener.listener.fn)) {
-          let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
-          if (!singleListener.eventInfo.path.resolved) {
-            resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
-          }
-          queue.push({
-            id: singleListener.listener.id,
-            resolvedPath: singleListener.eventInfo.path.resolved,
-            resolvedIdPath,
-            originalFn: singleListener.listener.fn,
-            fn: () => {
+          if (singleListener.listener.options.queue && this.jobsRunning) {
+            this.subscribeQueue.push(() => {
               singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
-            },
-            options: singleListener.listener.options,
-            groupId: singleListener.listener.groupId,
-          });
+            });
+          } else {
+            let resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.resolved;
+            if (!singleListener.eventInfo.path.resolved) {
+              resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
+            }
+            queue.push({
+              id: singleListener.listener.id,
+              resolvedPath: singleListener.eventInfo.path.resolved,
+              resolvedIdPath,
+              originalFn: singleListener.listener.fn,
+              fn: () => {
+                singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+              },
+              options: singleListener.listener.options,
+              groupId: singleListener.listener.groupId,
+            });
+          }
         }
         this.debugListener(time, singleListener);
       }
@@ -1159,21 +1242,31 @@ class DeepState {
           bulkValue.push({ ...bulk, value: bulk.value() });
         }
         if (!this.isMuted(bulkListener.listener.fn)) {
-          let resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
-          if (!bulkListener.eventInfo.path.resolved) {
-            resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+          if (bulkListener.listener.options.queue && this.jobsRunning) {
+            this.subscribeQueue.push(() => {
+              if (!this.jobsRunning) {
+                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+                return true;
+              }
+              return false;
+            });
+          } else {
+            let resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.resolved;
+            if (!bulkListener.eventInfo.path.resolved) {
+              resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
+            }
+            queue.push({
+              id: bulkListener.listener.id,
+              resolvedPath: bulkListener.eventInfo.path.resolved,
+              resolvedIdPath,
+              originalFn: bulkListener.listener.fn,
+              fn: () => {
+                bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
+              },
+              options: bulkListener.listener.options,
+              groupId: bulkListener.listener.groupId,
+            });
           }
-          queue.push({
-            id: bulkListener.listener.id,
-            resolvedPath: bulkListener.eventInfo.path.resolved,
-            resolvedIdPath,
-            originalFn: bulkListener.listener.fn,
-            fn: () => {
-              bulkListener.listener.fn(bulkValue, bulkListener.eventInfo);
-            },
-            options: bulkListener.listener.options,
-            groupId: bulkListener.listener.groupId,
-          });
         }
         this.debugListener(time, bulkListener);
       }
@@ -1528,11 +1621,15 @@ class DeepState {
     return { newValue, oldValue };
   }
 
-  private wildcardNotify(groupedListenersPack) {
+  private wildcardNotify(groupedListenersPack, waitingPaths) {
     let queue = [];
     for (const groupedListeners of groupedListenersPack) {
       this.getQueueNotifyListeners(groupedListeners, queue);
     }
+    for (const path of waitingPaths) {
+      this.executeWaitingListeners(path);
+    }
+    this.jobsRunning--;
     return queue;
   }
 
@@ -1542,6 +1639,7 @@ class DeepState {
     options: UpdateOptions = defaultUpdateOptions,
     multi = false
   ) {
+    ++this.jobsRunning;
     options = { ...defaultUpdateOptions, ...options };
     const scanned = this.scan.get(updatePath);
     const updated = {};
@@ -1557,6 +1655,7 @@ class DeepState {
     }
 
     const groupedListenersPack = [];
+    const waitingPaths = [];
     for (const path in updated) {
       const newValue = updated[path];
       if (options.only.length) {
@@ -1568,21 +1667,31 @@ class DeepState {
         }
       }
       options.debug && this.options.log("Wildcard update", { path, newValue });
+      waitingPaths.push(path);
     }
     if (multi) {
       const self = this;
       return function () {
-        const queue = self.wildcardNotify(groupedListenersPack);
+        const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
         self.sortAndRunQueue(queue, updatePath);
         for (const path in scanned) {
           self.removeSaving(self.split(path), scanned[path]);
         }
       };
     }
-    const queue = this.wildcardNotify(groupedListenersPack);
+    const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
     this.sortAndRunQueue(queue, updatePath);
     for (const path in scanned) {
       this.removeSaving(this.split(path), scanned[path]);
+    }
+  }
+
+  private runUpdateQueue() {
+    if (this.destroyed) return;
+    while (this.updateQueue.length && this.updateQueue.length < this.options.maxSimultaneousJobs) {
+      const params = this.updateQueue.shift();
+      params.options.queue = false; // prevent infinite loop
+      this.update(params.updatePath, params.fnOrValue, params.options, params.multi);
     }
   }
 
@@ -1592,6 +1701,7 @@ class DeepState {
       this.notifyNestedListeners(updatePath, newValue, options, "update", queue);
     }
     this.sortAndRunQueue(queue, updatePath);
+    this.executeWaitingListeners(updatePath);
   }
 
   private updateNotifyAll(updateStack: UpdateStack[]) {
@@ -1619,6 +1729,7 @@ class DeepState {
 
   private updateNotifyOnly(updatePath, newValue, options) {
     this.notifyOnly(updatePath, newValue, options);
+    this.executeWaitingListeners(updatePath);
   }
 
   public update(
@@ -1637,9 +1748,26 @@ class DeepState {
       trace.changed.push({ traceId, updatePath, fnOrValue, options });
       this.traceMap.set(traceId, trace);
     }
+    const jobsRunning = this.jobsRunning;
+    if ((this.options.queue || options.queue) && jobsRunning) {
+      if (jobsRunning > this.options.maxSimultaneousJobs) {
+        throw new Error("Maximal simultaneous jobs limit reached.");
+      }
+      this.updateQueue.push({ updatePath, fnOrValue, options, multi });
+      const result = Promise.resolve().then(() => {
+        this.runUpdateQueue();
+      });
+      if (multi) {
+        return function () {
+          return result;
+        };
+      }
+      return result;
+    }
     if (this.isWildcard(updatePath)) {
       return this.wildcardUpdate(updatePath, fnOrValue, options, multi);
     }
+    ++this.jobsRunning;
     const split = this.split(updatePath);
     const currentValue = this.pathGet(updatePath);
     const currentlySaving = this.isSaving(split, currentValue);
@@ -1654,6 +1782,7 @@ class DeepState {
     }
 
     if (this.same(newValue, oldValue) && !options.force) {
+      --this.jobsRunning;
       if (multi)
         return function () {
           return newValue;
@@ -1673,11 +1802,13 @@ class DeepState {
 
     options = { ...defaultUpdateOptions, ...options };
     if (options.only === null) {
+      --this.jobsRunning;
       if (multi) return function () {};
       this.removeSaving(split, newValue);
       return newValue;
     }
     if (options.only.length) {
+      --this.jobsRunning;
       if (multi) {
         const self = this;
         return function () {
@@ -1691,6 +1822,7 @@ class DeepState {
       return newValue;
     }
     if (multi) {
+      --this.jobsRunning;
       const self = this;
       return function multiUpdate() {
         const result = self.updateNotify(updatePath, newValue, options);
@@ -1700,6 +1832,7 @@ class DeepState {
     }
     this.updateNotify(updatePath, newValue, options);
     this.removeSaving(split, newValue);
+    --this.jobsRunning;
     return newValue;
   }
 

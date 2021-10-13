@@ -20,6 +20,7 @@ export interface Options {
     param?: string;
     wildcard?: string;
     experimentalMatch?: boolean;
+    queue?: boolean;
     useObjectMaps?: boolean;
     useProxy?: boolean;
     maxSimultaneousJobs?: number;
@@ -34,6 +35,7 @@ export interface ListenerOptions {
     debug?: boolean;
     source?: string;
     data?: any;
+    queue?: boolean;
     ignore?: string[];
     group?: boolean;
 }
@@ -162,14 +164,18 @@ export interface ProxyData {
 }
 declare class DeepState {
     private listeners;
+    private waitingListeners;
     private data;
     private options;
     private id;
     private scan;
+    private jobsRunning;
+    private updateQueue;
     private subscribeQueue;
     private listenersIgnoreCache;
     private is_match;
     private destroyed;
+    private queueRuns;
     private resolved;
     private muted;
     private mutedListeners;
@@ -222,7 +228,9 @@ declare class DeepState {
     private hasParams;
     private getParamsInfo;
     private getParams;
-    subscribeAll(userPaths: string[], fn: ListenerFunction, options?: ListenerOptions): () => void;
+    waitForAll(userPaths: string[], fn: WaitingListenerFunction): () => void;
+    private executeWaitingListeners;
+    subscribeAll(userPaths: string[], fn: ListenerFunction | WaitingListenerFunction, options?: ListenerOptions): () => void;
     private getCleanListenersCollection;
     private getCleanListener;
     private getListenerCollectionMatch;
@@ -244,6 +252,7 @@ declare class DeepState {
     private getUpdateValues;
     private wildcardNotify;
     private wildcardUpdate;
+    private runUpdateQueue;
     private updateNotify;
     private updateNotifyAll;
     private updateNotifyOnly;
