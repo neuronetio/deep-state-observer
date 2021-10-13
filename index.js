@@ -109,6 +109,7 @@ function getDefaultOptions() {
         experimentalMatch: false,
         queue: false,
         useCache: false,
+        useSplitCache: false,
         maxSimultaneousJobs: 1000,
         maxQueueRuns: 1000,
         log: log,
@@ -154,6 +155,7 @@ var DeepState = /** @class */ (function () {
         this.collection = null;
         this.collections = 0;
         this.cache = new Map();
+        this.splitCache = new Map();
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -306,7 +308,18 @@ var DeepState = /** @class */ (function () {
         return path;
     };
     DeepState.prototype.split = function (path) {
-        return path === '' ? [] : path.split(this.options.delimiter);
+        if (path === '')
+            return [];
+        if (!this.options.useSplitCache) {
+            return path.split(this.options.delimiter);
+        }
+        var fromCache = this.splitCache.get(path);
+        if (fromCache) {
+            return fromCache.slice();
+        }
+        var value = path.split(this.options.delimiter);
+        this.splitCache.set(path, value.slice());
+        return value;
     };
     DeepState.prototype.isWildcard = function (path) {
         return path.includes(this.options.wildcard) || this.hasParams(path);

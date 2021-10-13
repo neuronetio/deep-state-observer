@@ -22,6 +22,7 @@ export interface Options {
     experimentalMatch?: boolean;
     queue?: boolean;
     useCache?: boolean;
+    useSplitCache?: boolean;
     maxSimultaneousJobs?: number;
     maxQueueRuns?: number;
     log?: (message: string, info: any) => void;
@@ -176,6 +177,7 @@ declare class DeepState {
     private collection;
     private collections;
     private cache;
+    private splitCache;
     constructor(data?: object, options?: Options);
     private cacheGet;
     private cacheSet;

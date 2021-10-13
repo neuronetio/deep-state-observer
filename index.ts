@@ -32,6 +32,7 @@ export interface Options {
   experimentalMatch?: boolean;
   queue?: boolean;
   useCache?: boolean;
+  useSplitCache?: boolean;
   maxSimultaneousJobs?: number;
   maxQueueRuns?: number;
   log?: (message: string, info: any) => void;
@@ -238,6 +239,7 @@ function getDefaultOptions(): Options {
     experimentalMatch: false,
     queue: false,
     useCache: false,
+    useSplitCache: false,
     maxSimultaneousJobs: 1000,
     maxQueueRuns: 1000,
     log,
@@ -297,6 +299,7 @@ class DeepState {
   private collection: Multi = null;
   private collections: number = 0;
   private cache: Map<string, any> = new Map();
+  private splitCache: Map<string, string[]> = new Map();
 
   constructor(data: object = {}, options: Options = {}) {
     this.listeners = new Map();
@@ -475,7 +478,17 @@ class DeepState {
   }
 
   private split(path: string) {
-    return path === '' ? [] : path.split(this.options.delimiter);
+    if (path === '') return [];
+    if (!this.options.useSplitCache) {
+      return path.split(this.options.delimiter);
+    }
+    const fromCache = this.splitCache.get(path);
+    if (fromCache) {
+      return fromCache.slice();
+    }
+    const value = path.split(this.options.delimiter);
+    this.splitCache.set(path, value.slice());
+    return value;
   }
 
   private isWildcard(path: string): boolean {
