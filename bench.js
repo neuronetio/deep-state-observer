@@ -32,21 +32,23 @@ let ProxyNoMaps;
 let noProxyMaps;
 let ProxyMaps;
 
+const objs = [getObj(), getObj(), getObj(), getObj()];
+
 new Benchmark.Suite("create")
   .add("no proxy no maps", function () {
-    noProxyNoMaps = new State(getObj(), { useProxy: false, useObjectMaps: false });
+    noProxyNoMaps = new State(objs[0], { useProxy: false, useObjectMaps: false });
     generateSubs(noProxyNoMaps);
   })
   .add("proxy no maps", function () {
-    ProxyNoMaps = new State(getObj(), { useProxy: true, useObjectMaps: false });
+    ProxyNoMaps = new State(objs[1], { useProxy: true, useObjectMaps: false });
     generateSubs(ProxyNoMaps);
   })
   .add("no proxy with maps", function () {
-    noProxyMaps = new State(getObj(), { useProxy: false, useObjectMaps: true });
+    noProxyMaps = new State(objs[2], { useProxy: false, useObjectMaps: true });
     generateSubs(noProxyMaps);
   })
   .add("proxy & maps", function () {
-    ProxyMaps = new State(getObj(), { useProxy: true, useObjectMaps: true });
+    ProxyMaps = new State(objs[3], { useProxy: true, useObjectMaps: true });
     generateSubs(ProxyMaps);
   })
   .on("cycle", function (event) {

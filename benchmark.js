@@ -1,5 +1,44 @@
 const State = require("./index.cjs.js");
+console.log("start");
+const width = 10;
+const height = 10000;
+const subs = 1000;
 
+function getObj() {
+  const obj = {};
+  for (let h = 0; h < height; h++) {
+    const current = {};
+    for (let w = 0; w < width; w++) {
+      current["w" + w] = `${h} ${w}`;
+    }
+    obj["h" + h] = current;
+  }
+  return obj;
+}
+
+const item = `h${Math.round(height / 2)}.w${Math.round(width / 2)}`;
+
+function generateSubs(state) {
+  for (let i = 0; i < subs; i++) {
+    state.subscribe(item, () => {
+      const x = 1 + Math.random();
+    });
+  }
+}
+
+const objs = [];
+for (let i = 0; i < 50; i++) {
+  objs.push(getObj());
+}
+
+let s;
+for (let i = 0; i < 50; i++) {
+  s = new State(objs[i], { useProxy: false, useObjectMaps: true });
+}
+generateSubs(s);
+
+console.log("done");
+/*
 let dataItemsCount = 1000; //50000;
 let iterations = 1000;
 
@@ -67,7 +106,7 @@ console.log(`basic.update average result: ${result}`);
 
 // ---------------------------
 t1 = Date.now();
-const large = state.subscribe("nested.*.basic.data.*.value", (value) => {} /*, { bulk: true }*/);
+const large = state.subscribe("nested.*.basic.data.*.value", (value) => {} );
 for (let i = 0; i < iterations; i++) {
   const time = { start: Date.now() };
   state.update(
@@ -77,8 +116,7 @@ for (let i = 0; i < iterations; i++) {
         data[key].value = "mod";
       }
       return data;
-    } /*,
-    { only: ["value"] }*/
+    }
   );
   time.end = Date.now();
   time.result = time.end - time.start;
@@ -110,4 +148,4 @@ regular = (Date.now() - t1) / iterations;
 result = Math.round((basicResult.update / iterations + regular) / 2);
 console.log(`Regular time: ${regular}`);
 times.basic.subscribe.forEach((time) => (basicResult.subscribe += time.result));
-console.log(`basic.subscribe average result: ${result}`);
+console.log(`basic.subscribe average result: ${result}`); */

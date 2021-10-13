@@ -10,34 +10,15 @@ var __values = (this && this.__values) || function(o) {
     };
     throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
 };
-var __read = (this && this.__read) || function (o, n) {
-    var m = typeof Symbol === "function" && o[Symbol.iterator];
-    if (!m) return o;
-    var i = m.call(o), r, ar = [], e;
-    try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
-    }
-    catch (error) { e = { error: error }; }
-    finally {
-        try {
-            if (r && !r.done && (m = i["return"])) m.call(i);
-        }
-        finally { if (e) throw e.error; }
-    }
-    return ar;
-};
 exports.__esModule = true;
 var stringMatcher_1 = require("./stringMatcher");
 var WildcardObject = /** @class */ (function () {
-    function WildcardObject(obj, delimiter, wildcard, objectMap, is_match) {
-        if (objectMap === void 0) { objectMap = null; }
+    function WildcardObject(obj, delimiter, wildcard, is_match) {
         if (is_match === void 0) { is_match = undefined; }
-        this.objectMap = null;
         this.obj = obj;
         this.delimiter = delimiter;
         this.wildcard = wildcard;
         this.is_match = is_match;
-        this.objectMap = objectMap;
     }
     WildcardObject.prototype.shortMatch = function (first, second) {
         if (first === second)
@@ -133,44 +114,7 @@ var WildcardObject = /** @class */ (function () {
         }
         return this.handleObject(path, currentObj, partIndex, currentPath, result);
     };
-    WildcardObject.prototype.getIndicesCount = function (searchStr, str) {
-        var searchStrLen = searchStr.length;
-        if (searchStrLen == 0) {
-            return 0;
-        }
-        var startIndex = 0, index, indices = 0;
-        while ((index = str.indexOf(searchStr, startIndex)) > -1) {
-            indices++;
-            startIndex = index + searchStrLen;
-        }
-        return indices;
-    };
-    WildcardObject.prototype.getFromMap = function (path) {
-        var e_2, _a;
-        var result = {};
-        var pathDelimitersCount = this.getIndicesCount(this.delimiter, path);
-        var len = path.length;
-        try {
-            for (var _b = __values(this.objectMap), _c = _b.next(); !_c.done; _c = _b.next()) {
-                var _d = __read(_c.value, 2), key = _d[0], value = _d[1];
-                if (this.getIndicesCount(this.delimiter, key) === pathDelimitersCount && this.match(path, key)) {
-                    result[key] = value;
-                }
-            }
-        }
-        catch (e_2_1) { e_2 = { error: e_2_1 }; }
-        finally {
-            try {
-                if (_c && !_c.done && (_a = _b["return"])) _a.call(_b);
-            }
-            finally { if (e_2) throw e_2.error; }
-        }
-        return result;
-    };
     WildcardObject.prototype.get = function (path) {
-        if (this.objectMap) {
-            return this.getFromMap(path);
-        }
         return this.goFurther(path, this.obj, 0, "");
     };
     return WildcardObject;

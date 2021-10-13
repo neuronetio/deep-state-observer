@@ -28,8 +28,6 @@ export interface Options {
   wildcard?: string;
   experimentalMatch?: boolean;
   queue?: boolean;
-  useObjectMaps?: boolean;
-  useProxy?: boolean;
   maxSimultaneousJobs?: number;
   maxQueueRuns?: number;
   log?: (message: string, info: any) => void;
@@ -213,35 +211,8 @@ function log(message: string, info: any) {
   console.debug(message, info);
 }
 
-/**
- * Is object - helper function to determine if specified variable is an object
- *
- * @param {any} item
- * @returns {boolean}
- */
-function isObject(item: any) {
-  if (item && item.constructor) {
-    return item.constructor.name === "Object";
-  }
-  return typeof item === "object" && item !== null;
-}
-
 export interface UnknownObject {
   [key: string]: unknown;
-}
-
-export interface ProxyNode {
-  [key: string]: unknown;
-  [n: number]: unknown;
-  ___deep_state_observer___: ProxyData;
-}
-
-export interface ProxyData {
-  path: string;
-  pathChunks: string[];
-  saving: (string | number)[];
-  parent: ProxyNode | null;
-  mapOnly?: boolean;
 }
 
 function getDefaultOptions(): Options {
@@ -255,8 +226,6 @@ function getDefaultOptions(): Options {
     wildcard: `*`,
     experimentalMatch: false,
     queue: false,
-    useObjectMaps: false,
-    useProxy: false,
     maxSimultaneousJobs: 1000,
     maxQueueRuns: 1000,
     log,
@@ -292,124 +261,22 @@ class DeepState {
   private mutedListeners: Set<ListenerFunction>;
   private groupId: number = 0;
   private traceId: number = 0;
-  // private pathGet: any;
-  // private pathSet: any;
+  private pathGet: typeof Path.get;
+  private pathSet: typeof Path.set;
   private traceMap: Map<string, TraceValue> = new Map();
   private tracing: string[] = [];
   private savedTrace: TraceValue[] = [];
   private collection: Multi = null;
   private collections: number = 0;
-  public readonly proxyProperty = "___deep_state_observer___";
-  private rootProxyNode: ProxyNode = {
-    ___deep_state_observer___: {
-      path: "___deep_state_observer___",
-      pathChunks: ["___deep_state_observer___"],
-      saving: [],
-      parent: null,
-    },
-  };
-
-  private handler = {
-    set: (obj: ProxyNode, prop, value, proxy) => {
-      if (prop === this.proxyProperty) return true;
-      if (prop in obj && (this.same(obj[prop], value) || (this.isProxy(value) && obj[prop] === value))) {
-        return true;
-      }
-      if (!obj[this.proxyProperty].saving.includes(prop)) {
-        // we are not fired this from update
-        // change from proxy
-        const path = obj[this.proxyProperty].path ? obj[this.proxyProperty].path + this.options.delimiter + prop : prop;
-        // check if any parent property is currently saving this node - if yes we are not going to notify
-        if (!this.isSaving(obj[this.proxyProperty].pathChunks, obj)) {
-          this.update(path, value); // fire update to notify listeners and set isSaving
-        } else {
-          // if parent node is saving current node and in meanwhile someone updates nodes below - just update it - do not notify
-          // we are not generating new map because update fn will do it for us on final object
-          // we cannot check if values are the same from pathGet because pathGet is using maps and map is generated before obj because it will make value observable
-          if (isObject(value) || Array.isArray(value)) {
-            value = this.makeObservable(value, path, obj);
-          }
-          obj[prop] = value;
-        }
-      } else {
-        // change from update
-        obj[prop] = value;
-      }
-      return true;
-    },
-
-    deleteProperty: (obj: ProxyNode, prop) => {
-      if (!(prop in obj)) return false;
-      // delete property comes only from proxy
-      const parentPath = obj[this.proxyProperty].path;
-      delete obj[prop];
-      this.update(parentPath, (currentValue) => {
-        // only notification because value is already deleted
-        return currentValue;
-      });
-      return true;
-    },
-  };
-
-  private objectMapOnlyHandler = {
-    set: (obj: any, prop, value) => {
-      if (prop === this.proxyProperty) return true;
-      if (prop in obj && (this.same(obj[prop], value) || (this.isProxy(value) && obj[prop] === value))) {
-        return true;
-      }
-      const path = obj[this.proxyProperty].path ? obj[this.proxyProperty].path + this.options.delimiter + prop : prop;
-      if (!this.isSaving(this.split(path), obj)) {
-        obj[prop] = this.updateMapDown(path, value, obj);
-      } else {
-        obj[prop] = value;
-      }
-      return true;
-    },
-    deleteProperty: (obj: any, prop) => {
-      if (!(prop in obj)) return false;
-      const path = obj[this.proxyProperty].path ? obj[this.proxyProperty].path + this.options.delimiter + prop : prop;
-      this.deleteFromMap(path);
-      // here we only deleting - we don't fire update because we are not using proxy observable
-      // just object actualization
-      delete obj[prop];
-      return true;
-    },
-  };
-  public proxy: object;
-  /**
-   * @property $$$ proxy shorthand
-   */
-  public $$$: object;
-  private map: Map<string, any> = new Map();
 
   constructor(data: object = {}, options: Options = {}) {
     this.listeners = new Map();
     this.waitingListeners = new Map();
     this.options = { ...getDefaultOptions(), ...options };
-
-    if (this.options.useObjectMaps) {
-      // updateMapDown will check if we are using proxy or not
-      this.setNodeSaving(this.rootProxyNode, "");
-      this.data = this.updateMapDown("", data, this.rootProxyNode, false);
-      this.unsetNodeSaving(this.rootProxyNode, "");
-    } else if (this.options.useProxy) {
-      this.data = this.makeObservable(data, "", this.rootProxyNode);
-    }
-    if (!this.options.useObjectMaps && !this.options.useProxy) {
-      this.data = data;
-    }
-    this.proxy = this.data;
-    this.$$$ = this.proxy;
-
+    this.data = data;
     this.id = 0;
-    if (!this.options.useObjectMaps) {
-      this.pathGet = (path: string) => {
-        return Path.get(this.split(path), this.data);
-      };
-      this.pathSet = (pathChunks: string[], value: any) => {
-        return Path.set(pathChunks, value, this.data);
-      };
-    }
+    this.pathGet = Path.get;
+    this.pathSet = Path.set;
     if (options.Promise) {
       this.resolved = options.Promise.resolve();
     } else {
@@ -417,346 +284,13 @@ class DeepState {
     }
     this.muted = new Set();
     this.mutedListeners = new Set();
-    if (this.options.useObjectMaps) {
-      this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.map);
-    } else {
-      this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
-    }
+    this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
     this.destroyed = false;
   }
-
-  private deleteFromMap(fullPath: string, map = this.map) {
-    for (const key of map.keys()) {
-      if (key.startsWith(fullPath)) map.delete(key);
-    }
-  }
-
-  private updateMapDown(fullPath: string, value: any, parent: ProxyNode, deleteReferences = true, map = this.map) {
-    if (!this.options.useObjectMaps) return value;
-    if (deleteReferences) {
-      this.deleteFromMap(fullPath);
-    }
-    if (isObject(value)) {
-      value = this.makeObservable(value, fullPath, parent);
-      for (const prop in value) {
-        if (prop === this.proxyProperty) continue;
-        if (this.isProxy(parent) && this.options.useProxy) this.setNodeSaving(value, prop);
-        const valuePropWithProxy = this.updateMapDown(
-          fullPath ? fullPath + this.options.delimiter + prop : prop,
-          value[prop],
-          value,
-          false,
-          map
-        );
-        value[prop] = valuePropWithProxy;
-        if (this.isProxy(parent) && this.options.useProxy) this.unsetNodeSaving(value, prop);
-      }
-    } else if (Array.isArray(value)) {
-      value = this.makeObservable(value, fullPath, parent);
-      for (let i = 0, len = value.length; i < len; i++) {
-        if (this.isProxy(parent) && this.options.useProxy) this.setNodeSaving(value, i);
-        const valueWithProxy = this.updateMapDown(
-          fullPath ? fullPath + this.options.delimiter + String(i) : String(i),
-          value[i],
-          value as unknown as ProxyNode,
-          false,
-          map
-        );
-        value[i] = valueWithProxy;
-        if (this.isProxy(parent) && this.options.useProxy) this.unsetNodeSaving(value, i);
-      }
-    }
-    map.set(fullPath, value);
-    return value;
-  }
-
-  private pathGet(path: string) {
-    if (!this.options.useObjectMaps) return Path.get(this.split(path), this.data);
-    if (!path) return this.data;
-    return this.map.get(path);
-  }
-
-  private pathSet(pathChunks: string[], value: any) {
-    if (!this.options.useObjectMaps) return Path.set(pathChunks, value, this.data);
-    let prop,
-      currentPath = "",
-      obj = this.data;
-    if (!Array.isArray(pathChunks)) throw new Error("Invalid path chunks");
-    const chunks = pathChunks.slice();
-    let last = "";
-    if (chunks.length) {
-      last = chunks.pop();
-    }
-    let referencesDeleted = false;
-    const removeSavings = [];
-    // create nodes if needed
-    for (let i = 0, len = chunks.length; i < len; i++) {
-      prop = chunks[i];
-      if (currentPath) {
-        currentPath += this.options.delimiter + prop;
-      } else {
-        currentPath = prop;
-      }
-      if (prop in obj) {
-        obj = obj[prop];
-        continue;
-      }
-      // property doesn't exists
-      obj[prop] = this.makeObservable(Object.create(null), currentPath, obj as ProxyNode);
-      this.setNodeSaving(obj[prop], pathChunks[i + 1]); // do not notify anything now
-      removeSavings.push([obj[prop], pathChunks[i + 1]]);
-      if (!referencesDeleted) {
-        this.deleteFromMap(currentPath);
-        referencesDeleted = true;
-      }
-      this.map.set(currentPath, obj[prop]);
-      obj = obj[prop];
-    }
-    if (currentPath) {
-      currentPath += this.options.delimiter + last;
-    } else {
-      currentPath = last;
-    }
-    // update down if needed
-    let parent;
-    if (!currentPath) {
-      parent = this.rootProxyNode;
-    } else {
-      parent = obj;
-    }
-
-    if (this.options.useProxy) {
-      // NOTICE: we are using objectMaps because this method is fired otherwise it is replaced by object traverse pathSet
-      // if not using proxy objectMaps will update map down inside handler
-      value = this.updateMapDown(currentPath, value, parent as ProxyNode, !referencesDeleted);
-    }
-    if (last) {
-      this.setNodeSaving(parent, last);
-      obj[last] = value;
-      this.unsetNodeSaving(parent, last);
-    } else {
-      if (!isObject(value) && !Array.isArray(value)) {
-        console.error("The state root node should be an object.", value);
-        return;
-      }
-      if (isObject(value)) {
-        for (const key in value) {
-          this.setNodeSaving(parent, key);
-          obj[key] = value[key];
-          this.unsetNodeSaving(parent, key);
-        }
-      } else {
-        for (let i = 0, len = value.length; i < len; i++) {
-          this.setNodeSaving(parent, i);
-          obj[i] = value[i];
-          this.unsetNodeSaving(parent, i);
-        }
-      }
-    }
-    for (const [obj, prop] of removeSavings) {
-      this.unsetNodeSaving(obj, prop);
-    }
-  }
-
-  private getParent(pathChunks: string[], proxyNode: ProxyNode | any): ProxyNode | null {
-    if (!this.options.useProxy) {
-      const split = pathChunks.slice();
-      split.pop();
-      return this.get(this.trimPath(split.join(this.options.delimiter)));
-    }
-    if (proxyNode && typeof proxyNode[this.proxyProperty] !== "undefined") return proxyNode[this.proxyProperty].parent;
-    if (pathChunks.length === 0) return this.rootProxyNode;
-    const split = pathChunks.slice();
-    split.pop();
-    return this.get(this.trimPath(split.join(this.options.delimiter)));
-  }
-
-  private isSaving(pathChunks: string[], proxyNode: ProxyNode | any) {
-    if (!this.options.useProxy) return;
-    let parent = this.getParent(pathChunks, proxyNode);
-    if (parent && this.isProxy(parent)) {
-      if (parent[this.proxyProperty].saving.includes(pathChunks[pathChunks.length - 1])) return true;
-      return this.isSaving(parent[this.proxyProperty].pathChunks, parent);
-    }
-    return false;
-  }
-
-  private setNodeSaving(proxyNode: ProxyNode, prop: string | number) {
-    if (!this.options.useProxy) return;
-    if (!this.isProxy(proxyNode)) {
-      console.trace("It's not a proxy, but it should be.", proxyNode, prop);
-      return;
-    }
-    proxyNode[this.proxyProperty].saving.push(prop);
-  }
-
-  private unsetNodeSaving(proxyNode: ProxyNode, prop: string | number) {
-    if (!this.options.useProxy) return;
-    const saving = [];
-    for (const currentProp of proxyNode[this.proxyProperty].saving) {
-      if (currentProp !== prop) saving.push(currentProp);
-    }
-    if (!this.isProxy(proxyNode)) {
-      console.trace("It's not a proxy, but it should be.", proxyNode, prop);
-      return;
-    }
-    proxyNode[this.proxyProperty].saving = saving;
-  }
-
-  private addSaving(pathChunks: string[], proxyNode: ProxyNode | any) {
-    if (!this.options.useProxy) return;
-    const parent = this.getParent(pathChunks, proxyNode);
-    const changedProp = pathChunks[pathChunks.length - 1];
-    if (parent) this.setNodeSaving(parent, changedProp);
-  }
-
-  private removeSaving(pathChunks: string[], proxyNode: ProxyNode | any) {
-    if (!this.options.useProxy) return;
-    const parent = this.getParent(pathChunks, proxyNode);
-    if (parent) {
-      const changedProp = pathChunks[pathChunks.length - 1];
-      this.unsetNodeSaving(parent, changedProp);
-    }
-  }
-
-  private setProxy(target: any, data: ProxyData) {
-    if (!this.options.useProxy) return target;
-    if (typeof target[this.proxyProperty] === "undefined") {
-      Object.defineProperty(target, this.proxyProperty, {
-        enumerable: false,
-        writable: false,
-        configurable: false,
-        value: data,
-      });
-      return new Proxy(target, this.handler);
-    } else {
-      for (const key in data) {
-        target[this.proxyProperty][key] = data[key];
-      }
-    }
-    return target;
-  }
-
-  private setProxyForMapOnly(target: any, data: ProxyData) {
-    if (!this.options.useObjectMaps) return target;
-    if (typeof target[this.proxyProperty] === "undefined") {
-      data.mapOnly = true;
-      Object.defineProperty(target, this.proxyProperty, {
-        enumerable: false,
-        writable: false,
-        configurable: false,
-        value: data,
-      });
-      return new Proxy(target, this.objectMapOnlyHandler);
-    } else {
-      for (const key in data) {
-        target[this.proxyProperty][key] = data[key];
-      }
-    }
-    return target;
-  }
-
-  private isProxy(target: any) {
-    return target && typeof target[this.proxyProperty] !== "undefined";
-  }
-
-  private makeObservable(target: any, path: string, parent: ProxyNode) {
-    if (!this.options.useProxy && this.options.useObjectMaps) return this.makeProxyForMapOnly(target, path, parent);
-    if (!this.options.useProxy) return target;
-    if (isObject(target) || Array.isArray(target)) {
-      if (typeof target[this.proxyProperty] !== "undefined") {
-        const pp = target[this.proxyProperty];
-        if (pp.path === path && pp.parent === parent) return target;
-      }
-      if (isObject(target)) {
-        for (const key in target) {
-          if (key === this.proxyProperty) continue;
-          if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
-            if (this.isProxy(target)) this.setNodeSaving(target, key);
-            target[key] = this.makeObservable(
-              target[key],
-              `${path ? path + this.options.delimiter : ""}${key}`,
-              target
-            );
-            if (this.isProxy(target)) this.unsetNodeSaving(target, key);
-          }
-        }
-      } else {
-        for (let key = 0, len = target.length; key < len; key++) {
-          if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
-            if (this.isProxy(target)) this.setNodeSaving(target, String(key));
-            target[key] = this.makeObservable(
-              target[key],
-              `${path ? path + this.options.delimiter : ""}${key}`,
-              target
-            );
-            if (this.isProxy(target)) this.unsetNodeSaving(target, String(key));
-          }
-        }
-      }
-      if (!this.isProxy(target)) {
-        const proxyObj: ProxyData = Object.create(null);
-        proxyObj.path = path;
-        proxyObj.pathChunks = this.split(path);
-        proxyObj.saving = [];
-        proxyObj.parent = parent;
-        target = this.setProxy(target, proxyObj);
-      }
-    }
-    return target;
-  }
-
-  private makeProxyForMapOnly(target: any, path: string, parent: ProxyNode) {
-    if (!this.options.useObjectMaps) return target;
-    if (isObject(target) || Array.isArray(target)) {
-      if (typeof target[this.proxyProperty] !== "undefined") {
-        const pp = target[this.proxyProperty];
-        if (pp.path === path && pp.parent === parent) return target;
-      }
-      if (isObject(target)) {
-        for (const key in target) {
-          if (key === this.proxyProperty) continue;
-          if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
-            target[key] = this.makeProxyForMapOnly(
-              target[key],
-              `${path ? path + this.options.delimiter : ""}${key}`,
-              target
-            );
-          }
-        }
-      } else {
-        for (let key = 0, len = target.length; key < len; key++) {
-          if ((isObject(target[key]) || Array.isArray(target[key])) && !this.isProxy(target[key])) {
-            target[key] = this.makeProxyForMapOnly(
-              target[key],
-              `${path ? path + this.options.delimiter : ""}${key}`,
-              target
-            );
-          }
-        }
-      }
-      if (!this.isProxy(target)) {
-        const proxyObj: ProxyData = Object.create(null);
-        proxyObj.path = path;
-        proxyObj.pathChunks = this.split(path);
-        proxyObj.saving = [];
-        proxyObj.parent = parent;
-        target = this.setProxyForMapOnly(target, proxyObj);
-      }
-    }
-    return target;
-  }
-
   public async loadWasmMatcher(pathToWasmFile: string) {
     await init(pathToWasmFile);
     this.is_match = is_match;
-    this.scan = new WildcardObject(
-      this.data,
-      this.options.delimiter,
-      this.options.wildcard,
-      this.options.useObjectMaps ? this.map : null,
-      this.is_match
-    );
+    this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.is_match);
   }
 
   private same(newValue, oldValue): boolean {
@@ -1078,9 +612,10 @@ class DeepState {
     listenersCollection.count++;
     if (!options.group || (options.group && subscribeAllOptions.all.length - 1 === subscribeAllOptions.index)) {
       const cleanPath = this.cleanNotRecursivePath(listenersCollection.path);
+      const cleanPathChunks = this.split(cleanPath);
       if (!listenersCollection.isWildcard) {
         if (!this.isMuted(cleanPath) && !this.isMuted(fn)) {
-          fn(this.pathGet(cleanPath), {
+          fn(this.pathGet(cleanPathChunks, this.data), {
             type,
             listener,
             listenersCollection,
@@ -1095,16 +630,16 @@ class DeepState {
         }
       } else {
         const paths = this.scan.get(cleanPath);
-        const bulkValue: Bulk[] = [];
-        for (const path in paths) {
-          if (this.isMuted(path)) continue;
-          bulkValue.push({
-            path,
-            params: this.getParams(listenersCollection.paramsInfo, path),
-            value: paths[path],
-          });
-        }
         if (options.bulk) {
+          const bulkValue: Bulk[] = [];
+          for (const path in paths) {
+            if (this.isMuted(path)) continue;
+            bulkValue.push({
+              path,
+              params: this.getParams(listenersCollection.paramsInfo, path),
+              value: paths[path],
+            });
+          }
           if (!this.isMuted(fn)) {
             fn(bulkValue, {
               type,
@@ -1608,16 +1143,11 @@ class DeepState {
     return typeof newValue === "object" && newValue !== null;
   }
 
-  private getUpdateValues(oldValue, split, fn, parent: ProxyNode) {
+  private getUpdateValues(oldValue: any, fn: ListenerFunction | any) {
     let newValue = fn;
     if (typeof fn === "function") {
       newValue = fn(oldValue);
     }
-    if (this.options.useProxy) {
-      if (isObject(newValue) || Array.isArray(newValue))
-        newValue = this.makeObservable(newValue, split.join(this.options.delimiter), parent);
-    }
-    // here we don't want to update maps if only maps are enabled because PathSet will update everything for us
     return { newValue, oldValue };
   }
 
@@ -1645,11 +1175,9 @@ class DeepState {
     const updated = {};
     for (const path in scanned) {
       const split = this.split(path);
-      const parent = this.getParent(split, scanned[path]);
-      this.addSaving(split, scanned[path]);
-      const { oldValue, newValue } = this.getUpdateValues(scanned[path], split, fn, parent);
+      const { oldValue, newValue } = this.getUpdateValues(scanned[path], fn);
       if (!this.same(newValue, oldValue) || options.force) {
-        this.pathSet(split, newValue);
+        this.pathSet(split, newValue, this.data);
         updated[path] = newValue;
       }
     }
@@ -1674,16 +1202,10 @@ class DeepState {
       return function () {
         const queue = self.wildcardNotify(groupedListenersPack, waitingPaths);
         self.sortAndRunQueue(queue, updatePath);
-        for (const path in scanned) {
-          self.removeSaving(self.split(path), scanned[path]);
-        }
       };
     }
     const queue = this.wildcardNotify(groupedListenersPack, waitingPaths);
     this.sortAndRunQueue(queue, updatePath);
-    for (const path in scanned) {
-      this.removeSaving(this.split(path), scanned[path]);
-    }
   }
 
   private runUpdateQueue() {
@@ -1769,11 +1291,8 @@ class DeepState {
     }
     ++this.jobsRunning;
     const split = this.split(updatePath);
-    const currentValue = this.pathGet(updatePath);
-    const currentlySaving = this.isSaving(split, currentValue);
-    this.addSaving(split, currentValue);
-    const parent = this.getParent(split, currentValue);
-    let { oldValue, newValue } = this.getUpdateValues(currentValue, split, fnOrValue, parent);
+    const currentValue = this.pathGet(split, this.data);
+    let { oldValue, newValue } = this.getUpdateValues(currentValue, fnOrValue);
     if (options.debug) {
       this.options.log(`Updating ${updatePath} ${options.source ? `from ${options.source}` : ""}`, {
         oldValue,
@@ -1790,21 +1309,12 @@ class DeepState {
       return newValue;
     }
 
-    this.pathSet(split, newValue);
-
-    // if we are saving a parent node - do not notify about changes
-    // because someone may modify object which is given as argument
-    // and will fire subscriptions immediately which is not intended
-    if (this.options.useProxy && currentlySaving && !options.force) {
-      this.removeSaving(split, newValue);
-      return newValue;
-    }
+    this.pathSet(split, newValue, this.data);
 
     options = { ...defaultUpdateOptions, ...options };
     if (options.only === null) {
       --this.jobsRunning;
       if (multi) return function () {};
-      this.removeSaving(split, newValue);
       return newValue;
     }
     if (options.only.length) {
@@ -1813,12 +1323,10 @@ class DeepState {
         const self = this;
         return function () {
           const result = self.updateNotifyOnly(updatePath, newValue, options);
-          self.removeSaving(split, newValue);
           return result;
         };
       }
       this.updateNotifyOnly(updatePath, newValue, options);
-      this.removeSaving(split, newValue);
       return newValue;
     }
     if (multi) {
@@ -1826,12 +1334,10 @@ class DeepState {
       const self = this;
       return function multiUpdate() {
         const result = self.updateNotify(updatePath, newValue, options);
-        self.removeSaving(split, newValue);
         return result;
       };
     }
     this.updateNotify(updatePath, newValue, options);
-    this.removeSaving(split, newValue);
     --this.jobsRunning;
     return newValue;
   }
@@ -1856,19 +1362,11 @@ class DeepState {
         if (grouped) {
           const split = self.split(updatePath);
           let value = fnOrValue;
-          const currentValue = self.pathGet(updatePath);
-          self.addSaving(split, currentValue);
+          const currentValue = self.pathGet(split, self.data);
           if (typeof value === "function") {
             value = value(currentValue);
           }
-          if (self.options.useProxy) {
-            if (isObject(value) || Array.isArray(value)) {
-              const parent = self.getParent(split, currentValue);
-              value = self.makeObservable(value, updatePath, parent);
-            }
-          }
-          self.pathSet(split, value);
-          self.removeSaving(split, currentValue);
+          self.pathSet(split, value, self.data);
           updateStack.push({ updatePath, newValue: value, options });
         } else {
           notifiers.push(self.update(updatePath, fnOrValue, options, true));
@@ -1926,7 +1424,10 @@ class DeepState {
     if (typeof userPath === "undefined" || userPath === "") {
       return this.data;
     }
-    return this.pathGet(userPath as string);
+    if (this.isWildcard(userPath)) {
+      return this.scan.get(userPath);
+    }
+    return this.pathGet(this.split(userPath), this.data);
   }
 
   private lastExecs: WeakMap<() => void, { calls: number }> = new WeakMap();

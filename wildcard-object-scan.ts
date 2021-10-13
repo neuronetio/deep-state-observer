@@ -8,20 +8,17 @@ class WildcardObject {
   private delimiter;
   private wildcard;
   private is_match;
-  private objectMap: Map<string, any> = null;
 
   constructor(
     obj: object,
     delimiter: string,
     wildcard: string,
-    objectMap: Map<string, any> = null,
     is_match: (first: string, second: string) => boolean = undefined
   ) {
     this.obj = obj;
     this.delimiter = delimiter;
     this.wildcard = wildcard;
     this.is_match = is_match;
-    this.objectMap = objectMap;
   }
 
   shortMatch(first: string, second: string): boolean {
@@ -110,37 +107,7 @@ class WildcardObject {
     return this.handleObject(path, currentObj, partIndex, currentPath, result);
   }
 
-  private getIndicesCount(searchStr: string, str: string): number {
-    const searchStrLen = searchStr.length;
-    if (searchStrLen == 0) {
-      return 0;
-    }
-    let startIndex = 0,
-      index,
-      indices = 0;
-    while ((index = str.indexOf(searchStr, startIndex)) > -1) {
-      indices++;
-      startIndex = index + searchStrLen;
-    }
-    return indices;
-  }
-
-  getFromMap(path: string) {
-    const result = {};
-    const pathDelimitersCount = this.getIndicesCount(this.delimiter, path);
-    const len = path.length;
-    for (const [key, value] of this.objectMap) {
-      if (this.getIndicesCount(this.delimiter, key) === pathDelimitersCount && this.match(path, key)) {
-        result[key] = value;
-      }
-    }
-    return result;
-  }
-
   get(path: string): any {
-    if (this.objectMap) {
-      return this.getFromMap(path);
-    }
     return this.goFurther(path, this.obj, 0, "");
   }
 }

@@ -1,74 +1,33 @@
-import * as path from "path";
 import DeepStateObserver from "./index";
 
-export interface Zobj {
-  d: number;
-  e: string;
+const width = 5;
+const height = 5;
+const subs = 10;
+
+function getObj() {
+  const obj = {};
+  for (let h = 0; h < height; h++) {
+    const current = {};
+    for (let w = 0; w < width; w++) {
+      current["w" + w] = `${h} ${w}`;
+    }
+    obj["h" + h] = current;
+  }
+  return obj;
 }
 
-export interface Yobj {
-  a: number;
-  b: string;
-  c: Zobj;
-  d: Zobj;
+const item = `h${Math.round(height / 2)}.w${Math.round(width / 2)}`;
+console.log("item", item);
+function generateSubs(state) {
+  for (let i = 0; i < subs; i++) {
+    state.subscribe(item, () => {
+      const x = 1 + Math.random();
+    });
+  }
 }
 
-export interface SomeState {
-  x: number;
-  y: Yobj;
-}
+const state = new DeepStateObserver(getObj());
+generateSubs(state);
+console.log(state.get(""));
 
-const someState: SomeState = {
-  x: 10,
-  y: {
-    a: 1,
-    b: "2",
-    c: {
-      d: 3,
-      e: "4",
-    },
-    d: {
-      d: 4,
-      e: "55",
-    },
-  },
-};
-
-const state = new DeepStateObserver<SomeState>(someState);
-
-state.subscribe("y.c.d", (v) => {}, { bulk: true });
-
-state.$$$.y.c.d = 33;
-
-if (state.get("y.c.d") !== 33) {
-  console.error("wrong");
-} else {
-  console.log("ok");
-}
-type PathImpl<T, K extends keyof T> = K extends string
-  ? T[K] extends Record<string, any>
-    ? T[K] extends ArrayLike<any>
-      ? K | `${K}.${PathImpl<T[K], Exclude<keyof T[K], keyof any[]>>}`
-      : K | `${K}.${PathImpl<T[K], keyof T[K]>}`
-    : K
-  : never;
-
-type Path<T> = PathImpl<T, keyof T> | keyof T;
-
-type PathValue<T, P extends Path<T>> = P extends `${infer K}.${infer Rest}`
-  ? K extends keyof T
-    ? Rest extends Path<T[K]>
-      ? PathValue<T[K], Rest>
-      : never
-    : never
-  : P extends keyof T
-  ? T[P]
-  : never;
-
-declare function get<P extends Path<SomeState>>(path: P): PathValue<SomeState, P>;
-
-declare function sub<P extends Path<SomeState>>(path: P, callback: (val: PathValue<SomeState, P>) => void): void;
-
-sub("y.c.d", (val) => {});
-
-const v = get("y.c.e");
+state.update(item, { xxx: 1010 });

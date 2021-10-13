@@ -21,8 +21,6 @@ export interface Options {
     wildcard?: string;
     experimentalMatch?: boolean;
     queue?: boolean;
-    useObjectMaps?: boolean;
-    useProxy?: boolean;
     maxSimultaneousJobs?: number;
     maxQueueRuns?: number;
     log?: (message: string, info: any) => void;
@@ -150,18 +148,6 @@ export interface Multi {
 export interface UnknownObject {
     [key: string]: unknown;
 }
-export interface ProxyNode {
-    [key: string]: unknown;
-    [n: number]: unknown;
-    ___deep_state_observer___: ProxyData;
-}
-export interface ProxyData {
-    path: string;
-    pathChunks: string[];
-    saving: (string | number)[];
-    parent: ProxyNode | null;
-    mapOnly?: boolean;
-}
 declare class DeepState {
     private listeners;
     private waitingListeners;
@@ -181,37 +167,14 @@ declare class DeepState {
     private mutedListeners;
     private groupId;
     private traceId;
+    private pathGet;
+    private pathSet;
     private traceMap;
     private tracing;
     private savedTrace;
     private collection;
     private collections;
-    readonly proxyProperty = "___deep_state_observer___";
-    private rootProxyNode;
-    private handler;
-    private objectMapOnlyHandler;
-    proxy: object;
-    /**
-     * @property $$$ proxy shorthand
-     */
-    $$$: object;
-    private map;
     constructor(data?: object, options?: Options);
-    private deleteFromMap;
-    private updateMapDown;
-    private pathGet;
-    private pathSet;
-    private getParent;
-    private isSaving;
-    private setNodeSaving;
-    private unsetNodeSaving;
-    private addSaving;
-    private removeSaving;
-    private setProxy;
-    private setProxyForMapOnly;
-    private isProxy;
-    private makeObservable;
-    private makeProxyForMapOnly;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
     getListeners(): Listeners;
