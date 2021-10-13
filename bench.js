@@ -1,5 +1,5 @@
-const Benchmark = require("benchmark");
-const State = require("./index.cjs.js");
+const Benchmark = require('benchmark');
+const DeepState = require('./index.cjs.js');
 
 const width = 10;
 const height = 10000;
@@ -10,121 +10,82 @@ function getObj() {
   for (let h = 0; h < height; h++) {
     const current = {};
     for (let w = 0; w < width; w++) {
-      current["w" + w] = `${h} ${w}`;
+      current['w' + w] = `${h} ${w}`;
     }
-    obj["h" + h] = current;
+    obj['h' + h] = current;
   }
   return obj;
 }
 
 const item = `h${Math.round(height / 2)}.w${Math.round(width / 2)}`;
+const wild = `h${Math.round(height / 2)}.*${Math.round(width / 2)}`;
 
 function generateSubs(state) {
   for (let i = 0; i < subs; i++) {
+    state.subscribe(wild, () => {
+      const x = 1 + Math.random();
+    });
     state.subscribe(item, () => {
       const x = 1 + Math.random();
     });
   }
 }
 
-let noProxyNoMaps;
-let ProxyNoMaps;
-let noProxyMaps;
-let ProxyMaps;
+const state = new Array(2);
 
-const objs = [getObj(), getObj(), getObj(), getObj()];
+const objs = [getObj(), getObj()];
 
-new Benchmark.Suite("create")
-  .add("no proxy no maps", function () {
-    noProxyNoMaps = new State(objs[0], { useProxy: false, useObjectMaps: false });
-    generateSubs(noProxyNoMaps);
+state[0] = new DeepState(objs[0], { useCache: false });
+generateSubs(state[0]);
+state[1] = new DeepState(objs[1], { useCache: true });
+generateSubs(state[1]);
+
+console.log('update & get');
+new Benchmark.Suite('update get')
+  .add('[no cache]', function () {
+    state[0].update(item, { val: Math.random() });
+    state[0].get(wild);
   })
-  .add("proxy no maps", function () {
-    ProxyNoMaps = new State(objs[1], { useProxy: true, useObjectMaps: false });
-    generateSubs(ProxyNoMaps);
+  .add('[cache]', function () {
+    state[1].update(item, 2);
+    state[1].get(wild);
   })
-  .add("no proxy with maps", function () {
-    noProxyMaps = new State(objs[2], { useProxy: false, useObjectMaps: true });
-    generateSubs(noProxyMaps);
-  })
-  .add("proxy & maps", function () {
-    ProxyMaps = new State(objs[3], { useProxy: true, useObjectMaps: true });
-    generateSubs(ProxyMaps);
-  })
-  .on("cycle", function (event) {
+  .on('cycle', function (event) {
     console.log(String(event.target));
   })
-  .on("complete", function () {
-    console.log(`Fastest is '${this.filter("fastest").map("name")}'`);
+  .on('complete', function () {
+    console.log(`Fastest is '${this.filter('fastest').map('name')}'`);
   })
   .run();
 
-console.log("update & get");
-new Benchmark.Suite("update get")
-  .add("no proxy no maps", function () {
-    noProxyNoMaps.update(item, 2);
-    noProxyNoMaps.get(item);
+console.log('update');
+new Benchmark.Suite('update')
+  .add('[no cache]', function () {
+    state[0].update(item, { val: Math.random() });
   })
-  .add("proxy no maps", function () {
-    ProxyNoMaps.update(item, 2);
-    ProxyNoMaps.get(item);
+  .add('[cache]', function () {
+    state[1].update(item, { val: Math.random() });
   })
-  .add("no proxy with maps", function () {
-    noProxyMaps.update(item, 2);
-    noProxyMaps.get(item);
-  })
-  .add("proxy & maps", function (event) {
-    ProxyMaps.update(item, 2);
-    ProxyMaps.get(item);
-  })
-  .on("cycle", function (event) {
+  .on('cycle', function (event) {
     console.log(String(event.target));
   })
-  .on("complete", function () {
-    console.log(`Fastest is '${this.filter("fastest").map("name")}'`);
+  .on('complete', function () {
+    console.log(`Fastest is '${this.filter('fastest').map('name')}'`);
   })
   .run();
 
-console.log("update");
-new Benchmark.Suite("update")
-  .add("no proxy no maps", function () {
-    noProxyNoMaps.update(item, 2);
+console.log('get');
+new Benchmark.Suite('get')
+  .add('[no cache]', function () {
+    state[0].get(wild);
   })
-  .add("proxy no maps", function () {
-    ProxyNoMaps.update(item, 2);
+  .add('[cache]', function () {
+    state[1].get(wild);
   })
-  .add("no proxy with maps", function () {
-    noProxyMaps.update(item, 2);
-  })
-  .add("proxy & maps", function (event) {
-    ProxyMaps.update(item, 2);
-  })
-  .on("cycle", function (event) {
+  .on('cycle', function (event) {
     console.log(String(event.target));
   })
-  .on("complete", function () {
-    console.log(`Fastest is '${this.filter("fastest").map("name")}'`);
-  })
-  .run();
-
-console.log("get");
-new Benchmark.Suite("get")
-  .add("no proxy no maps", function () {
-    noProxyNoMaps.get(item);
-  })
-  .add("proxy no maps", function () {
-    ProxyNoMaps.get(item);
-  })
-  .add("no proxy with maps", function () {
-    noProxyMaps.get(item);
-  })
-  .add("proxy & maps", function (event) {
-    ProxyMaps.get(item);
-  })
-  .on("cycle", function (event) {
-    console.log(String(event.target));
-  })
-  .on("complete", function () {
-    console.log(`Fastest is '${this.filter("fastest").map("name")}'`);
+  .on('complete', function () {
+    console.log(`Fastest is '${this.filter('fastest').map('name')}'`);
   })
   .run();

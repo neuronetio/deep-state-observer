@@ -21,6 +21,7 @@ export interface Options {
     wildcard?: string;
     experimentalMatch?: boolean;
     queue?: boolean;
+    useCache?: boolean;
     maxSimultaneousJobs?: number;
     maxQueueRuns?: number;
     log?: (message: string, info: any) => void;
@@ -174,7 +175,10 @@ declare class DeepState {
     private savedTrace;
     private collection;
     private collections;
+    private cache;
     constructor(data?: object, options?: Options);
+    private cacheGet;
+    private cacheSet;
     loadWasmMatcher(pathToWasmFile: string): Promise<void>;
     private same;
     getListeners(): Listeners;

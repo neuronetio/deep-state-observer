@@ -1,5 +1,5 @@
-const State = require("./index.cjs.js");
-console.log("start");
+const State = require('./index.cjs.js');
+console.log('start');
 const width = 10;
 const height = 10000;
 const subs = 1000;
@@ -9,9 +9,9 @@ function getObj() {
   for (let h = 0; h < height; h++) {
     const current = {};
     for (let w = 0; w < width; w++) {
-      current["w" + w] = `${h} ${w}`;
+      current['w' + w] = `${h} ${w}`;
     }
-    obj["h" + h] = current;
+    obj['h' + h] = current;
   }
   return obj;
 }
@@ -33,11 +33,11 @@ for (let i = 0; i < 50; i++) {
 
 let s;
 for (let i = 0; i < 50; i++) {
-  s = new State(objs[i], { useProxy: false, useObjectMaps: true });
+  s = new State(objs[i], { useCache: false });
 }
 generateSubs(s);
 
-console.log("done");
+console.log('done');
 /*
 let dataItemsCount = 1000; //50000;
 let iterations = 1000;
