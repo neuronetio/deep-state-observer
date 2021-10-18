@@ -37,7 +37,7 @@ export interface ListenerOptions {
     data?: any;
     queue?: boolean;
     ignore?: string[];
-    group?: boolean;
+    group?: boolean | string;
 }
 export interface UpdateOptions {
     only?: string[];
@@ -51,7 +51,7 @@ export interface Listener {
     fn: ListenerFunction;
     options: ListenerOptions;
     id?: number;
-    groupId: number | null;
+    groupId: number | string | null;
 }
 export interface Queue {
     id: number;
@@ -60,7 +60,7 @@ export interface Queue {
     fn: () => void;
     originalFn: ListenerFunction;
     options: ListenerOptions;
-    groupId: number;
+    groupId: number | string | null;
 }
 export interface GroupedListener {
     listener: Listener;
@@ -123,7 +123,7 @@ export interface ParamsInfo {
 export interface SubscribeAllOptions {
     all: string[];
     index: number;
-    groupId: number;
+    groupId: number | string | null;
 }
 export interface TraceValue {
     id: string;
@@ -168,6 +168,8 @@ declare class DeepState {
     private muted;
     private mutedListeners;
     private groupId;
+    private namedGroups;
+    private numberGroups;
     private traceId;
     private pathGet;
     private pathSet;
