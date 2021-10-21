@@ -110,6 +110,7 @@ function getDefaultOptions() {
         queue: false,
         useCache: false,
         useSplitCache: false,
+        useIndicesCache: false,
         maxSimultaneousJobs: 1000,
         maxQueueRuns: 1000,
         log: log,
@@ -158,6 +159,8 @@ var DeepState = /** @class */ (function () {
         this.collections = 0;
         this.cache = new Map();
         this.splitCache = new Map();
+        this.indices = new Map();
+        this.indicesCount = new Map();
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -268,6 +271,8 @@ var DeepState = /** @class */ (function () {
         return this.scan.match(first, second);
     };
     DeepState.prototype.getIndicesOf = function (searchStr, str) {
+        if (this.options.useIndicesCache && this.indices.has(str))
+            return this.indices.get(str);
         var searchStrLen = searchStr.length;
         if (searchStrLen == 0) {
             return [];
@@ -277,9 +282,13 @@ var DeepState = /** @class */ (function () {
             indices.push(index);
             startIndex = index + searchStrLen;
         }
+        if (this.options.useIndicesCache)
+            this.indices.set(str, indices);
         return indices;
     };
     DeepState.prototype.getIndicesCount = function (searchStr, str) {
+        if (this.options.useIndicesCache && this.indicesCount.has(str))
+            return this.indicesCount.get(str);
         var searchStrLen = searchStr.length;
         if (searchStrLen == 0) {
             return 0;
@@ -289,6 +298,8 @@ var DeepState = /** @class */ (function () {
             indices++;
             startIndex = index + searchStrLen;
         }
+        if (this.options.useIndicesCache)
+            this.indicesCount.set(str, indices);
         return indices;
     };
     DeepState.prototype.cutPath = function (longer, shorter) {

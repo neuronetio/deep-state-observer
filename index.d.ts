@@ -23,6 +23,7 @@ export interface Options {
     queue?: boolean;
     useCache?: boolean;
     useSplitCache?: boolean;
+    useIndicesCache?: boolean;
     maxSimultaneousJobs?: number;
     maxQueueRuns?: number;
     log?: (message: string, info: any) => void;
@@ -195,7 +196,9 @@ declare class DeepState {
     getListeners(): Listeners;
     destroy(): void;
     private match;
+    private indices;
     private getIndicesOf;
+    private indicesCount;
     private getIndicesCount;
     private cutPath;
     private trimPath;

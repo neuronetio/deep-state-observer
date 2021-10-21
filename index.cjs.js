@@ -376,6 +376,7 @@ function getDefaultOptions() {
         queue: false,
         useCache: false,
         useSplitCache: false,
+        useIndicesCache: false,
         maxSimultaneousJobs: 1000,
         maxQueueRuns: 1000,
         log,
@@ -422,6 +423,8 @@ class DeepState {
         this.collections = 0;
         this.cache = new Map();
         this.splitCache = new Map();
+        this.indices = new Map();
+        this.indicesCount = new Map();
         this.lastExecs = new WeakMap();
         this.listeners = new Map();
         this.waitingListeners = new Map();
@@ -521,6 +524,8 @@ class DeepState {
         return this.scan.match(first, second);
     }
     getIndicesOf(searchStr, str) {
+        if (this.options.useIndicesCache && this.indices.has(str))
+            return this.indices.get(str);
         const searchStrLen = searchStr.length;
         if (searchStrLen == 0) {
             return [];
@@ -530,9 +535,13 @@ class DeepState {
             indices.push(index);
             startIndex = index + searchStrLen;
         }
+        if (this.options.useIndicesCache)
+            this.indices.set(str, indices);
         return indices;
     }
     getIndicesCount(searchStr, str) {
+        if (this.options.useIndicesCache && this.indicesCount.has(str))
+            return this.indicesCount.get(str);
         const searchStrLen = searchStr.length;
         if (searchStrLen == 0) {
             return 0;
@@ -542,6 +551,8 @@ class DeepState {
             indices++;
             startIndex = index + searchStrLen;
         }
+        if (this.options.useIndicesCache)
+            this.indicesCount.set(str, indices);
         return indices;
     }
     cutPath(longer, shorter) {

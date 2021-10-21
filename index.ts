@@ -30,6 +30,7 @@ export interface Options {
   queue?: boolean;
   useCache?: boolean;
   useSplitCache?: boolean;
+  useIndicesCache?: boolean;
   maxSimultaneousJobs?: number;
   maxQueueRuns?: number;
   log?: (message: string, info: any) => void;
@@ -230,6 +231,7 @@ function getDefaultOptions(): Options {
     queue: false,
     useCache: false,
     useSplitCache: false,
+    useIndicesCache: false,
     maxSimultaneousJobs: 1000,
     maxQueueRuns: 1000,
     log,
@@ -396,7 +398,9 @@ class DeepState {
     return this.scan.match(first, second);
   }
 
+  private indices: Map<string, number[]> = new Map();
   private getIndicesOf(searchStr: string, str: string): number[] {
+    if (this.options.useIndicesCache && this.indices.has(str)) return this.indices.get(str);
     const searchStrLen = searchStr.length;
     if (searchStrLen == 0) {
       return [];
@@ -408,10 +412,13 @@ class DeepState {
       indices.push(index);
       startIndex = index + searchStrLen;
     }
+    if (this.options.useIndicesCache) this.indices.set(str, indices);
     return indices;
   }
 
+  private indicesCount: Map<string, number> = new Map();
   private getIndicesCount(searchStr: string, str: string): number {
+    if (this.options.useIndicesCache && this.indicesCount.has(str)) return this.indicesCount.get(str);
     const searchStrLen = searchStr.length;
     if (searchStrLen == 0) {
       return 0;
@@ -423,6 +430,7 @@ class DeepState {
       indices++;
       startIndex = index + searchStrLen;
     }
+    if (this.options.useIndicesCache) this.indicesCount.set(str, indices);
     return indices;
   }
 
