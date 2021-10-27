@@ -26,11 +26,12 @@ function __awaiter(thisArg, _arguments, P, generator) {
 }
 
 // forked from https://github.com/joonhocho/superwild
+const segments = [];
 function Match(pattern, match, wchar = "*") {
     if (pattern === wchar) {
         return true;
     }
-    let segments = [];
+    segments.length = 0;
     let starCount = 0;
     let minLength = 0;
     let maxLength = 0;

@@ -84,11 +84,12 @@ class Matcher {
 }
 
 export default Matcher;
+const segments = [];
 export function Match(pattern: string, match: string, wchar: string = "*") {
   if (pattern === wchar) {
     return true;
   }
-  let segments = [];
+  segments.length = 0;
   let starCount = 0;
   let minLength = 0;
   let maxLength = 0;

@@ -81,12 +81,13 @@ var Matcher = /** @class */ (function () {
     return Matcher;
 }());
 exports["default"] = Matcher;
+var segments = [];
 function Match(pattern, match, wchar) {
     if (wchar === void 0) { wchar = "*"; }
     if (pattern === wchar) {
         return true;
     }
-    var segments = [];
+    segments.length = 0;
     var starCount = 0;
     var minLength = 0;
     var maxLength = 0;
