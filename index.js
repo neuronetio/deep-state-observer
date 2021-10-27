@@ -937,8 +937,8 @@ var DeepState = /** @class */ (function () {
         var listeners = {};
         var _loop_3 = function (listenerPath, listenersCollection) {
             var e_13, _e, e_14, _f;
-            listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
             if (listenersCollection.match(updatePath)) {
+                listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
                 var params = listenersCollection.paramsInfo
                     ? this_3.getParams(listenersCollection.paramsInfo, updatePath)
                     : undefined;
@@ -1063,10 +1063,10 @@ var DeepState = /** @class */ (function () {
             var e_16, _e;
             if (!listenersCollection.isRecursive)
                 return "continue";
-            listeners[listenerPath] = { single: [], bulk: [] };
             // listenerPath is longer and is shortened - because we want to get listeners underneath change
             var currentAbovePathCut = this_4.cutPath(listenerPath, updatePath);
             if (this_4.match(currentAbovePathCut, updatePath)) {
+                listeners[listenerPath] = { single: [], bulk: [] };
                 // listener is listening below updated node
                 var restBelowPathCut = this_4.trimPath(listenerPath.substr(currentAbovePathCut.length));
                 var wildcardNewValues_1 = restBelowValues[restBelowPathCut]

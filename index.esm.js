@@ -1049,8 +1049,8 @@ class DeepState {
         options = Object.assign(Object.assign({}, defaultUpdateOptions), options);
         const listeners = {};
         for (let [listenerPath, listenersCollection] of this.listeners) {
-            listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
             if (listenersCollection.match(updatePath)) {
+                listeners[listenerPath] = { single: [], bulk: [], bulkData: [] };
                 const params = listenersCollection.paramsInfo
                     ? this.getParams(listenersCollection.paramsInfo, updatePath)
                     : undefined;
@@ -1135,10 +1135,10 @@ class DeepState {
         for (let [listenerPath, listenersCollection] of this.listeners) {
             if (!listenersCollection.isRecursive)
                 continue;
-            listeners[listenerPath] = { single: [], bulk: [] };
             // listenerPath is longer and is shortened - because we want to get listeners underneath change
             const currentAbovePathCut = this.cutPath(listenerPath, updatePath);
             if (this.match(currentAbovePathCut, updatePath)) {
+                listeners[listenerPath] = { single: [], bulk: [] };
                 // listener is listening below updated node
                 const restBelowPathCut = this.trimPath(listenerPath.substr(currentAbovePathCut.length));
                 const wildcardNewValues = restBelowValues[restBelowPathCut]
