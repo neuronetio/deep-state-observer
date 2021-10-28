@@ -33,6 +33,7 @@ export interface Options {
 }
 export interface ListenerOptions {
     bulk?: boolean;
+    bulkValue?: boolean;
     debug?: boolean;
     source?: string;
     data?: any;
@@ -224,6 +225,7 @@ declare class DeepState {
     private shouldIgnore;
     private getSubscribedListeners;
     private notifySubscribedListeners;
+    private useBulkValue;
     private getNestedListeners;
     private notifyNestedListeners;
     private getNotifyOnlyListeners;

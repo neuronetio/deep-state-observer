@@ -386,6 +386,7 @@ function getDefaultOptions() {
 }
 const defaultListenerOptions = {
     bulk: false,
+    bulkValue: true,
     debug: false,
     source: "",
     data: undefined,
@@ -1131,6 +1132,13 @@ class DeepState {
     notifySubscribedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
         return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
     }
+    useBulkValue(listenersCollection) {
+        for (const [listenerId, listener] of listenersCollection.listeners) {
+            if (listener.options.bulkValue)
+                return true;
+        }
+        return false;
+    }
     getNestedListeners(updatePath, newValue, options, type = "update", originalPath = null) {
         const listeners = {};
         const restBelowValues = {};
@@ -1143,19 +1151,53 @@ class DeepState {
                 listeners[listenerPath] = { single: [], bulk: [] };
                 // listener is listening below updated node
                 const restBelowPathCut = this.trimPath(listenerPath.substr(currentAbovePathCut.length));
-                const wildcardNewValues = restBelowValues[restBelowPathCut]
-                    ? restBelowValues[restBelowPathCut] // if those values are already calculated use it
-                    : new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(restBelowPathCut);
-                restBelowValues[restBelowPathCut] = wildcardNewValues;
+                const useBulkValue = this.useBulkValue(listenersCollection);
+                let wildcardNewValues;
+                if (useBulkValue) {
+                    wildcardNewValues = restBelowValues[restBelowPathCut]
+                        ? restBelowValues[restBelowPathCut] // if those values are already calculated use it
+                        : new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(restBelowPathCut);
+                    restBelowValues[restBelowPathCut] = wildcardNewValues;
+                }
                 const params = listenersCollection.paramsInfo
                     ? this.getParams(listenersCollection.paramsInfo, updatePath)
                     : undefined;
                 const bulk = [];
                 const bulkListeners = {};
-                for (const currentRestPath in wildcardNewValues) {
-                    const value = () => wildcardNewValues[currentRestPath];
-                    const fullPath = [updatePath, currentRestPath].join(this.options.delimiter);
-                    for (const [listenerId, listener] of listenersCollection.listeners) {
+                for (const [listenerId, listener] of listenersCollection.listeners) {
+                    if (useBulkValue) {
+                        for (const currentRestPath in wildcardNewValues) {
+                            const value = () => wildcardNewValues[currentRestPath];
+                            const fullPath = [updatePath, currentRestPath].join(this.options.delimiter);
+                            const eventInfo = {
+                                type,
+                                listener,
+                                listenersCollection,
+                                path: {
+                                    listener: listenerPath,
+                                    update: originalPath ? originalPath : updatePath,
+                                    resolved: this.cleanNotRecursivePath(fullPath),
+                                },
+                                params,
+                                options,
+                            };
+                            if (this.shouldIgnore(listener, updatePath))
+                                continue;
+                            if (listener.options.bulk) {
+                                bulk.push({ value, path: fullPath, params });
+                                bulkListeners[listenerId] = listener;
+                            }
+                            else {
+                                listeners[listenerPath].single.push({
+                                    listener,
+                                    listenersCollection,
+                                    eventInfo,
+                                    value,
+                                });
+                            }
+                        }
+                    }
+                    else {
                         const eventInfo = {
                             type,
                             listener,
@@ -1163,7 +1205,7 @@ class DeepState {
                             path: {
                                 listener: listenerPath,
                                 update: originalPath ? originalPath : updatePath,
-                                resolved: this.cleanNotRecursivePath(fullPath),
+                                resolved: undefined,
                             },
                             params,
                             options,
@@ -1171,7 +1213,7 @@ class DeepState {
                         if (this.shouldIgnore(listener, updatePath))
                             continue;
                         if (listener.options.bulk) {
-                            bulk.push({ value, path: fullPath, params });
+                            bulk.push({ value: undefined, path: undefined, params });
                             bulkListeners[listenerId] = listener;
                         }
                         else {
@@ -1179,7 +1221,7 @@ class DeepState {
                                 listener,
                                 listenersCollection,
                                 eventInfo,
-                                value,
+                                value: undefined,
                             });
                         }
                     }

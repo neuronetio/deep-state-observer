@@ -255,6 +255,75 @@ onDestroy(() => {
 });
 ```
 
+## Wildcard bulk without bulk values (even better performance)
+
+```javascript
+import { onDestroy } from "svelte";
+import State from "deep-state-observer"; // const State = require('deep-state-observer');
+
+// first parameter is an object that hold the state, and the second one is just options (optional - for now it hold just delimiter :P )
+const state = new State({
+  byId: {
+    1: { val: 1 },
+    2: { val: 2 },
+    3: { val: 3 },
+  },
+});
+
+// store some unsubscribe methods
+let subscribers = [];
+
+subscribers.push(
+  state.subscribe(
+    "byId.:id.val",
+    (bulk, eventInfo) => {
+      // fired only once where bulk = [
+      //  {
+      //    value: undefined,
+      //    eventInfo.params: { id: 1 }
+      //  },
+      //  {
+      //    value: undefined,
+      //    eventInfo.params: { id: 2 }
+      //  },
+      //  {
+      //    value: 3,
+      //    eventInfo.params: { id: 3 }
+      //  },
+      // ]
+    },
+    { bulk: true, bulkValue: false }
+  )
+);
+
+subscribers.push(
+  state.subscribe(
+    "byId.*.val",
+    (bulk, eventInfo) => {
+      // fired only once where bulk = [
+      //  {
+      //    value: undefined,
+      //    eventInfo.params: undefined
+      //  },
+      //  {
+      //    value: undefined,
+      //    eventInfo.params: undefined
+      //  },
+      //  {
+      //    value: undefined,
+      //    eventInfo.params: undefined
+      //  },
+      // ]
+    },
+    { bulk: true, bulkValue: false }
+  )
+);
+
+onDestroy(() => {
+  subscribers.forEach((unsubscribe) => unsubscribe());
+});
+```
+
 ## Observe only chosen node changes (not recursive, not nested, for immutable data)
 
 ```javascript
