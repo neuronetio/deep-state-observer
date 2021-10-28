@@ -373,6 +373,7 @@ function getDefaultOptions() {
         wildcard: `*`,
         experimentalMatch: false,
         queue: false,
+        defaultBulkValue: true,
         useCache: false,
         useSplitCache: false,
         useIndicesCache: false,
@@ -382,15 +383,6 @@ function getDefaultOptions() {
         Promise,
     };
 }
-const defaultListenerOptions = {
-    bulk: false,
-    bulkValue: true,
-    debug: false,
-    source: "",
-    data: undefined,
-    queue: false,
-    group: false,
-};
 /**
  * Is object - helper function to determine if specified variable is an object
  *
@@ -449,6 +441,17 @@ class DeepState {
         this.mutedListeners = new Set();
         this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
         this.destroyed = false;
+    }
+    getDefaultListenerOptions() {
+        return {
+            bulk: false,
+            bulkValue: this.options.defaultBulkValue,
+            debug: false,
+            source: "",
+            data: undefined,
+            queue: false,
+            group: false,
+        };
     }
     cacheGet(pathChunks, data = this.data, create = false) {
         const path = pathChunks.join(this.options.delimiter);
@@ -683,7 +686,7 @@ class DeepState {
             }
         }
     }
-    subscribeAll(userPaths, fn, options = defaultListenerOptions) {
+    subscribeAll(userPaths, fn, options = this.getDefaultListenerOptions()) {
         if (this.destroyed)
             return () => { };
         let unsubscribers = [];
@@ -715,10 +718,10 @@ class DeepState {
     getCleanListenersCollection(values = {}) {
         return Object.assign({ listeners: new Map(), isRecursive: false, isWildcard: false, hasParams: false, match: undefined, paramsInfo: undefined, path: undefined, originalPath: undefined, count: 0 }, values);
     }
-    getCleanListener(fn, options = defaultListenerOptions) {
+    getCleanListener(fn, options = this.getDefaultListenerOptions()) {
         return {
             fn,
-            options: Object.assign(Object.assign({}, defaultListenerOptions), options),
+            options: Object.assign(Object.assign({}, this.getDefaultListenerOptions()), options),
             groupId: null,
         };
     }
@@ -777,7 +780,7 @@ class DeepState {
         this.listeners.set(collCfg.originalPath, listenersCollection);
         return listenersCollection;
     }
-    subscribe(listenerPath, fn, options = defaultListenerOptions, subscribeAllOptions = {
+    subscribe(listenerPath, fn, options = this.getDefaultListenerOptions(), subscribeAllOptions = {
         all: [listenerPath],
         index: 0,
         groupId: null,

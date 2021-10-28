@@ -108,6 +108,7 @@ function getDefaultOptions() {
         wildcard: "*",
         experimentalMatch: false,
         queue: false,
+        defaultBulkValue: true,
         useCache: false,
         useSplitCache: false,
         useIndicesCache: false,
@@ -117,15 +118,6 @@ function getDefaultOptions() {
         Promise: Promise
     };
 }
-var defaultListenerOptions = {
-    bulk: false,
-    bulkValue: true,
-    debug: false,
-    source: "",
-    data: undefined,
-    queue: false,
-    group: false
-};
 /**
  * Is object - helper function to determine if specified variable is an object
  *
@@ -187,6 +179,17 @@ var DeepState = /** @class */ (function () {
         this.scan = new wildcard_object_scan_1["default"](this.data, this.options.delimiter, this.options.wildcard);
         this.destroyed = false;
     }
+    DeepState.prototype.getDefaultListenerOptions = function () {
+        return {
+            bulk: false,
+            bulkValue: this.options.defaultBulkValue,
+            debug: false,
+            source: "",
+            data: undefined,
+            queue: false,
+            group: false
+        };
+    };
     DeepState.prototype.cacheGet = function (pathChunks, data, create) {
         if (data === void 0) { data = this.data; }
         if (create === void 0) { create = false; }
@@ -466,7 +469,7 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.subscribeAll = function (userPaths, fn, options) {
         var e_4, _a;
-        if (options === void 0) { options = defaultListenerOptions; }
+        if (options === void 0) { options = this.getDefaultListenerOptions(); }
         if (this.destroyed)
             return function () { };
         var unsubscribers = [];
@@ -521,10 +524,10 @@ var DeepState = /** @class */ (function () {
         return __assign({ listeners: new Map(), isRecursive: false, isWildcard: false, hasParams: false, match: undefined, paramsInfo: undefined, path: undefined, originalPath: undefined, count: 0 }, values);
     };
     DeepState.prototype.getCleanListener = function (fn, options) {
-        if (options === void 0) { options = defaultListenerOptions; }
+        if (options === void 0) { options = this.getDefaultListenerOptions(); }
         return {
             fn: fn,
-            options: __assign(__assign({}, defaultListenerOptions), options),
+            options: __assign(__assign({}, this.getDefaultListenerOptions()), options),
             groupId: null
         };
     };
@@ -585,7 +588,7 @@ var DeepState = /** @class */ (function () {
         return listenersCollection;
     };
     DeepState.prototype.subscribe = function (listenerPath, fn, options, subscribeAllOptions) {
-        if (options === void 0) { options = defaultListenerOptions; }
+        if (options === void 0) { options = this.getDefaultListenerOptions(); }
         if (subscribeAllOptions === void 0) { subscribeAllOptions = {
             all: [listenerPath],
             index: 0,

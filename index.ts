@@ -33,6 +33,7 @@ export interface Options {
   useIndicesCache?: boolean;
   maxSimultaneousJobs?: number;
   maxQueueRuns?: number;
+  defaultBulkValue?: boolean;
   log?: (message: string, info: any) => void;
   debug?: boolean;
   extraDebug?: boolean;
@@ -230,6 +231,7 @@ function getDefaultOptions(): Options {
     wildcard: `*`,
     experimentalMatch: false,
     queue: false,
+    defaultBulkValue: true,
     useCache: false,
     useSplitCache: false,
     useIndicesCache: false,
@@ -239,16 +241,6 @@ function getDefaultOptions(): Options {
     Promise,
   };
 }
-
-const defaultListenerOptions: ListenerOptions = {
-  bulk: false,
-  bulkValue: true,
-  debug: false,
-  source: "",
-  data: undefined,
-  queue: false,
-  group: false,
-};
 
 /**
  * Is object - helper function to determine if specified variable is an object
@@ -318,6 +310,18 @@ class DeepState {
     this.mutedListeners = new Set();
     this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard);
     this.destroyed = false;
+  }
+
+  private getDefaultListenerOptions(): ListenerOptions {
+    return {
+      bulk: false,
+      bulkValue: this.options.defaultBulkValue,
+      debug: false,
+      source: "",
+      data: undefined,
+      queue: false,
+      group: false,
+    };
   }
 
   private cacheGet(pathChunks: string[], data: any = this.data, create = false) {
@@ -572,7 +576,7 @@ class DeepState {
   public subscribeAll(
     userPaths: string[],
     fn: ListenerFunction | WaitingListenerFunction,
-    options: ListenerOptions = defaultListenerOptions
+    options: ListenerOptions = this.getDefaultListenerOptions()
   ) {
     if (this.destroyed) return () => {};
     let unsubscribers = [];
@@ -618,10 +622,13 @@ class DeepState {
     };
   }
 
-  private getCleanListener(fn: ListenerFunction, options: ListenerOptions = defaultListenerOptions): Listener {
+  private getCleanListener(
+    fn: ListenerFunction,
+    options: ListenerOptions = this.getDefaultListenerOptions()
+  ): Listener {
     return {
       fn,
-      options: { ...defaultListenerOptions, ...options },
+      options: { ...this.getDefaultListenerOptions(), ...options },
       groupId: null,
     };
   }
@@ -687,7 +694,7 @@ class DeepState {
   public subscribe(
     listenerPath: string,
     fn: ListenerFunction,
-    options: ListenerOptions = defaultListenerOptions,
+    options: ListenerOptions = this.getDefaultListenerOptions(),
     subscribeAllOptions: SubscribeAllOptions = {
       all: [listenerPath as string],
       index: 0,

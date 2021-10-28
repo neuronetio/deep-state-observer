@@ -26,6 +26,7 @@ export interface Options {
     useIndicesCache?: boolean;
     maxSimultaneousJobs?: number;
     maxQueueRuns?: number;
+    defaultBulkValue?: boolean;
     log?: (message: string, info: any) => void;
     debug?: boolean;
     extraDebug?: boolean;
@@ -184,6 +185,7 @@ declare class DeepState {
     private cache;
     private splitCache;
     constructor(data?: object, options?: Options);
+    private getDefaultListenerOptions;
     private cacheGet;
     private cacheSet;
     /**
