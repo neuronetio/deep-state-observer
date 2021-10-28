@@ -957,7 +957,7 @@ class DeepState {
                 if (!this.isMuted(singleListener.listener.fn)) {
                     if (singleListener.listener.options.queue && this.jobsRunning) {
                         this.subscribeQueue.push(() => {
-                            singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                            singleListener.listener.fn(singleListener.value ? singleListener.value() : undefined, singleListener.eventInfo);
                         });
                     }
                     else {
@@ -971,7 +971,7 @@ class DeepState {
                             resolvedIdPath,
                             originalFn: singleListener.listener.fn,
                             fn: () => {
-                                singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                                singleListener.listener.fn(singleListener.value ? singleListener.value() : undefined, singleListener.eventInfo);
                             },
                             options: singleListener.listener.options,
                             groupId: singleListener.listener.groupId,
@@ -993,7 +993,7 @@ class DeepState {
                 const time = this.debugTime(bulkListener);
                 const bulkValue = [];
                 for (const bulk of bulkListener.value) {
-                    bulkValue.push(Object.assign(Object.assign({}, bulk), { value: bulk.value() }));
+                    bulkValue.push(Object.assign(Object.assign({}, bulk), { value: bulk.value ? bulk.value() : undefined }));
                 }
                 if (!this.isMuted(bulkListener.listener.fn)) {
                     if (bulkListener.listener.options.queue && this.jobsRunning) {
@@ -1134,7 +1134,9 @@ class DeepState {
     }
     useBulkValue(listenersCollection) {
         for (const [listenerId, listener] of listenersCollection.listeners) {
-            if (listener.options.bulkValue)
+            if (listener.options.bulk && listener.options.bulkValue)
+                return true;
+            if (!listener.options.bulk)
                 return true;
         }
         return false;

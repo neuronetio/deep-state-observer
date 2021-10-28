@@ -778,7 +778,7 @@ var DeepState = /** @class */ (function () {
                 if (!this_1.isMuted(singleListener.listener.fn)) {
                     if (singleListener.listener.options.queue && this_1.jobsRunning) {
                         this_1.subscribeQueue.push(function () {
-                            singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                            singleListener.listener.fn(singleListener.value ? singleListener.value() : undefined, singleListener.eventInfo);
                         });
                     }
                     else {
@@ -792,7 +792,7 @@ var DeepState = /** @class */ (function () {
                             resolvedIdPath: resolvedIdPath_1,
                             originalFn: singleListener.listener.fn,
                             fn: function () {
-                                singleListener.listener.fn(singleListener.value(), singleListener.eventInfo);
+                                singleListener.listener.fn(singleListener.value ? singleListener.value() : undefined, singleListener.eventInfo);
                             },
                             options: singleListener.listener.options,
                             groupId: singleListener.listener.groupId
@@ -841,7 +841,7 @@ var DeepState = /** @class */ (function () {
                 try {
                     for (var _g = (e_10 = void 0, __values(bulkListener.value)), _h = _g.next(); !_h.done; _h = _g.next()) {
                         var bulk_2 = _h.value;
-                        bulkValue.push(__assign(__assign({}, bulk_2), { value: bulk_2.value() }));
+                        bulkValue.push(__assign(__assign({}, bulk_2), { value: bulk_2.value ? bulk_2.value() : undefined }));
                     }
                 }
                 catch (e_10_1) { e_10 = { error: e_10_1 }; }
@@ -1059,7 +1059,9 @@ var DeepState = /** @class */ (function () {
         try {
             for (var _b = __values(listenersCollection.listeners), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var _d = __read(_c.value, 2), listenerId = _d[0], listener = _d[1];
-                if (listener.options.bulkValue)
+                if (listener.options.bulk && listener.options.bulkValue)
+                    return true;
+                if (!listener.options.bulk)
                     return true;
             }
         }
