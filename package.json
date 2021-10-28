@@ -4,8 +4,6 @@
   "description": "Deep state observer is an state management library that will fire listeners only when specified object node (which also can be a wildcard) was changed.",
   "main": "index.esm.js",
   "types": "index.d.ts",
-  "module": "index.esm.js",
-  "browser": "index.umd.js",
   "scripts": {
     "build": "npm run types && rollup -c",
     "types": "tsc -d index.ts --downlevelIteration",
