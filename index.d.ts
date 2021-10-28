@@ -155,6 +155,7 @@ declare class DeepState {
     private listeners;
     private waitingListeners;
     private data;
+    $: object;
     private options;
     private id;
     private scan;
@@ -243,7 +244,7 @@ declare class DeepState {
     executeCollected(): void;
     getCollectedCount(): number;
     getCollectedStack(): UpdateStack[];
-    get(userPath: string): any;
+    get(userPath?: string | undefined): any;
     private lastExecs;
     last(callback: () => void): void;
     isMuted(pathOrListenerFunction: string | ListenerFunction): boolean;

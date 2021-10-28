@@ -1572,10 +1572,10 @@ class DeepState {
             return [];
         return this.collection.getStack();
     }
-    get(userPath) {
+    get(userPath = undefined) {
         if (this.destroyed)
             return;
-        if (typeof userPath === "undefined" || userPath === "") {
+        if (userPath === undefined || userPath === "") {
             return this.data;
         }
         if (this.isWildcard(userPath)) {

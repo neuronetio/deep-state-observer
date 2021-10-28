@@ -1646,9 +1646,10 @@ var DeepState = /** @class */ (function () {
         return this.collection.getStack();
     };
     DeepState.prototype.get = function (userPath) {
+        if (userPath === void 0) { userPath = undefined; }
         if (this.destroyed)
             return;
-        if (typeof userPath === "undefined" || userPath === "") {
+        if (userPath === undefined || userPath === "") {
             return this.data;
         }
         if (this.isWildcard(userPath)) {

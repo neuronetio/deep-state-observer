@@ -265,6 +265,7 @@ class DeepState {
   private listeners: Listeners;
   private waitingListeners: WaitingListeners;
   private data: object;
+  public $: object;
   private options: Options;
   private id: number;
   private scan: any;
@@ -1534,9 +1535,9 @@ class DeepState {
     return this.collection.getStack();
   }
 
-  public get(userPath: string) {
+  public get(userPath: string | undefined = undefined) {
     if (this.destroyed) return;
-    if (typeof userPath === "undefined" || userPath === "") {
+    if (userPath === undefined || userPath === "") {
       return this.data;
     }
     if (this.isWildcard(userPath)) {
