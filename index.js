@@ -307,13 +307,15 @@ var DeepState = /** @class */ (function () {
         return indices;
     };
     DeepState.prototype.cutPath = function (longer, shorter) {
+        if (shorter === "")
+            return "";
         longer = this.cleanNotRecursivePath(longer);
         shorter = this.cleanNotRecursivePath(shorter);
         if (longer === shorter)
             return longer;
         var shorterPartsLen = this.getIndicesCount(this.options.delimiter, shorter);
         var longerParts = this.getIndicesOf(this.options.delimiter, longer);
-        return longer.substr(0, longerParts[shorterPartsLen]);
+        return longer.substring(0, longerParts[shorterPartsLen]);
     };
     DeepState.prototype.trimPath = function (path) {
         path = this.cleanNotRecursivePath(path);
@@ -1087,7 +1089,7 @@ var DeepState = /** @class */ (function () {
             var e_17, _e, e_18, _f;
             if (!listenersCollection.isRecursive)
                 return "continue";
-            // listenerPath is longer and is shortened - because we want to get listeners underneath change
+            // listenerPath may be longer and is shortened - because we want to get listeners underneath change
             var currentAbovePathCut = this_4.cutPath(listenerPath, updatePath);
             if (this_4.match(currentAbovePathCut, updatePath)) {
                 listeners[listenerPath] = { single: [], bulk: [] };

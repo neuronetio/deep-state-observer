@@ -43,7 +43,7 @@ export interface ListenerOptions {
     group?: boolean | string;
 }
 export interface UpdateOptions {
-    only?: string[];
+    only?: string[] | null;
     source?: string;
     debug?: boolean;
     data?: any;
