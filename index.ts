@@ -442,12 +442,13 @@ class DeepState {
   }
 
   private cutPath(longer: string, shorter: string): string {
+    if (shorter === "") return "";
     longer = this.cleanNotRecursivePath(longer);
     shorter = this.cleanNotRecursivePath(shorter);
     if (longer === shorter) return longer;
     const shorterPartsLen = this.getIndicesCount(this.options.delimiter, shorter);
     const longerParts = this.getIndicesOf(this.options.delimiter, longer);
-    return longer.substr(0, longerParts[shorterPartsLen]);
+    return longer.substring(0, longerParts[shorterPartsLen]);
   }
 
   private trimPath(path: string): string {
@@ -1074,11 +1075,10 @@ class DeepState {
     const restBelowValues = {};
     for (let [listenerPath, listenersCollection] of this.listeners) {
       if (!listenersCollection.isRecursive) continue;
-      // listenerPath is longer and is shortened - because we want to get listeners underneath change
+      // listenerPath may be longer and is shortened - because we want to get listeners underneath change
       const currentAbovePathCut = this.cutPath(listenerPath, updatePath);
       if (this.match(currentAbovePathCut, updatePath)) {
         listeners[listenerPath] = { single: [], bulk: [] };
-
         // listener is listening below updated node
         const restBelowPathCut = this.trimPath(listenerPath.substr(currentAbovePathCut.length));
         const useBulkValue = this.useBulkValue(listenersCollection);

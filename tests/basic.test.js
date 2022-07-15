@@ -1476,7 +1476,7 @@ describe("State", () => {
     const obj = { x: { y: { z: "z" } } };
     const state = new State(obj);
     const values = [];
-    state.subscribe("", (val) => {
+    const unsub = state.subscribe("", (val) => {
       values.push(JSON.stringify(val));
     });
     expect(values.length).toEqual(1);
@@ -1484,7 +1484,11 @@ describe("State", () => {
     state.update("", { a: { b: { c: "c" } } });
     expect(values.length).toEqual(2);
     expect(values[1]).toEqual(JSON.stringify({ a: { b: { c: "c" } } }));
-    values.length = 0;
+  });
+
+  it("should notify listeners when full state was replaced", () => {
+    const state = new State({ a: { b: { c: "c" } } });
+    const values = [];
     state.subscribe("a.b", (val) => {
       values.push(JSON.stringify(val));
     });
@@ -1493,5 +1497,8 @@ describe("State", () => {
     state.update("a", { b: { c: "cc" } });
     expect(values.length).toEqual(2);
     expect(values[1]).toEqual(JSON.stringify({ c: "cc" }));
+    state.update("", { a: { b: { c: "ccc" } } });
+    expect(values.length).toEqual(3);
+    expect(values[2]).toEqual(JSON.stringify({ c: "ccc" }));
   });
 });
