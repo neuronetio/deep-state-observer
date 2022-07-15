@@ -1459,9 +1459,39 @@ describe("State", () => {
     //console.log(paths);
   });
 
-  it("it should properly clean not recursive path", () => {
+  it("should properly clean not recursive path", () => {
     const state = new State({});
     expect(state.cleanNotRecursivePath("config.list.rows;")).toEqual("config.list.rows");
     expect(state.cutPath("config.list.rows", "config.list.rows")).toEqual("config.list.rows");
+  });
+
+  it("should replace whole state", () => {
+    const state = new State({ x: "x" });
+    expect(state.get()).toEqual({ x: "x" });
+    state.update("", { y: "y" });
+    expect(state.get()).toEqual({ y: "y" });
+  });
+
+  it("should subscribe to empty path", () => {
+    const obj = { x: { y: { z: "z" } } };
+    const state = new State(obj);
+    const values = [];
+    state.subscribe("", (val) => {
+      values.push(JSON.stringify(val));
+    });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(JSON.stringify(obj));
+    state.update("", { a: { b: { c: "c" } } });
+    expect(values.length).toEqual(2);
+    expect(values[1]).toEqual(JSON.stringify({ a: { b: { c: "c" } } }));
+    values.length = 0;
+    state.subscribe("a.b", (val) => {
+      values.push(JSON.stringify(val));
+    });
+    expect(values.length).toEqual(1);
+    expect(values[0]).toEqual(JSON.stringify({ c: "c" }));
+    state.update("a", { b: { c: "cc" } });
+    expect(values.length).toEqual(2);
+    expect(values[1]).toEqual(JSON.stringify({ c: "cc" }));
   });
 });

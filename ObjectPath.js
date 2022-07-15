@@ -48,6 +48,9 @@ var ObjectPath = /** @class */ (function () {
         if (!obj)
             return;
         if (path.length === 0) {
+            for (var key in obj) {
+                delete obj[key];
+            }
             for (var key in value) {
                 obj[key] = value[key];
             }

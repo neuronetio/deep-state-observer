@@ -18,6 +18,9 @@ export default class ObjectPath {
   static set(path: string[], value, obj) {
     if (!obj) return;
     if (path.length === 0) {
+      for (const key in obj) {
+        delete obj[key];
+      }
       for (const key in value) {
         obj[key] = value[key];
       }
