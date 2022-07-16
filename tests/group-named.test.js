@@ -1,4 +1,4 @@
-const State = require("../index.cjs.js");
+import State from "../index.esm.js";
 
 describe("Group", () => {
   it("it should fire once grouped listeners at update", () => {

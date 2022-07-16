@@ -1,4 +1,4 @@
-const State = require("../index.cjs.js");
+import State from "../index.esm.js";
 
 describe("Multi", () => {
   it("should fire couple of updates without notify and at the end of all should notify all", () => {

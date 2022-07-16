@@ -1,6 +1,6 @@
-const State = require("../index.cjs.js");
-const path = require("path");
-const fs = require("fs");
+import State from "../index.esm.js";
+import path from "path";
+import fs from "fs";
 
 describe("State", () => {
   it("should match simple wildcards", () => {
@@ -1500,5 +1500,12 @@ describe("State", () => {
     state.update("", { a: { b: { c: "ccc" } } });
     expect(values.length).toEqual(3);
     expect(values[2]).toEqual(JSON.stringify({ c: "ccc" }));
+  });
+
+  it("should replace array properly", () => {
+    const state = new State({ something: { a: [["a"], ["b"]] } });
+    state.update("something", { a: [["a"]] });
+    const something = state.get("something");
+    expect(something).toEqual({ a: [["a"]] });
   });
 });

@@ -391,7 +391,7 @@ class DeepState {
     this.jobsRunning = 0;
   }
 
-  private match(first: string, second: string, nested: boolean = true): boolean {
+  public match(first: string, second: string, nested: boolean = true): boolean {
     if (this.is_match) return this.is_match(first, second);
     if (first === second) return true;
     if (first === this.options.wildcard || second === this.options.wildcard) return true;

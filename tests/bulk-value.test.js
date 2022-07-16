@@ -1,6 +1,6 @@
-const State = require("../index.cjs.js");
-const path = require("path");
-const fs = require("fs");
+import State from "../index.esm.js";
+import path from "path";
+import fs from "fs";
 
 describe("Bulk value", () => {
   it("should not send bulk value (subscribeAll)", () => {

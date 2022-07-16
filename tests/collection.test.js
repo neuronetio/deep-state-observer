@@ -1,4 +1,4 @@
-const State = require("../index.cjs.js");
+import State from "../index.esm.js";
 
 describe("Collection", () => {
   it("should collect all updates", () => {

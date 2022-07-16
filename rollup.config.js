@@ -21,6 +21,7 @@ export default [
     output: {
       file: "index.cjs.js",
       format: "cjs",
+      exports: "default",
     },
     plugins: [
       typescript(),
@@ -36,6 +37,7 @@ export default [
       name: "DeepStateObserver",
       file: "index.umd.js",
       format: "umd",
+      exports: "default",
     },
     plugins: [
       typescript(),
