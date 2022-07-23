@@ -8,16 +8,21 @@ import typescript from "@rollup/plugin-typescript";
 
 let production = !process.env.ROLLUP_WATCH;
 
-let typescriptOptions = production
-  ? {
-      tsconfig: "./tsconfig.json",
-    }
-  : { include: ["src/**/*.ts"], exclude: ["node_modules/**"], transforms: ["typescript"] };
+const typescriptOptions = {
+  tsconfig: "./tsconfig.json",
+};
 
-const ts = production ? typescript : sucrase;
+const sucraseOptions = {
+  include: ["src/**/*.ts"],
+  exclude: ["node_modules/**"],
+  transforms: ["typescript"],
+  production: true,
+};
 
-// @ts-ignore
-const tsPlugin = ts(typescriptOptions);
+const tsPlugin = production
+  ? typescript(typescriptOptions)
+  : // @ts-ignore
+    sucrase(sucraseOptions);
 
 const plugins = [
   resolve({

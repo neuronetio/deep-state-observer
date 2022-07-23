@@ -1,1 +1,0 @@
-{"version":3,"file":"listener.d.ts","sourceRoot":"","sources":["../../src/listener.ts"],"names":[],"mappings":"AAAA,OAAO,iBAAiB,MAAM,GAAG,CAAC;AAElC,cAAM,iBAAiB;IACrB,KAAK,EAAE,iBAAiB,CAAC;IACzB,IAAI,EAAE,MAAM,CAAC;gBAED,KAAK,EAAE,iBAAiB,EAAE,IAAI,EAAE,MAAM;CAInD;AAED,eAAe,iBAAiB,CAAC"}

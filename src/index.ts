@@ -1,49 +1,27 @@
+import DeepStateObserverCore from "./core";
 import DeepStateListener from "./listener";
 
-export interface ListenersById {
-  [key: number]: DeepStateListener;
-}
-
 class DeepStateObserver {
-  lastListenerId: number;
-  private listenersById: ListenersById;
-  private listeners: DeepStateListener[];
+  private core: DeepStateObserverCore;
 
-  constructor() {
-    this.lastListenerId = 0;
-    this.listenersById = {};
-    this.listeners = [];
+  constructor(data: object = {}) {
+    this.core = new DeepStateObserverCore(data);
   }
 
-  createListener(listenerName: string) {
-    return new DeepStateListener(this, listenerName);
+  createDataListener(listenerName: string) {
+    return this.core.createListener(listenerName);
   }
 
-  addListener(listener: DeepStateListener) {
-    if (!this.listenersById[listener.id]) {
-      this.listenersById[listener.id] = listener;
-      this.listeners.push(listener);
-    }
-  }
-
-  getListeners() {
-    return this.listeners;
-  }
-
-  getListenersById() {
-    return this.listenersById;
-  }
-
-  destroyListener(listener: DeepStateListener) {
-    delete this.listenersById[listener.id];
-    this.listeners = this.listeners.filter((current) => current !== listener);
+  getCore() {
+    return this.core;
   }
 
   destroy() {
-    this.listenersById = {};
-    this.listeners = [];
+    return this.core.destroy();
   }
 }
 
 export default DeepStateObserver;
-export { DeepStateObserver, DeepStateListener };
+export * from "./core";
+export * from "./listener";
+export { DeepStateObserverCore, DeepStateListener, DeepStateObserver };
