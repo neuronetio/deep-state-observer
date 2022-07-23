@@ -1,0 +1,29 @@
+{
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "./index.d.ts",
+    "./dist/**",
+    "./*.conf.js",
+    "./*.config.js",
+    "./tests/**/*.js",
+    "types/**",
+    "node_modules/**",
+    "tests/**",
+    "media/**",
+    "scripts/**"
+  ],
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": false,
+    "module": "ESNext",
+    "downlevelIteration": true,
+    "allowJs": true,
+    "target": "ES2016",
+    "declaration": true,
+    "declarationDir": "dist/types",
+    "declarationMap": true
+  }
+}

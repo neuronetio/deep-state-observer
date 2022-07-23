@@ -2,13 +2,13 @@
   "name": "deep-state-observer",
   "version": "6.0.0",
   "description": "Deep state observer is an state management library that will fire listeners only when specified object node (which also can be a wildcard) was changed.",
-  "main": "index.esm.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/types/index.d.ts",
   "type": "module",
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
-    "test": ""
+    "test": "jasmine"
   },
   "repository": {
     "type": "git",
@@ -45,10 +45,13 @@
     "@rollup/plugin-commonjs": "^22.0.1",
     "@rollup/plugin-node-resolve": "^13.3.0",
     "@rollup/plugin-sucrase": "^4.0.4",
+    "@rollup/plugin-typescript": "^8.3.3",
+    "@types/jasmine": "^4.0.3",
     "benchmark": "^2.1.4",
+    "jasmine": "^4.2.1",
     "prettier": "^2.7.1",
     "rollup": "^2.77.0",
-    "rollup-plugin-livereload": "^2.0.5",
-    "rollup-plugin-terser": "^7.0.2"
+    "rollup-plugin-terser": "^7.0.2",
+    "tslib": "^2.4.0"
   }
 }
