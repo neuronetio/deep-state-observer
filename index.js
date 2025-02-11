@@ -25,7 +25,7 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     function verb(n) { return function (v) { return step([n, v]); }; }
     function step(op) {
         if (f) throw new TypeError("Generator is already executing.");
-        while (_) try {
+        while (g && (g = 0, op[0] && (_ = 0)), _) try {
             if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
             if (y = 0, t) op = [op[0] & 2, t.value];
             switch (op[0]) {
@@ -363,7 +363,7 @@ var DeepState = /** @class */ (function () {
                     replaced: "",
                     name: ""
                 };
-                var reg = new RegExp("\\" + this.options.param + "([^\\" + this.options.delimiter + "\\" + this.options.param + "]+)", "g");
+                var reg = new RegExp("\\".concat(this.options.param, "([^\\").concat(this.options.delimiter, "\\").concat(this.options.param, "]+)"), "g");
                 var param = reg.exec(part);
                 if (param) {
                     paramsInfo.params[partIndex].name = param[1];
@@ -1384,7 +1384,7 @@ var DeepState = /** @class */ (function () {
             return a.id - b.id;
         });
         if (this.options.debug) {
-            console.log("[deep-state-observer] queue for " + path, queue);
+            console.log("[deep-state-observer] queue for ".concat(path), queue);
         }
         this.runQueue(queue);
     };
@@ -1570,7 +1570,7 @@ var DeepState = /** @class */ (function () {
         var currentValue = this.pathGet(split, this.data);
         var _a = this.getUpdateValues(currentValue, fnOrValue), oldValue = _a.oldValue, newValue = _a.newValue;
         if (options.debug) {
-            this.options.log("Updating " + updatePath + " " + (options.source ? "from " + options.source : ""), {
+            this.options.log("Updating ".concat(updatePath, " ").concat(options.source ? "from ".concat(options.source) : ""), {
                 oldValue: oldValue,
                 newValue: newValue
             });

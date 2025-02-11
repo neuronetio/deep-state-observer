@@ -11,8 +11,8 @@ export interface ListenerFunctionEventInfo {
     params: Params;
     options: ListenerOptions | UpdateOptions | undefined;
 }
-export declare type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
-export declare type Match = (path: string, debug?: boolean) => boolean;
+export type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
+export type Match = (path: string, debug?: boolean) => boolean;
 export interface Options {
     delimiter?: string;
     useMute?: boolean;
@@ -78,8 +78,8 @@ export interface GroupedListenerContainer {
 export interface GroupedListeners {
     [path: string]: GroupedListenerContainer;
 }
-export declare type Updater = (value: any) => any;
-export declare type ListenersObject = Map<string | number, Listener>;
+export type Updater = (value: any) => any;
+export type ListenersObject = Map<string | number, Listener>;
 export interface ListenersCollection {
     path: string;
     originalPath: string;
@@ -91,7 +91,7 @@ export interface ListenersCollection {
     match: Match;
     count: number;
 }
-export declare type Listeners = Map<string, ListenersCollection>;
+export type Listeners = Map<string, ListenersCollection>;
 export interface WaitingPath {
     dirty: boolean;
     isWildcard: boolean;
@@ -101,12 +101,12 @@ export interface WaitingPath {
 export interface WaitingPaths {
     [key: string]: WaitingPath;
 }
-export declare type WaitingListenerFunction = (paths: WaitingPaths) => () => void;
+export type WaitingListenerFunction = (paths: WaitingPaths) => () => void;
 export interface WaitingListener {
     fn: WaitingListenerFunction;
     paths: WaitingPaths;
 }
-export declare type WaitingListeners = Map<string[], WaitingListener>;
+export type WaitingListeners = Map<string[], WaitingListener>;
 export interface ParamInfo {
     name: string;
     replaced: string;
