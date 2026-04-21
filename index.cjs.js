@@ -1,30 +1,5 @@
 'use strict';
 
-/*! *****************************************************************************
-Copyright (c) Microsoft Corporation.
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-***************************************************************************** */
-
-function __awaiter(thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-}
-
 // forked from https://github.com/joonhocho/superwild
 const segments = [];
 function Match(pattern, match, wchar = "*") {
@@ -223,9 +198,11 @@ class ObjectPath {
         }
         const prePath = path.slice();
         const lastPath = prePath.pop();
-        const get = ObjectPath.get(prePath, obj, true);
-        if (typeof get === "object") {
-            get[lastPath] = value;
+        if (lastPath) {
+            const get = ObjectPath.get(prePath, obj, true);
+            if (typeof get === "object") {
+                get[lastPath] = value;
+            }
         }
         return value;
     }
@@ -495,12 +472,10 @@ class DeepState {
     silentSet(path, value) {
         return this.pathSet(this.split(path), value, this.data);
     }
-    loadWasmMatcher(pathToWasmFile) {
-        return __awaiter(this, void 0, void 0, function* () {
-            yield init(pathToWasmFile);
-            this.is_match = is_match;
-            this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.is_match);
-        });
+    async loadWasmMatcher(pathToWasmFile) {
+        await init(pathToWasmFile);
+        this.is_match = is_match;
+        this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.is_match);
     }
     same(newValue, oldValue) {
         return ((["number", "string", "undefined", "boolean"].includes(typeof newValue) || newValue === null) &&
@@ -660,7 +635,7 @@ class DeepState {
         }
         this.waitingListeners.set(userPaths, { fn, paths });
         fn(paths);
-        return function unsubscribe() {
+        return () => {
             this.waitingListeners.delete(userPaths);
         };
     }
@@ -700,8 +675,7 @@ class DeepState {
         let index = 0;
         let groupId = null;
         if (typeof options.group === "boolean" && options.group) {
-            this.groupId++;
-            groupId = this.groupId;
+            groupId = ++this.groupId;
             options.bulk = true;
         }
         else if (typeof options.group === "string") {
@@ -904,6 +878,8 @@ class DeepState {
     }
     unsubscribe(path, id) {
         const listeners = this.listeners;
+        if (!listeners.has(path))
+            return () => { };
         const listenersCollection = listeners.get(path);
         return function unsub() {
             listenersCollection.listeners.delete(id);
@@ -1402,7 +1378,7 @@ class DeepState {
         const waitingPaths = [];
         for (const path in updated) {
             const newValue = updated[path];
-            if (options.only.length) {
+            if (options && options.only && options.only.length) {
                 groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
             }
             else {
@@ -1448,13 +1424,15 @@ class DeepState {
             if (this.tracing.length) {
                 const traceId = this.tracing[this.tracing.length - 1];
                 const trace = this.traceMap.get(traceId);
-                trace.changed.push({
-                    traceId,
-                    updatePath: current.updatePath,
-                    fnOrValue: value,
-                    options: current.options,
-                });
-                this.traceMap.set(traceId, trace);
+                if (trace) {
+                    trace.changed.push({
+                        traceId,
+                        updatePath: current.updatePath,
+                        fnOrValue: value,
+                        options: current.options,
+                    });
+                    this.traceMap.set(traceId, trace);
+                }
             }
             queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
             if (this.canBeNested(current.newValue)) {
@@ -1476,8 +1454,10 @@ class DeepState {
         if (this.tracing.length) {
             const traceId = this.tracing[this.tracing.length - 1];
             const trace = this.traceMap.get(traceId);
-            trace.changed.push({ traceId, updatePath, fnOrValue, options });
-            this.traceMap.set(traceId, trace);
+            if (trace) {
+                trace.changed.push({ traceId, updatePath, fnOrValue, options });
+                this.traceMap.set(traceId, trace);
+            }
         }
         const jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
@@ -1524,7 +1504,7 @@ class DeepState {
                 return function () { };
             return newValue;
         }
-        if (options.only.length) {
+        if (options.only && options.only.length) {
             --this.jobsRunning;
             if (multi) {
                 const self = this;
@@ -1697,7 +1677,11 @@ class DeepState {
         }
     }
     debugListener(time, groupedListener) {
-        if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
+        if ((groupedListener &&
+            groupedListener.eventInfo &&
+            groupedListener.eventInfo.options &&
+            groupedListener.eventInfo.options.debug) ||
+            groupedListener.listener.options.debug) {
             this.options.log("Listener fired", {
                 time: Date.now() - time,
                 info: groupedListener,
@@ -1705,7 +1689,8 @@ class DeepState {
         }
     }
     debugTime(groupedListener) {
-        return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
+        var _a, _b, _c, _d;
+        return ((_b = (_a = groupedListener === null || groupedListener === void 0 ? void 0 : groupedListener.listener) === null || _a === void 0 ? void 0 : _a.options) === null || _b === void 0 ? void 0 : _b.debug) || ((_d = (_c = groupedListener === null || groupedListener === void 0 ? void 0 : groupedListener.eventInfo) === null || _c === void 0 ? void 0 : _c.options) === null || _d === void 0 ? void 0 : _d.debug) ? Date.now() : 0;
     }
     startTrace(name, additionalData = null) {
         this.traceId++;
@@ -1728,9 +1713,11 @@ class DeepState {
     }
     saveTrace(id) {
         const result = this.traceMap.get(id);
-        this.tracing.pop();
-        this.traceMap.delete(id);
-        this.savedTrace.push(result);
+        if (result) {
+            this.tracing.pop();
+            this.traceMap.delete(id);
+            this.savedTrace.push(result);
+        }
         return result;
     }
     getSavedTraces() {

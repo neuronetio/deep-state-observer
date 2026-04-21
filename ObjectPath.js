@@ -58,9 +58,11 @@ var ObjectPath = /** @class */ (function () {
         }
         var prePath = path.slice();
         var lastPath = prePath.pop();
-        var get = ObjectPath.get(prePath, obj, true);
-        if (typeof get === "object") {
-            get[lastPath] = value;
+        if (lastPath) {
+            var get = ObjectPath.get(prePath, obj, true);
+            if (typeof get === "object") {
+                get[lastPath] = value;
+            }
         }
         return value;
     };

@@ -404,6 +404,7 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.waitForAll = function (userPaths, fn) {
         var e_2, _a;
+        var _this = this;
         var paths = {};
         try {
             for (var userPaths_1 = __values(userPaths), userPaths_1_1 = userPaths_1.next(); !userPaths_1_1.done; userPaths_1_1 = userPaths_1.next()) {
@@ -425,8 +426,8 @@ var DeepState = /** @class */ (function () {
         }
         this.waitingListeners.set(userPaths, { fn: fn, paths: paths });
         fn(paths);
-        return function unsubscribe() {
-            this.waitingListeners["delete"](userPaths);
+        return function () {
+            _this.waitingListeners["delete"](userPaths);
         };
     };
     DeepState.prototype.executeWaitingListeners = function (updatePath) {
@@ -478,8 +479,7 @@ var DeepState = /** @class */ (function () {
         var index = 0;
         var groupId = null;
         if (typeof options.group === "boolean" && options.group) {
-            this.groupId++;
-            groupId = this.groupId;
+            groupId = ++this.groupId;
             options.bulk = true;
         }
         else if (typeof options.group === "string") {
@@ -708,6 +708,8 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.unsubscribe = function (path, id) {
         var listeners = this.listeners;
+        if (!listeners.has(path))
+            return function () { };
         var listenersCollection = listeners.get(path);
         return function unsub() {
             listenersCollection.listeners["delete"](id);
@@ -1455,7 +1457,7 @@ var DeepState = /** @class */ (function () {
         var waitingPaths = [];
         for (var path in updated) {
             var newValue = updated[path];
-            if (options.only.length) {
+            if (options && options.only && options.only.length) {
                 groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
             }
             else {
@@ -1504,13 +1506,15 @@ var DeepState = /** @class */ (function () {
                 if (this.tracing.length) {
                     var traceId = this.tracing[this.tracing.length - 1];
                     var trace = this.traceMap.get(traceId);
-                    trace.changed.push({
-                        traceId: traceId,
-                        updatePath: current.updatePath,
-                        fnOrValue: value,
-                        options: current.options
-                    });
-                    this.traceMap.set(traceId, trace);
+                    if (trace) {
+                        trace.changed.push({
+                            traceId: traceId,
+                            updatePath: current.updatePath,
+                            fnOrValue: value,
+                            options: current.options
+                        });
+                        this.traceMap.set(traceId, trace);
+                    }
                 }
                 queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
                 if (this.canBeNested(current.newValue)) {
@@ -1543,8 +1547,10 @@ var DeepState = /** @class */ (function () {
         if (this.tracing.length) {
             var traceId = this.tracing[this.tracing.length - 1];
             var trace = this.traceMap.get(traceId);
-            trace.changed.push({ traceId: traceId, updatePath: updatePath, fnOrValue: fnOrValue, options: options });
-            this.traceMap.set(traceId, trace);
+            if (trace) {
+                trace.changed.push({ traceId: traceId, updatePath: updatePath, fnOrValue: fnOrValue, options: options });
+                this.traceMap.set(traceId, trace);
+            }
         }
         var jobsRunning = this.jobsRunning;
         if ((this.options.queue || options.queue) && jobsRunning) {
@@ -1591,7 +1597,7 @@ var DeepState = /** @class */ (function () {
                 return function () { };
             return newValue;
         }
-        if (options.only.length) {
+        if (options.only && options.only.length) {
             --this.jobsRunning;
             if (multi) {
                 var self_2 = this;
@@ -1790,7 +1796,11 @@ var DeepState = /** @class */ (function () {
         }
     };
     DeepState.prototype.debugListener = function (time, groupedListener) {
-        if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
+        if ((groupedListener &&
+            groupedListener.eventInfo &&
+            groupedListener.eventInfo.options &&
+            groupedListener.eventInfo.options.debug) ||
+            groupedListener.listener.options.debug) {
             this.options.log("Listener fired", {
                 time: Date.now() - time,
                 info: groupedListener
@@ -1798,7 +1808,8 @@ var DeepState = /** @class */ (function () {
         }
     };
     DeepState.prototype.debugTime = function (groupedListener) {
-        return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
+        var _a, _b, _c, _d;
+        return ((_b = (_a = groupedListener === null || groupedListener === void 0 ? void 0 : groupedListener.listener) === null || _a === void 0 ? void 0 : _a.options) === null || _b === void 0 ? void 0 : _b.debug) || ((_d = (_c = groupedListener === null || groupedListener === void 0 ? void 0 : groupedListener.eventInfo) === null || _c === void 0 ? void 0 : _c.options) === null || _d === void 0 ? void 0 : _d.debug) ? Date.now() : 0;
     };
     DeepState.prototype.startTrace = function (name, additionalData) {
         if (additionalData === void 0) { additionalData = null; }
@@ -1822,9 +1833,11 @@ var DeepState = /** @class */ (function () {
     };
     DeepState.prototype.saveTrace = function (id) {
         var result = this.traceMap.get(id);
-        this.tracing.pop();
-        this.traceMap["delete"](id);
-        this.savedTrace.push(result);
+        if (result) {
+            this.tracing.pop();
+            this.traceMap["delete"](id);
+            this.savedTrace.push(result);
+        }
         return result;
     };
     DeepState.prototype.getSavedTraces = function () {

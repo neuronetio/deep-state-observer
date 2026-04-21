@@ -8,7 +8,7 @@ export interface ListenerFunctionEventInfo {
     listener: Listener;
     listenersCollection: ListenersCollection;
     path: PathInfo;
-    params: Params;
+    params: Params | undefined;
     options: ListenerOptions | UpdateOptions | undefined;
 }
 export type ListenerFunction = (value: any, eventInfo: ListenerFunctionEventInfo) => void;
@@ -141,9 +141,9 @@ export interface UpdateStack {
     options: UpdateOptions;
 }
 export interface Bulk {
-    path: string;
+    path?: string;
     value: any;
-    params: Params;
+    params?: Params;
 }
 export interface Multi {
     update: (updatePath: string, fn: Updater | any, options?: UpdateOptions) => Multi;
@@ -157,7 +157,6 @@ declare class DeepState {
     private listeners;
     private waitingListeners;
     private data;
-    $: object;
     private options;
     private id;
     private scan;
