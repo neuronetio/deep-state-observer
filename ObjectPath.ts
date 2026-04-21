@@ -28,9 +28,11 @@ export default class ObjectPath {
     }
     const prePath = path.slice();
     const lastPath = prePath.pop();
-    const get = ObjectPath.get(prePath, obj, true);
-    if (typeof get === "object") {
-      get[lastPath] = value;
+    if (lastPath) {
+      const get = ObjectPath.get(prePath, obj, true);
+      if (typeof get === "object") {
+        get[lastPath] = value;
+      }
     }
     return value;
   }

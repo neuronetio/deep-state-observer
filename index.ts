@@ -13,7 +13,7 @@ export interface ListenerFunctionEventInfo {
   listener: Listener;
   listenersCollection: ListenersCollection;
   path: PathInfo;
-  params: Params;
+  params: Params | undefined;
   options: ListenerOptions | UpdateOptions | undefined;
 }
 
@@ -172,9 +172,9 @@ export interface UpdateStack {
 }
 
 export interface Bulk {
-  path: string;
+  path?: string;
   value: any;
-  params: Params;
+  params?: Params;
 }
 
 const defaultUpdateOptions: UpdateOptions = {
@@ -220,7 +220,7 @@ export interface UnknownObject {
   [key: string]: unknown;
 }
 
-function getDefaultOptions(): Options {
+function getDefaultOptions(): Required<Options> {
   return {
     delimiter: `.`,
     debug: false,
@@ -258,14 +258,14 @@ function isObject(item: any) {
 class DeepState {
   private listeners: Listeners;
   private waitingListeners: WaitingListeners;
-  private data: object;
-  public $: object;
-  private options: Options;
+  private data: object | undefined;
+  //public $: object;
+  private options: Required<Options>;
   private id: number;
   private scan: any;
   private jobsRunning = 0;
-  private updateQueue = [];
-  private subscribeQueue = [];
+  private updateQueue: any[] = [];
+  private subscribeQueue: any[] = [];
   private listenersIgnoreCache: WeakMap<Listener, { truthy: string[]; falsy: string[] }> = new WeakMap();
   private is_match: any = null;
   private destroyed = false;
@@ -282,7 +282,7 @@ class DeepState {
   private traceMap: Map<string, TraceValue> = new Map();
   private tracing: string[] = [];
   private savedTrace: TraceValue[] = [];
-  private collection: Multi = null;
+  private collection: Multi | null = null;
   private collections: number = 0;
   private cache: Map<string, any> = new Map();
   private splitCache: Map<string, string[]> = new Map();
@@ -347,7 +347,7 @@ class DeepState {
       this.cache.set(
         path,
         //@ts-ignore-next-line
-        new WeakRef(value)
+        new WeakRef(value),
       );
     } else {
       this.cache.delete(path);
@@ -368,7 +368,7 @@ class DeepState {
   public async loadWasmMatcher(pathToWasmFile: string) {
     await init(pathToWasmFile);
     this.is_match = is_match;
-    this.scan = new WildcardObject(this.data, this.options.delimiter, this.options.wildcard, this.is_match);
+    this.scan = new WildcardObject(this.data!, this.options.delimiter, this.options.wildcard, this.is_match);
   }
 
   private same(newValue, oldValue): boolean {
@@ -407,14 +407,14 @@ class DeepState {
 
   private indices: Map<string, number[]> = new Map();
   private getIndicesOf(searchStr: string, str: string): number[] {
-    if (this.options.useIndicesCache && this.indices.has(str)) return this.indices.get(str);
+    if (this.options.useIndicesCache && this.indices.has(str)) return this.indices.get(str)!;
     const searchStrLen = searchStr.length;
     if (searchStrLen == 0) {
       return [];
     }
-    let startIndex = 0,
-      index,
-      indices = [];
+    let startIndex: number = 0,
+      index: number,
+      indices: number[] = [];
     while ((index = str.indexOf(searchStr, startIndex)) > -1) {
       indices.push(index);
       startIndex = index + searchStrLen;
@@ -425,7 +425,7 @@ class DeepState {
 
   private indicesCount: Map<string, number> = new Map();
   private getIndicesCount(searchStr: string, str: string): number {
-    if (this.options.useIndicesCache && this.indicesCount.has(str)) return this.indicesCount.get(str);
+    if (this.options.useIndicesCache && this.indicesCount.has(str)) return this.indicesCount.get(str)!;
     const searchStrLen = searchStr.length;
     if (searchStrLen == 0) {
       return 0;
@@ -492,7 +492,7 @@ class DeepState {
   private getParamsInfo(path: string): ParamsInfo {
     let paramsInfo: ParamsInfo = { replaced: "", original: path, params: {} };
     let partIndex = 0;
-    let fullReplaced = [];
+    let fullReplaced: string[] = [];
     for (const part of this.split(path)) {
       paramsInfo.params[partIndex] = {
         original: part,
@@ -518,12 +518,12 @@ class DeepState {
     return paramsInfo;
   }
 
-  private getParams(paramsInfo: ParamsInfo | undefined, path: string): Params {
+  private getParams(paramsInfo: ParamsInfo | undefined, path: string): Params | undefined {
     if (!paramsInfo) {
       return undefined;
     }
     const split = this.split(path);
-    const result = {};
+    const result: Params = {};
     for (const partIndex in paramsInfo.params) {
       const param = paramsInfo.params[partIndex];
       result[param.name] = split[partIndex];
@@ -543,7 +543,7 @@ class DeepState {
     }
     this.waitingListeners.set(userPaths, { fn, paths });
     fn(paths);
-    return function unsubscribe() {
+    return () => {
       this.waitingListeners.delete(userPaths);
     };
   }
@@ -577,15 +577,14 @@ class DeepState {
   public subscribeAll(
     userPaths: string[],
     fn: ListenerFunction | WaitingListenerFunction,
-    options: ListenerOptions = this.getDefaultListenerOptions()
+    options: ListenerOptions = this.getDefaultListenerOptions(),
   ) {
     if (this.destroyed) return () => {};
-    let unsubscribers = [];
+    let unsubscribers: any = [];
     let index = 0;
-    let groupId = null;
+    let groupId: number | string | null = null;
     if (typeof options.group === "boolean" && options.group) {
-      this.groupId++;
-      groupId = this.groupId;
+      groupId = ++this.groupId;
       options.bulk = true;
     } else if (typeof options.group === "string") {
       options.bulk = true;
@@ -597,7 +596,7 @@ class DeepState {
           all: userPaths,
           index,
           groupId,
-        })
+        }),
       );
       index++;
     }
@@ -620,12 +619,12 @@ class DeepState {
       originalPath: undefined,
       count: 0,
       ...values,
-    };
+    } as unknown as ListenersCollection;
   }
 
   private getCleanListener(
     fn: ListenerFunction,
-    options: ListenerOptions = this.getDefaultListenerOptions()
+    options: ListenerOptions = this.getDefaultListenerOptions(),
   ): Listener {
     return {
       fn,
@@ -660,7 +659,7 @@ class DeepState {
 
   private getListenersCollection(listenerPath: string, listener: Listener): ListenersCollection {
     if (this.listeners.has(listenerPath)) {
-      let listenersCollection = this.listeners.get(listenerPath);
+      let listenersCollection = this.listeners.get(listenerPath)!;
       listenersCollection.listeners.set(++this.id, listener);
       listener.id = this.id;
       return listenersCollection;
@@ -700,7 +699,7 @@ class DeepState {
       all: [listenerPath as string],
       index: 0,
       groupId: null,
-    }
+    },
   ) {
     if (this.destroyed) return () => {};
     this.jobsRunning++;
@@ -762,7 +761,7 @@ class DeepState {
             if (this.isMuted(path)) continue;
             bulkValue.push({
               path,
-              params: this.getParams(listenersCollection.paramsInfo, path),
+              params: this.getParams(listenersCollection.paramsInfo, path)!,
               value: paths[path],
             });
           }
@@ -807,7 +806,8 @@ class DeepState {
 
   private unsubscribe(path: string, id: number) {
     const listeners = this.listeners;
-    const listenersCollection = listeners.get(path);
+    if (!listeners.has(path)) return () => {};
+    const listenersCollection = listeners.get(path)!;
     return function unsub() {
       listenersCollection.listeners.delete(id);
       listenersCollection.count--;
@@ -867,7 +867,7 @@ class DeepState {
             this.subscribeQueue.push(() => {
               singleListener.listener.fn(
                 singleListener.value ? singleListener.value() : undefined,
-                singleListener.eventInfo
+                singleListener.eventInfo,
               );
             });
           } else {
@@ -876,14 +876,14 @@ class DeepState {
               resolvedIdPath = singleListener.listener.id + ":" + singleListener.eventInfo.path.listener;
             }
             queue.push({
-              id: singleListener.listener.id,
-              resolvedPath: singleListener.eventInfo.path.resolved,
+              id: singleListener.listener.id!,
+              resolvedPath: singleListener.eventInfo.path.resolved!,
               resolvedIdPath,
               originalFn: singleListener.listener.fn,
               fn: () => {
                 singleListener.listener.fn(
                   singleListener.value ? singleListener.value() : undefined,
-                  singleListener.eventInfo
+                  singleListener.eventInfo,
                 );
               },
               options: singleListener.listener.options,
@@ -923,8 +923,8 @@ class DeepState {
               resolvedIdPath = bulkListener.listener.id + ":" + bulkListener.eventInfo.path.listener;
             }
             queue.push({
-              id: bulkListener.listener.id,
-              resolvedPath: bulkListener.eventInfo.path.resolved,
+              id: bulkListener.listener.id!,
+              resolvedPath: bulkListener.eventInfo.path.resolved!,
               resolvedIdPath,
               originalFn: bulkListener.listener.fn,
               fn: () => {
@@ -965,7 +965,7 @@ class DeepState {
     newValue,
     options: UpdateOptions,
     type: string = "update",
-    originalPath: string = null
+    originalPath: string | null = null,
   ): GroupedListeners {
     options = { ...defaultUpdateOptions, ...options };
     const listeners = {};
@@ -1051,7 +1051,7 @@ class DeepState {
     newValue,
     options: UpdateOptions,
     type: string = "update",
-    originalPath: string = null
+    originalPath: string | null = null,
   ): Queue[] {
     return this.getQueueNotifyListeners(this.getSubscribedListeners(updatePath, newValue, options, type, originalPath));
   }
@@ -1069,7 +1069,7 @@ class DeepState {
     newValue,
     options: UpdateOptions,
     type: string = "update",
-    originalPath: string = null
+    originalPath: string | null = null,
   ): GroupedListeners {
     const listeners: GroupedListeners = {};
     const restBelowValues = {};
@@ -1197,11 +1197,11 @@ class DeepState {
     options: UpdateOptions,
     type: string = "update",
     queue: Queue[],
-    originalPath: string = null
+    originalPath: string | null = null,
   ): Queue[] {
     return this.getQueueNotifyListeners(
       this.getNestedListeners(updatePath, newValue, options, type, originalPath),
-      queue
+      queue,
     );
   }
 
@@ -1210,7 +1210,7 @@ class DeepState {
     newValue,
     options: UpdateOptions,
     type: string = "update",
-    originalPath: string = null
+    originalPath: string | null = null,
   ): GroupedListeners {
     const listeners = {};
     if (
@@ -1223,7 +1223,7 @@ class DeepState {
     }
     for (const notifyPath of options.only) {
       const wildcardScanNewValue = new WildcardObject(newValue, this.options.delimiter, this.options.wildcard).get(
-        notifyPath
+        notifyPath,
       );
       listeners[notifyPath] = { bulk: [], single: [] };
       for (const wildcardPath in wildcardScanNewValue) {
@@ -1275,7 +1275,7 @@ class DeepState {
   }
 
   private runQueue(queue: Queue[]) {
-    const firedGroups = [];
+    const firedGroups: (string | number | null)[] = [];
     for (const q of queue) {
       if (q.options.group) {
         if (!firedGroups.includes(q.groupId)) {
@@ -1303,10 +1303,10 @@ class DeepState {
     newValue,
     options: UpdateOptions,
     type: string = "update",
-    originalPath: string = ""
+    originalPath: string = "",
   ) {
     const queue = this.getQueueNotifyListeners(
-      this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath)
+      this.getNotifyOnlyListeners(updatePath, newValue, options, type, originalPath),
     );
     this.sortAndRunQueue(queue, updatePath);
   }
@@ -1339,7 +1339,7 @@ class DeepState {
     updatePath: string,
     fn: Updater | any,
     options: UpdateOptions = defaultUpdateOptions,
-    multi = false
+    multi = false,
   ) {
     ++this.jobsRunning;
     options = { ...defaultUpdateOptions, ...options };
@@ -1354,11 +1354,11 @@ class DeepState {
       }
     }
 
-    const groupedListenersPack = [];
-    const waitingPaths = [];
+    const groupedListenersPack: GroupedListeners[] = [];
+    const waitingPaths: string[] = [];
     for (const path in updated) {
       const newValue = updated[path];
-      if (options.only.length) {
+      if (options && options.only && options.only.length) {
         groupedListenersPack.push(this.getNotifyOnlyListeners(path, newValue, options, "update", updatePath));
       } else {
         groupedListenersPack.push(this.getSubscribedListeners(path, newValue, options, "update", updatePath));
@@ -1399,19 +1399,21 @@ class DeepState {
   }
 
   private updateNotifyAll(updateStack: UpdateStack[]) {
-    let queue = [];
+    let queue: Queue[] = [];
     for (const current of updateStack) {
       const value = current.newValue;
       if (this.tracing.length) {
         const traceId = this.tracing[this.tracing.length - 1];
         const trace = this.traceMap.get(traceId);
-        trace.changed.push({
-          traceId,
-          updatePath: current.updatePath,
-          fnOrValue: value,
-          options: current.options,
-        });
-        this.traceMap.set(traceId, trace);
+        if (trace) {
+          trace.changed.push({
+            traceId,
+            updatePath: current.updatePath,
+            fnOrValue: value,
+            options: current.options,
+          });
+          this.traceMap.set(traceId, trace);
+        }
       }
       queue = queue.concat(this.notifySubscribedListeners(current.updatePath, value, current.options));
       if (this.canBeNested(current.newValue)) {
@@ -1430,7 +1432,7 @@ class DeepState {
     updatePath: string,
     fnOrValue: Updater | any,
     options: UpdateOptions = { ...defaultUpdateOptions },
-    multi = false
+    multi = false,
   ) {
     if (this.destroyed) return;
     if (this.collection) {
@@ -1439,8 +1441,10 @@ class DeepState {
     if (this.tracing.length) {
       const traceId = this.tracing[this.tracing.length - 1];
       const trace = this.traceMap.get(traceId);
-      trace.changed.push({ traceId, updatePath, fnOrValue, options });
-      this.traceMap.set(traceId, trace);
+      if (trace) {
+        trace.changed.push({ traceId, updatePath, fnOrValue, options });
+        this.traceMap.set(traceId, trace);
+      }
     }
     const jobsRunning = this.jobsRunning;
     if ((this.options.queue || options.queue) && jobsRunning) {
@@ -1489,7 +1493,7 @@ class DeepState {
       if (multi) return function () {};
       return newValue;
     }
-    if (options.only.length) {
+    if (options.only && options.only.length) {
       --this.jobsRunning;
       if (multi) {
         const self = this;
@@ -1528,7 +1532,7 @@ class DeepState {
     if (this.collection) return this.collection;
     const self = this;
     const updateStack: UpdateStack[] = [];
-    const notifiers = [];
+    const notifiers: any[] = [];
     const multiObject: Multi = {
       update(updatePath: string, fnOrValue: Updater | any, options: UpdateOptions = defaultUpdateOptions) {
         if (grouped) {
@@ -1666,7 +1670,13 @@ class DeepState {
   }
 
   private debugListener(time: number, groupedListener: GroupedListener) {
-    if (groupedListener.eventInfo.options.debug || groupedListener.listener.options.debug) {
+    if (
+      (groupedListener &&
+        groupedListener.eventInfo &&
+        groupedListener.eventInfo.options &&
+        groupedListener.eventInfo.options.debug) ||
+      groupedListener.listener.options.debug
+    ) {
       this.options.log("Listener fired", {
         time: Date.now() - time,
         info: groupedListener,
@@ -1675,7 +1685,7 @@ class DeepState {
   }
 
   private debugTime(groupedListener: GroupedListener): number {
-    return groupedListener.listener.options.debug || groupedListener.eventInfo.options.debug ? Date.now() : 0;
+    return groupedListener?.listener?.options?.debug || groupedListener?.eventInfo?.options?.debug ? Date.now() : 0;
   }
 
   public startTrace(name: string, additionalData: any = null) {
@@ -1701,9 +1711,11 @@ class DeepState {
 
   public saveTrace(id: string) {
     const result = this.traceMap.get(id);
-    this.tracing.pop();
-    this.traceMap.delete(id);
-    this.savedTrace.push(result);
+    if (result) {
+      this.tracing.pop();
+      this.traceMap.delete(id);
+      this.savedTrace.push(result);
+    }
     return result;
   }
 
