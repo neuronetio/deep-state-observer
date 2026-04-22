@@ -268,10 +268,10 @@ export interface IDeepState {
     fn: WaitingListenerFunction | ListenerFunction,
     options?: ListenerOptions,
   ) => () => void;
-  update: (updatePath: string, fnOrValue: any, options?: UpdateOptions, multi?: boolean) => any;
-  get: (path: string) => any;
+  update: (updatePath: string, fnOrValue: Updater | any, options?: UpdateOptions, multi?: boolean) => any;
+  get: (path?: string) => any;
   collect: () => Multi;
-  executeCollected: (stack: UpdateStack[]) => void;
+  executeCollected: () => void;
   getCollectedStack: () => UpdateStack[];
   getCollectedCount: () => number;
   multi: (grouped?: boolean) => Multi;
@@ -281,7 +281,7 @@ export interface IDeepState {
   mute: (pathOrFn: string | ListenerFunction) => void;
   unmute: (pathOrFn: string | ListenerFunction) => void;
   startTrace: (id: string, additionalData?: any) => void;
-  saveTrace: (id: string, additionalData?: any) => void;
+  saveTrace: (id: string) => void;
   stopTrace: (id: string) => void;
   getSavedTraces: () => TraceValue[];
 }
