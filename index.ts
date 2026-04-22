@@ -286,7 +286,7 @@ export interface IDeepState {
   getSavedTraces: () => TraceValue[];
 }
 
-export class DeepState implements IDeepState {
+class DeepState implements IDeepState {
   private listeners: Listeners;
   private waitingListeners: WaitingListeners;
   private data: object | undefined;
