@@ -255,7 +255,38 @@ function isObject(item: any) {
   return typeof item === "object" && item !== null;
 }
 
-class DeepState {
+export interface IDeepState {
+  silentSet: (path: string, value: any) => void;
+  loadWasmMatcher: (pathToWasmFile: string) => Promise<void>;
+  getListeners: () => Listeners;
+  destroy: () => void;
+  match: (first: string, second: string, nested?: boolean) => boolean;
+  waitForAll: (userPaths: string[], fn: WaitingListenerFunction) => () => void;
+  subscribe: (listenerPath: string, fn: ListenerFunction, options?: ListenerOptions) => () => void;
+  subscribeAll: (
+    userPaths: string[],
+    fn: WaitingListenerFunction | ListenerFunction,
+    options?: ListenerOptions,
+  ) => () => void;
+  update: (updatePath: string, fnOrValue: any, options?: UpdateOptions, multi?: boolean) => any;
+  get: (path: string) => any;
+  collect: () => Multi;
+  executeCollected: (stack: UpdateStack[]) => void;
+  getCollectedStack: () => UpdateStack[];
+  getCollectedCount: () => number;
+  multi: (grouped?: boolean) => Multi;
+  last: (callback: () => void) => void;
+  isMuted: (pathOrFn: string | ListenerFunction) => boolean;
+  isMutedListener: (listenerFunc: ListenerFunction) => boolean;
+  mute: (pathOrFn: string | ListenerFunction) => void;
+  unmute: (pathOrFn: string | ListenerFunction) => void;
+  startTrace: (id: string, additionalData?: any) => void;
+  saveTrace: (id: string, additionalData?: any) => void;
+  stopTrace: (id: string) => void;
+  getSavedTraces: () => TraceValue[];
+}
+
+export class DeepState implements IDeepState {
   private listeners: Listeners;
   private waitingListeners: WaitingListeners;
   private data: object | undefined;
